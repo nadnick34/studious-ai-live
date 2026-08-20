@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 140" fill="none">
+  <defs>
+    <linearGradient id="teal" x1="30" y1="8" x2="130" y2="130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4"/>
+      <stop offset="0.45" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="tealDeep" x1="20" y1="70" x2="140" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#0d9488"/>
+    </linearGradient>
+  </defs>
+  <!-- Rising S -->
+  <path fill="url(#teal)" d="M92 10c-18-2-38 6-46 22-6 12 1 22 16 28 18 7 36 8 42 16 5 7 1 16-12 20-16 5-34-1-42-8l-8 14c12 10 36 18 58 10 24-8 34-28 22-44-10-14-32-18-50-24-10-3-16-8-13-14 3-8 16-12 28-10 10 2 20 8 26 14l8-14C118 14 106 11 92 10Z"/>
+  <!-- Open book -->
+  <path fill="url(#tealDeep)" d="M80 78c-8 10-28 18-52 20-2 0-4 2-4 4v8c0 3 2 4 5 4 26-2 42-10 51-20 9 10 25 18 51 20 3 0 5-1 5-4v-8c0-2-2-4-4-4-24-2-44-10-52-20Z"/>
+  <path fill="#99f6e4" opacity=".85" d="M80 82c-7 8-24 16-46 18v6c22-2 38-10 46-20 8 10 24 18 46 20v-6c-22-2-39-10-46-18Z"/>
+  <path stroke="#ecfdf5" stroke-width="2.2" stroke-linecap="round" d="M80 82v26"/>
+</svg>

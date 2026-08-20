@@ -1,0 +1,116 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
+import { createStudySet, getClassById } from "@/lib/data";
+import { extractMaterials, generateStudyPackage } from "@/lib/ai";
+import type { ClassRecord } from "@/lib/types";
+
+export const Route = createFileRoute("/class/$id/upload")({ component: UploadPage });
+
+function UploadPage() {
+  const { id: classId } = Route.useParams();
+  const navigate = useNavigate();
+  const [cls, setCls] = useState<ClassRecord | null>(null);
+  const [name, setName] = useState("");
+  const [files, setFiles] = useState<CapturedFile[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    void getClassById({ data: classId }).then((c) => setCls(c));
+  }, [classId]);
+
+  async function handleGenerate() {
+    if (!name.trim()) {
+      setError("Please name this chapter (for example: Chapter 2).");
+      return;
+    }
+    if (!files.length) {
+      setError("Add at least one file, photo, or scan.");
+      return;
+    }
+    if (!cls) return;
+    setError(null);
+    setGenerating(true);
+    setStatus("Reading your materials…");
+    try {
+      const payloads = await capturedToPayloads(files);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      setStatus("Building notes, audio, flash cards, and quiz…");
+      const generated = await generateStudyPackage({
+        data: {
+          className: cls.name,
+          classCode: cls.code,
+          subject: cls.subject,
+          setName: name.trim(),
+          sourceFiles: extracted.attachments.map((a) => a.name),
+          extractedText: extracted.text,
+        },
+      });
+      const set = await createStudySet({
+        data: {
+          classId,
+          name: name.trim(),
+          generated,
+          sourceFiles: extracted.attachments.map((a) => a.name),
+          attachments: extracted.attachments,
+        },
+      });
+      await navigate({ to: "/class/$id/set/$setId", params: { id: classId, setId: set.id } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setGenerating(false);
+      setStatus("");
+    }
+  }
+
+  if (!cls) {
+    return (
+      <AppShell title="Upload">
+        <p className="text-sm text-muted">Loading…</p>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title={`${cls.code} – New chapter`}>
+      <Link to="/class/$id" params={{ id: classId }} className="mb-4 inline-block text-sm text-teal hover:underline">
+        ← Back to class
+      </Link>
+      <div className="mx-auto max-w-lg">
+        <div className="card-surface rounded-xl p-5 sm:p-6">
+          <h2 className="mb-1 text-base font-semibold">New chapter</h2>
+          <p className="mb-5 text-xs text-muted">
+            Name the set, then attach files, take a photo, or scan a page. Generate when you’re ready.
+          </p>
+          <div className="mb-4">
+            <label className="mb-1.5 block text-xs font-medium text-muted">Name this set</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Chapter 2"
+              disabled={generating}
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm outline-none focus:border-teal"
+            />
+          </div>
+          <CaptureBar items={files} onChange={setFiles} disabled={generating} />
+          {error && <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red">{error}</div>}
+          {status && generating && <div className="mt-4 text-sm text-teal">{status}</div>}
+          <div className="mt-5 flex justify-end gap-2">
+            <Link to="/class/$id" params={{ id: classId }}>
+              <Button type="button" variant="secondary" disabled={generating}>
+                Cancel
+              </Button>
+            </Link>
+            <Button type="button" onClick={() => void handleGenerate()} disabled={generating || !files.length || !name.trim()}>
+              {generating ? "Generating…" : "Generate study materials"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </AppShell>
+  );
+}

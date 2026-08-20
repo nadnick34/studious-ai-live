@@ -1,0 +1,37 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Studious AI",
+      "hasCanvas": false,
+      "bodyTextLen": 299,
+      "bodyTextHash": "f95dce0a066c83c648210834de2660e62af14529a5f0a863fb1f82ceaea3cd01",
+      "bodyTextPrefix": "Studious AI Your masterclass for every class. Get Studious! Turn",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Studious AI",
+      "hasCanvas": false,
+      "bodyTextLen": 299,
+      "bodyTextHash": "f95dce0a066c83c648210834de2660e62af14529a5f0a863fb1f82ceaea3cd01",
+      "bodyTextPrefix": "Studious AI Your masterclass for every class. Get Studious! Turn",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}

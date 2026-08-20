@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --slate: #3d4f5f;
+  --slate-dark: #2c3a47;
+  --teal: #0d9488;
+  --teal-hover: #0f766e;
+  --bg: #f3f5f7;
+  --card: #ffffff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --green: #059669;
+  --amber: #d97706;
+  --red: #dc2626;
+  --cream: #f4efe6;
+  --shadow-card: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.06), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+}
+
+html.dark {
+  --slate: #1e293b;
+  --slate-dark: #0f172a;
+  --teal: #2dd4bf;
+  --teal-hover: #5eead4;
+  --bg: #0f172a;
+  --card: #1e293b;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --border: #334155;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --cream: #e8e2d6;
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+@theme inline {
+  --color-slate: var(--slate);
+  --color-slate-dark: var(--slate-dark);
+  --color-teal: var(--teal);
+  --color-teal-hover: var(--teal-hover);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-cream: var(--cream);
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+.card-surface {
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+@media print {
+  aside, header, .print-hidden, nav {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body {
+    background: white !important;
+  }
+}
