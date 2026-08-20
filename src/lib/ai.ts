@@ -408,23 +408,33 @@ export const lookupProfessor = createServerFn({ method: "POST" })
       };
     }
     const { system, user } = buildProfessorInsightPrompt(data);
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+    const payload = {
+      model: "grok-4.5",
+      temperature: 0.2,
+      max_tokens: 1200,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    };
+    let res = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        model: "grok-4.5",
-        temperature: 0.2,
-        max_tokens: 1200,
-        search_parameters: { mode: "on" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
+      body: JSON.stringify({ ...payload, search_parameters: { mode: "on" } }),
     });
+    if (!res.ok) {
+      res = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    }
     if (!res.ok) {
       const err = await res.text();
       return { summary: `Could not look up this professor (${res.status}): ${err.slice(0, 160)}` };

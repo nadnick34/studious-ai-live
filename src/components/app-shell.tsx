@@ -4,7 +4,7 @@ import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
-import { applyBrand, DEFAULT_BRAND, FALLBACK_PALETTES, getStockById, hydrateBrand, persistBrand } from "@/lib/schools";
+import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 import type { UserProfile } from "@/lib/types";
 
 export function AppShell({
@@ -48,22 +48,11 @@ function AppShellInner({
     void getProfile()
       .then((p) => {
         setProfile(p);
-        if (!p?.schoolSelect || p.schoolSelect === "studious") return;
-        if (p.schoolSelect === "custom") {
-          const pal = FALLBACK_PALETTES.find((x) => x.id === p.paletteId) || FALLBACK_PALETTES[0];
-          persistBrand({
-            ...DEFAULT_BRAND,
-            id: "custom",
-            name: p.customSchoolName || "Custom",
-            primary: pal.primary,
-            accent: pal.accent,
-            kind: "custom",
-          });
-        } else {
-          persistBrand(getStockById(p.schoolSelect) || DEFAULT_BRAND);
-        }
+        const brand = brandFromProfile(p);
+        if (brand) persistBrand(brand);
+        else hydrateBrand();
       })
-      .catch(() => {});
+      .catch(() => hydrateBrand());
   }, []);
 
   function toggleDark() {

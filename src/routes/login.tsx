@@ -3,6 +3,8 @@ import { useState } from "react";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
+import { getProfile } from "@/lib/data";
+import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -25,6 +27,14 @@ function Login() {
     if (err) {
       setError(err.message || "Invalid email or password.");
       return;
+    }
+    try {
+      const p = await getProfile();
+      const brand = brandFromProfile(p);
+      if (brand) persistBrand(brand);
+      else hydrateBrand();
+    } catch {
+      hydrateBrand();
     }
     await navigate({ to: "/dashboard" });
   }

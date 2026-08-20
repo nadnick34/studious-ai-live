@@ -167,6 +167,27 @@ function shade(hex: string, amount: number) {
 
 const BRAND_KEY = "studious-brand-v1";
 
+export function brandFromProfile(p?: {
+  schoolSelect?: string;
+  paletteId?: string | null;
+  customSchoolName?: string | null;
+} | null): SchoolBrand | null {
+  if (!p?.schoolSelect || p.schoolSelect === "studious") return null;
+  if (p.schoolSelect === "custom") {
+    const pal = FALLBACK_PALETTES.find((x) => x.id === p.paletteId) || FALLBACK_PALETTES[0];
+    return {
+      ...DEFAULT_BRAND,
+      id: "custom",
+      name: p.customSchoolName || "Custom",
+      primary: pal.primary,
+      accent: pal.accent,
+      initials: (p.customSchoolName || "CS").slice(0, 2).toUpperCase(),
+      kind: "custom",
+    };
+  }
+  return getStockById(p.schoolSelect) || null;
+}
+
 export function persistBrand(brand: SchoolBrand) {
   if (typeof window === "undefined") return;
   try {
