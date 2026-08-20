@@ -4,7 +4,7 @@ import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
-import { applyBrand, DEFAULT_BRAND, FALLBACK_PALETTES, getStockById } from "@/lib/schools";
+import { applyBrand, DEFAULT_BRAND, FALLBACK_PALETTES, getStockById, hydrateBrand, persistBrand } from "@/lib/schools";
 import type { UserProfile } from "@/lib/types";
 
 export function AppShell({
@@ -44,13 +44,14 @@ function AppShellInner({
       stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setDark(preferDark);
     document.documentElement.classList.toggle("dark", preferDark);
+    hydrateBrand();
     void getProfile()
       .then((p) => {
         setProfile(p);
-        if (!p) return;
+        if (!p?.schoolSelect || p.schoolSelect === "studious") return;
         if (p.schoolSelect === "custom") {
           const pal = FALLBACK_PALETTES.find((x) => x.id === p.paletteId) || FALLBACK_PALETTES[0];
-          applyBrand({
+          persistBrand({
             ...DEFAULT_BRAND,
             id: "custom",
             name: p.customSchoolName || "Custom",
@@ -59,7 +60,7 @@ function AppShellInner({
             kind: "custom",
           });
         } else {
-          applyBrand(getStockById(p.schoolSelect) || DEFAULT_BRAND);
+          persistBrand(getStockById(p.schoolSelect) || DEFAULT_BRAND);
         }
       })
       .catch(() => {});

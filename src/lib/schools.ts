@@ -165,13 +165,40 @@ function shade(hex: string, amount: number) {
   return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
+const BRAND_KEY = "studious-brand-v1";
+
+export function persistBrand(brand: SchoolBrand) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(BRAND_KEY, JSON.stringify(brand));
+  } catch {
+    /* ignore */
+  }
+  applyBrand(brand);
+}
+
+export function hydrateBrand() {
+  if (typeof window === "undefined") return DEFAULT_BRAND;
+  try {
+    const raw = localStorage.getItem(BRAND_KEY);
+    if (raw) {
+      const brand = JSON.parse(raw) as SchoolBrand;
+      applyBrand(brand);
+      return brand;
+    }
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_BRAND;
+}
+
 export function applyBrand(brand: SchoolBrand) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.style.setProperty("--teal", brand.primary);
-  root.style.setProperty("--teal-hover", shade(brand.primary, -18));
-  root.style.setProperty("--slate", brand.accent);
-  root.style.setProperty("--slate-dark", shade(brand.accent, -20));
+  root.style.setProperty("--teal", brand.primary, "important");
+  root.style.setProperty("--teal-hover", shade(brand.primary, -18), "important");
+  root.style.setProperty("--slate", brand.accent, "important");
+  root.style.setProperty("--slate-dark", shade(brand.accent, -20), "important");
 }
 
 export function clearBrandVars() {

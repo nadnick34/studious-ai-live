@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile, saveProfile } from "@/lib/data";
-import { applyBrand, DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById } from "@/lib/schools";
+import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
 import type { UserProfile, UserRole } from "@/lib/types";
 
@@ -60,10 +60,9 @@ function ProfilePage() {
     await saveProfile({ data: next });
     if (schoolSelect === "custom") {
       const pal = FALLBACK_PALETTES.find((p) => p.id === paletteId) || FALLBACK_PALETTES[0];
-      applyBrand({ ...DEFAULT_BRAND, id: "custom", name: customName || "Custom", primary: pal.primary, accent: pal.accent, initials: initialsFromName(customName || "CS"), kind: "custom" });
+      persistBrand({ ...DEFAULT_BRAND, id: "custom", name: customName || "Custom", primary: pal.primary, accent: pal.accent, initials: initialsFromName(customName || "CS"), kind: "custom" });
     } else {
-      const brand = getStockById(schoolSelect) || DEFAULT_BRAND;
-      applyBrand(brand);
+      persistBrand(getStockById(schoolSelect) || DEFAULT_BRAND);
     }
     setSaving(false);
     if (next.edition === "teacher") await navigate({ to: "/coming-soon" });
