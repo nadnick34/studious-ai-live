@@ -74,16 +74,29 @@ export function parseSyllabusLocally(text: string): {
   upcoming.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
   const soon = upcoming.filter((u) => {
     if (!u.date) return u.type === "exam";
-    const d = new Date(u.date).getTime();
+    const d = new Date(u.date + "T12:00:00").getTime();
     const now = Date.now();
-    return d >= now - 86400000 && d <= now + 10 * 86400000;
+    return d >= now - 86400000 && d <= now + 14 * 86400000;
   });
 
-  const alerts: ClassAlert[] = soon.slice(0, 4).map((u, i) => ({
+  const alerts: ClassAlert[] = soon.slice(0, 3).map((u, i) => ({
     id: "a_" + i,
     kind: u.type === "exam" ? "exam" : u.type === "reading" ? "reading" : "due-soon",
-    message: u.date ? `${u.title} (${u.date})` : u.title,
+    message: u.date ? `${u.title}` : u.title,
   }));
 
-  return { alerts, upcoming: upcoming.slice(0, 10) };
+  return { alerts, upcoming: upcoming.slice(0, 12) };
+}
+
+export function mergeCalendar(
+  alerts: ClassAlert[] | undefined,
+  upcoming: ClassUpcoming[] | undefined,
+): { alerts: ClassAlert[]; upcoming: ClassUpcoming[] } {
+  const list = upcoming || [];
+  const titles = new Set(list.map((u) => (u.title || "").toLowerCase().slice(0, 40)));
+  const uniqueAlerts = (alerts || []).filter((a) => {
+    const msg = (a.message || "").toLowerCase();
+    return ![...titles].some((t) => msg.includes(t) || t.includes(msg.slice(0, 40)));
+  });
+  return { alerts: uniqueAlerts, upcoming: list };
 }

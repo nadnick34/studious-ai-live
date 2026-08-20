@@ -105,21 +105,6 @@ function ProfilePage() {
   return (
     <AppShell title="Profile">
       <div className="mx-auto max-w-xl space-y-5">
-        <form onSubmit={handlePassword} className="card-surface space-y-3 rounded-xl p-5 sm:p-6">
-          <h2 className="text-base font-semibold">Change password</h2>
-          <p className="text-xs text-muted">
-            For email accounts. Google / X sign-in manages passwords with that provider.
-          </p>
-          <PwField label="Current password" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" />
-          <PwField label="New password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" />
-          <PwField label="Confirm new password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
-          {pwError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red">{pwError}</p>}
-          {pwMsg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-green">{pwMsg}</p>}
-          <Button type="submit" disabled={pwBusy}>
-            {pwBusy ? "Updating…" : "Update password"}
-          </Button>
-        </form>
-
         <form onSubmit={handleSave} className="card-surface space-y-5 rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-teal text-lg font-semibold text-white">
@@ -213,6 +198,21 @@ function ProfilePage() {
           </label>
           <Button type="submit" disabled={saving}>
             {saving ? "Saving…" : "Save profile"}
+          </Button>
+        </form>
+
+        <form onSubmit={handlePassword} className="card-surface space-y-3 rounded-xl p-5 sm:p-6">
+          <h2 className="text-base font-semibold">Change password</h2>
+          <p className="text-xs text-muted">
+            For email accounts. Google / X sign-in manages passwords with that provider.
+          </p>
+          <PwField label="Current password" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" />
+          <PwField label="New password" value={newPassword} onChange={setNewPassword} autoComplete="new-password" />
+          <PwField label="Confirm new password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" />
+          {pwError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red">{pwError}</p>}
+          {pwMsg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-green">{pwMsg}</p>}
+          <Button type="submit" disabled={pwBusy}>
+            {pwBusy ? "Updating…" : "Update password"}
           </Button>
         </form>
       </div>

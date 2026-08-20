@@ -418,6 +418,7 @@ export const lookupProfessor = createServerFn({ method: "POST" })
         model: "grok-4.5",
         temperature: 0.2,
         max_tokens: 1200,
+        search_parameters: { mode: "on" },
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },

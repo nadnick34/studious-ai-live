@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { createClass, listClasses, seedSampleClass, updateClass } from "@/lib/data";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
-import { formatShortDate, timeAgo } from "@/lib/utils";
+import { extractPdfText, formatShortDate, timeAgo } from "@/lib/utils";
 import type { ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/dashboard")({ component: DashboardPage });
@@ -196,15 +196,23 @@ function DashboardPage() {
                   )}
                   {c.semester && <div>{c.semester}</div>}
                 </div>
-                {c.alerts && c.alerts.length > 0 && (
+                {(() => {
+                  const upcoming = c.upcoming || [];
+                  const titles = new Set(upcoming.map((u) => (u.title || "").toLowerCase().slice(0, 40)));
+                  const alerts = (c.alerts || []).filter((a) => {
+                    const msg = (a.message || "").toLowerCase();
+                    return ![...titles].some((t) => t && (msg.includes(t) || t.includes(msg.slice(0, 40))));
+                  });
+                  return alerts.length > 0 ? (
                   <div className="mt-3 space-y-1">
-                    {c.alerts.slice(0, 3).map((a) => (
+                    {alerts.slice(0, 3).map((a) => (
                       <div key={a.id} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
                         {a.message}
                       </div>
                     ))}
                   </div>
-                )}
+                  ) : null;
+                })()}
                 {c.upcoming && c.upcoming.length > 0 && (
                   <div className="mt-3">
                     <div className="mb-1 text-[10px] font-semibold tracking-wide text-teal uppercase">Upcoming</div>
@@ -357,9 +365,20 @@ function SyllabusField({
           type="file"
           accept=".pdf,.txt,.png,.jpg,.jpeg"
           className="hidden"
-          onChange={(e) => {
+          onChange={async (e) => {
             const f = e.target.files?.[0];
-            if (f) onFile(f.name);
+            if (!f) return;
+            onFile(f.name);
+            try {
+              if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
+                const text = await extractPdfText(f);
+                if (text) onText(text.slice(0, 20000));
+              } else if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) {
+                onText((await f.text()).slice(0, 20000));
+              }
+            } catch {
+              /* keep filename; user can paste text */
+            }
           }}
         />
       </div>

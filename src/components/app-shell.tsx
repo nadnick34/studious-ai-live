@@ -4,6 +4,7 @@ import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
+import { applyBrand, DEFAULT_BRAND, FALLBACK_PALETTES, getStockById } from "@/lib/schools";
 import type { UserProfile } from "@/lib/types";
 
 export function AppShell({
@@ -43,7 +44,25 @@ function AppShellInner({
       stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setDark(preferDark);
     document.documentElement.classList.toggle("dark", preferDark);
-    void getProfile().then(setProfile).catch(() => {});
+    void getProfile()
+      .then((p) => {
+        setProfile(p);
+        if (!p) return;
+        if (p.schoolSelect === "custom") {
+          const pal = FALLBACK_PALETTES.find((x) => x.id === p.paletteId) || FALLBACK_PALETTES[0];
+          applyBrand({
+            ...DEFAULT_BRAND,
+            id: "custom",
+            name: p.customSchoolName || "Custom",
+            primary: pal.primary,
+            accent: pal.accent,
+            kind: "custom",
+          });
+        } else {
+          applyBrand(getStockById(p.schoolSelect) || DEFAULT_BRAND);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   function toggleDark() {

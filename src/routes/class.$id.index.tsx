@@ -49,6 +49,13 @@ function ClassPage() {
     void refresh();
   }, [classId]);
 
+  useEffect(() => {
+    const pending = sets.some((s) => s.notes?.subtitle?.includes("Generating"));
+    if (!pending) return;
+    const t = window.setInterval(() => void refresh(), 8000);
+    return () => window.clearInterval(t);
+  }, [sets, classId]);
+
   async function handleCustomFocus() {
     if (!cls || !focusText.trim()) {
       setError("Describe what you want to focus on.");

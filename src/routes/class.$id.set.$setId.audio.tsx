@@ -29,6 +29,12 @@ function AudioPage() {
     });
   }, [classId, setId]);
 
+  useEffect(() => {
+    if (!set?.audioScript || audioUrl || loadingAudio) return;
+    void ensureAudio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set?.audioScript]);
+
   async function ensureAudio(): Promise<string | null> {
     if (audioUrl) return audioUrl;
     if (!set?.audioScript) {

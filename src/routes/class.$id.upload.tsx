@@ -39,27 +39,57 @@ function UploadPage() {
     try {
       const payloads = await capturedToPayloads(files);
       const extracted = await extractMaterials({ data: { files: payloads } });
-      setStatus("Building notes, audio, flash cards, and quiz…");
-      const generated = await generateStudyPackage({
-        data: {
-          className: cls.name,
-          classCode: cls.code,
-          subject: cls.subject,
-          setName: name.trim(),
-          sourceFiles: extracted.attachments.map((a) => a.name),
-          extractedText: extracted.text,
+      setStatus("Saving this chapter, then building notes in the background…");
+      const pending = {
+        notes: {
+          title: name.trim(),
+          subtitle: "Generating… keep this tab open.",
+          sections: [{ heading: "Working", body: "Studious AI is writing notes, quiz, and flash cards from your upload.", layout: "stack" as const, bullets: ["This usually takes a few minutes for a long chapter."] }],
+          otherResources: [],
         },
-      });
+        audioScript: "",
+        quiz: [],
+        flashcards: [],
+        slides: [],
+      };
       const set = await createStudySet({
         data: {
           classId,
           name: name.trim(),
-          generated,
+          generated: pending,
           sourceFiles: extracted.attachments.map((a) => a.name),
           attachments: extracted.attachments,
         },
       });
-      await navigate({ to: "/class/$id/set/$setId", params: { id: classId, setId: set.id } });
+      void (async () => {
+        try {
+          const generated = await generateStudyPackage({
+            data: {
+              className: cls.name,
+              classCode: cls.code,
+              subject: cls.subject,
+              setName: name.trim(),
+              sourceFiles: extracted.attachments.map((a) => a.name),
+              extractedText: extracted.text,
+            },
+          });
+          const { updateStudySet } = await import("@/lib/data");
+          await updateStudySet({
+            data: {
+              id: set.id,
+              patch: {
+                notes: generated.notes,
+                audioScript: generated.audioScript,
+                quiz: generated.quiz,
+                flashcards: generated.flashcards,
+              },
+            },
+          });
+        } catch {
+          /* class page will still show the pending row */
+        }
+      })();
+      await navigate({ to: "/class/$id", params: { id: classId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setGenerating(false);

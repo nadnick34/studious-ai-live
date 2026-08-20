@@ -145,8 +145,9 @@ Return JSON only:
 
 Rules:
 - Identify by NAME + the SCHOOL the student entered. Course number is optional.
-- found=true only if this person can be placed at that school (or a clearly stated prior appointment at that same school).
-- If the name matches someone at a different university, found=false.
+- Search faculty directories, Rate My Professors, Coursicle, and department pages.
+- found=true if this person can be placed at that school or a clearly stated prior appointment there.
+- If the school is blank, still search by name and subject and say which school you used.
 - Never use Wikipedia. Never invent ratings, quotes, or private contact information.
 - If identity is not clearly tied to the entered school, found=false and say so.
 - No gossip, no home addresses, no personal family details.`;

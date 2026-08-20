@@ -87,14 +87,47 @@ function loadImage(src: string) {
   });
 }
 
+export async function extractPdfText(file: File): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const pdf = await getDocumentProxy(buf);
+  const result = await extractText(pdf, { mergePages: true });
+  const text = Array.isArray(result.text) ? result.text.join("\n") : result.text;
+  return (text || "").toString().trim();
+}
+
 export async function fileToPayload(file: File): Promise<{
   name: string;
   type: string;
   size: number;
   base64: string;
 }> {
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  if (isPdf) {
+    try {
+      const text = await extractPdfText(file);
+      if (text.length > 40) {
+        const clipped = text.slice(0, 60000);
+        const bytes = new TextEncoder().encode(clipped);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        return {
+          name: file.name,
+          type: "text/plain",
+          size: bytes.length,
+          base64: btoa(binary),
+        };
+      }
+    } catch {
+      /* fall through and send a truncated PDF */
+    }
+  }
+
   const buf = await file.arrayBuffer();
-  const bytes = new Uint8Array(buf);
+  const max = 1_200_000;
+  const bytes = new Uint8Array(buf.byteLength > max ? buf.slice(0, max) : buf);
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
