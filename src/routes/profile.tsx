@@ -104,6 +104,7 @@ function ProfilePage() {
   return (
     <AppShell title="Profile">
       <div className="mx-auto max-w-xl space-y-5">
+  <p className="text-xs font-medium text-teal">App update: August 20</p>
         <form onSubmit={handleSave} className="card-surface space-y-5 rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-teal text-lg font-semibold text-white">
