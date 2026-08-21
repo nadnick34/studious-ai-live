@@ -102,7 +102,7 @@ function ProfilePage() {
   const email = user?.primaryEmail || "";
 
   return (
-    <AppShell title="Profile New Build">
+    <AppShell title="Profile">
       <div className="mx-auto max-w-xl space-y-5">
   <p className="text-xs font-medium text-teal">App update: August 20</p>
         <form onSubmit={handleSave} className="card-surface space-y-5 rounded-xl p-5 sm:p-6">
