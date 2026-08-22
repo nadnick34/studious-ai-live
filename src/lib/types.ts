@@ -16,6 +16,44 @@ export interface StudyNotes {
   subtitle: string;
   sections: NotesSection[];
   otherResources: { title: string; url?: string }[];
+  /** Classical Education package for this chapter, when generated */
+  classical?: ClassicalPackage;
+}
+
+export type SocraticCardType = "recite" | "explain" | "dialectic" | "locus";
+
+export interface SocraticCard {
+  id: string;
+  type: SocraticCardType;
+  front: string;
+  back: string;
+  locus?: string;
+}
+
+export interface ClassicalPackage {
+  generatedAt: string;
+  conspectus: {
+    memoryWork: string[];
+    outline: { heading: string; bullets: string[] }[];
+    logicQuestions: string[];
+    fiveCommonTopics: {
+      definition: string;
+      comparison: string;
+      circumstance: string;
+      relationship: string;
+      testimony: string;
+    };
+    tellBackPrompts: string[];
+    lociMap: { locus: string; item: string }[];
+  };
+  orator: {
+    recitationScript: string;
+    narrationScript: string;
+  };
+  socraticCards: SocraticCard[];
+  commonplace: { id: string; text: string; kind: "sentence" | "definition" | "connection" }[];
+  recitationQueue: { id: string; text: string; kind: "list" | "definition" | "sentence" }[];
+  fromMemoryOutline: { heading: string; blankBullets: number }[];
 }
 
 export interface QuizQuestion {

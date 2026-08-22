@@ -206,6 +206,7 @@ function ClassPage() {
               key={s.id}
               classId={classId}
               set={s}
+              cls={cls}
               onEdit={() => setEditing(s)}
               onDelete={async () => {
                 if (!confirm(`Delete “${s.name}”? This cannot be undone.`)) return;
@@ -293,11 +294,13 @@ function ClassPage() {
 function ChapterCard({
   classId,
   set,
+  cls,
   onEdit,
   onDelete,
 }: {
   classId: string;
   set: StudySet;
+  cls: ClassRecord;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -349,7 +352,7 @@ function ChapterCard({
         </div>
       </div>
       {classicalOpen && (
-        <ClassicalModeModal chapterName={set.name} onClose={() => setClassicalOpen(false)} />
+        <ClassicalModeModal cls={cls} set={set} onClose={() => setClassicalOpen(false)} />
       )}
       <div className="mt-3 grid grid-cols-4 gap-1">
         {actions.map((a) => {

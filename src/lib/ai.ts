@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { buildClassicalPrompt } from "@/lib/classical-prompts";
 import { buildGenerationPrompt, buildProfessorInsightPrompt } from "@/lib/prompts";
 import { parseSyllabusLocally } from "@/lib/calendar";
 import { normalizeSlides } from "@/lib/slides";
 import { uid } from "@/lib/utils";
-import type { Attachment, FilePayload, GeneratedPackage, Slide } from "@/lib/types";
+import type { Attachment, ClassicalPackage, FilePayload, GeneratedPackage, Slide } from "@/lib/types";
 
 function apiKey() {
   return process.env.XAI_API_KEY || process.env.GROK_API_KEY || "";
@@ -399,7 +400,139 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
     throw new Error(lastError);
   });
 
+function normalizeClassical(raw: Partial<ClassicalPackage> | null | undefined): ClassicalPackage {
+  const c = raw || {};
+  return {
+    generatedAt: new Date().toISOString(),
+    conspectus: {
+      memoryWork: c.conspectus?.memoryWork || [],
+      outline: c.conspectus?.outline || [],
+      logicQuestions: c.conspectus?.logicQuestions || [],
+      fiveCommonTopics: {
+        definition: c.conspectus?.fiveCommonTopics?.definition || "",
+        comparison: c.conspectus?.fiveCommonTopics?.comparison || "",
+        circumstance: c.conspectus?.fiveCommonTopics?.circumstance || "",
+        relationship: c.conspectus?.fiveCommonTopics?.relationship || "",
+        testimony: c.conspectus?.fiveCommonTopics?.testimony || "",
+      },
+      tellBackPrompts: c.conspectus?.tellBackPrompts || [],
+      lociMap: c.conspectus?.lociMap || [],
+    },
+    orator: {
+      recitationScript: c.orator?.recitationScript || "",
+      narrationScript: c.orator?.narrationScript || "",
+    },
+    socraticCards: (c.socraticCards || []).map((card, i) => ({
+      id: card.id || `c${i + 1}`,
+      type: card.type || "recite",
+      front: card.front || "",
+      back: card.back || "",
+      locus: card.locus,
+    })),
+    commonplace: (c.commonplace || []).map((item, i) => ({
+      id: item.id || `cp${i + 1}`,
+      text: item.text || "",
+      kind: item.kind || "sentence",
+    })),
+    recitationQueue: (c.recitationQueue || []).map((item, i) => ({
+      id: item.id || `r${i + 1}`,
+      text: item.text || "",
+      kind: item.kind || "sentence",
+    })),
+    fromMemoryOutline: c.fromMemoryOutline || [],
+  };
+}
+
+export const generateClassicalPackage = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      className: string;
+      classCode: string;
+      subject: string;
+      setName: string;
+      sourceText: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { system, user } = buildClassicalPrompt({
+      className: data.className || "Course",
+      classCode: data.classCode || "",
+      subject: data.subject || "General",
+      setName: data.setName.trim(),
+      sourceText: data.sourceText || "",
+    });
+    const key = apiKey();
+    if (!key) {
+      return normalizeClassical({
+        conspectus: {
+          memoryWork: [`Key definition from ${data.setName}`, "Core list item 1", "Core list item 2"],
+          outline: [{ heading: data.setName, bullets: ["Main claim", "Supporting points", "Why it matters"] }],
+          logicQuestions: [
+            "Why does this follow from earlier material?",
+            "How does X relate to Y?",
+            "What would change if the cause were removed?",
+          ],
+          fiveCommonTopics: {
+            definition: "Working definition from the chapter material.",
+            comparison: "How this is like and unlike related ideas.",
+            circumstance: "Context in which this appears.",
+            relationship: "Cause, effect, or part-whole links.",
+            testimony: "Evidence or authority cited in the material.",
+          },
+          tellBackPrompts: [
+            `Retell the process or argument of ${data.setName} in order.`,
+            "Explain why the main claim follows from the evidence.",
+          ],
+          lociMap: [
+            { locus: "Front door", item: "Opening definition" },
+            { locus: "Kitchen table", item: "Core process" },
+          ],
+        },
+        orator: {
+          recitationScript: `Speak slowly. Recite the key terms and lists for ${data.setName}.`,
+          narrationScript: `Tell the story of ${data.setName}, including why each major step matters.`,
+        },
+        socraticCards: [
+          { id: "c1", type: "recite", front: "Recite the core definition.", back: "Model definition from the material." },
+          { id: "c2", type: "explain", front: "Explain the main idea in your own words.", back: "Clear paraphrase." },
+          { id: "c3", type: "dialectic", front: "Why does this follow?", back: "Because of the prior claim in the material." },
+        ],
+        commonplace: [{ id: "cp1", text: "A striking sentence from the material.", kind: "sentence" }],
+        recitationQueue: [{ id: "r1", text: "Core definition to say aloud.", kind: "definition" }],
+        fromMemoryOutline: [{ heading: data.setName, blankBullets: 4 }],
+      });
+    }
+
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.3,
+        max_tokens: 10000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Classical generation failed (${res.status}): ${err.slice(0, 240)}`);
+    }
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty classical response");
+    const parsed = JSON.parse(extractJsonObject(content)) as Partial<ClassicalPackage>;
+    return normalizeClassical(parsed);
+  });
+
 export const parseClassCalendar = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .middleware([authMiddleware])
   .validator((input: { className: string; semester?: string; syllabusText: string; notesText?: string }) => input)
   .handler(async ({ data }) => {
