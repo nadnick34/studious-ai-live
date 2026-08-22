@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { createStudySet, getClassById } from "@/lib/data";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
-import type { ClassRecord } from "@/lib/types";
+import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
+import { uid } from "@/lib/utils";
+import type { Attachment, ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/upload")({ component: UploadPage });
 
@@ -37,8 +39,33 @@ function UploadPage() {
     setGenerating(true);
     setStatus("Reading your materials…");
     try {
-      const payloads = await capturedToPayloads(files);
-      const extracted = await extractMaterials({ data: { files: payloads } });
+      const audioItems = files.filter((f) => fileIsAudio(f.file));
+      const otherItems = files.filter((f) => !fileIsAudio(f.file));
+      let extractedText = "";
+      const attachments: Attachment[] = [];
+      for (const item of audioItems) {
+        const transcript = await transcribeLectureFile(item.file, setStatus);
+        extractedText += `\n\n===== SOURCE: ${item.file.name} =====\n${transcript}`;
+        attachments.push({
+          id: uid("a"),
+          name: item.file.name,
+          kind: "audio",
+          size: item.file.size,
+          addedAt: new Date().toISOString(),
+          extractedText: transcript.slice(0, 80000),
+        });
+      }
+      if (otherItems.length) {
+        setStatus("Reading PDFs and notes…");
+        const payloads = await capturedToPayloads(otherItems);
+        const extracted = await extractMaterials({ data: { files: payloads } });
+        extractedText += `\n${extracted.text}`;
+        attachments.push(...extracted.attachments);
+      }
+      const extracted = {
+        text: extractedText.trim(),
+        attachments,
+      };
       setStatus("Saving this chapter, then building notes in the background…");
       const pending = {
         notes: {

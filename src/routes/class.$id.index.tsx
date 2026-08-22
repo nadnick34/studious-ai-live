@@ -13,6 +13,8 @@ import {
   updateStudySet,
 } from "@/lib/data";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
+import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
+import { uid } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
 import type { Attachment, ClassRecord, StudySet } from "@/lib/types";
 
@@ -382,10 +384,28 @@ function EditChapterModal({
       let nextAttachments = attachments;
       let extractedExtra = "";
       if (newFiles.length) {
-        const payloads = await capturedToPayloads(newFiles);
-        const extracted = await extractMaterials({ data: { files: payloads } });
-        nextAttachments = [...attachments, ...extracted.attachments];
-        extractedExtra = extracted.text;
+        const audioItems = newFiles.filter((f) => fileIsAudio(f.file));
+        const otherItems = newFiles.filter((f) => !fileIsAudio(f.file));
+        const extraAttachments: Attachment[] = [];
+        for (const item of audioItems) {
+          const transcript = await transcribeLectureFile(item.file);
+          extractedExtra += `\n\n===== SOURCE: ${item.file.name} =====\n${transcript}`;
+          extraAttachments.push({
+            id: uid("a"),
+            name: item.file.name,
+            kind: "audio",
+            size: item.file.size,
+            addedAt: new Date().toISOString(),
+            extractedText: transcript.slice(0, 80000),
+          });
+        }
+        if (otherItems.length) {
+          const payloads = await capturedToPayloads(otherItems);
+          const extracted = await extractMaterials({ data: { files: payloads } });
+          extractedExtra += `\n${extracted.text}`;
+          extraAttachments.push(...extracted.attachments);
+        }
+        nextAttachments = [...attachments, ...extraAttachments];
       }
       const sourceFiles = nextAttachments.map((a) => a.name);
       if (rebuild) {

@@ -148,6 +148,15 @@ async function processFile(file: FilePayload): Promise<{ heading: string; text: 
   return { heading, text, attachment };
 }
 
+export const transcribeAudioChunk = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: FilePayload) => input)
+  .handler(async ({ data }) => {
+    const buf = decodeBase64(data.base64);
+    const raw = await transcribeAudio(data.name || "chunk.wav", data.type || "audio/wav", buf);
+    return raw.replace(/^LECTURE TRANSCRIPT from .+:\n/i, "").trim();
+  });
+
 export const extractMaterials = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { files: FilePayload[] }) => input)

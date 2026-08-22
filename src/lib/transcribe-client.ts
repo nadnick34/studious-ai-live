@@ -1,0 +1,112 @@
+import { transcribeAudioChunk } from "@/lib/ai";
+
+function isAudioFile(file: File) {
+  return file.type.startsWith("audio/") || /\.(mp3|m4a|wav|aac|mp4)$/i.test(file.name);
+}
+
+function mixMono(buffer: AudioBuffer): Float32Array {
+  const len = buffer.length;
+  const out = new Float32Array(len);
+  const channels = buffer.numberOfChannels;
+  for (let c = 0; c < channels; c++) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < len; i++) out[i] += data[i] / channels;
+  }
+  return out;
+}
+
+function resample(input: Float32Array, fromRate: number, toRate: number): Float32Array {
+  if (fromRate === toRate) return input;
+  const ratio = fromRate / toRate;
+  const outLen = Math.max(1, Math.round(input.length / ratio));
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const src = i * ratio;
+    const i0 = Math.floor(src);
+    const i1 = Math.min(input.length - 1, i0 + 1);
+    const t = src - i0;
+    out[i] = input[i0] * (1 - t) + input[i1] * t;
+  }
+  return out;
+}
+
+function encodeWav(samples: Float32Array, sampleRate: number): Blob {
+  const bytes = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(bytes);
+  const writeStr = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([bytes], { type: "audio/wav" });
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+export async function transcribeLectureFile(
+  file: File,
+  onStatus?: (msg: string) => void,
+): Promise<string> {
+  onStatus?.(`Decoding ${file.name}…`);
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AC();
+  try {
+    const raw = await file.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(raw.slice(0));
+    const mono = mixMono(decoded);
+    const sampled = resample(mono, decoded.sampleRate, 16000);
+    const chunkSize = 16000 * 60;
+    const total = Math.ceil(sampled.length / chunkSize);
+    const parts: string[] = [];
+    for (let i = 0; i < sampled.length; i += chunkSize) {
+      const n = parts.length + 1;
+      onStatus?.(`Transcribing ${file.name} (${n} of ${total})…`);
+      const slice = sampled.subarray(i, Math.min(sampled.length, i + chunkSize));
+      const wav = encodeWav(slice, 16000);
+      const text = await transcribeAudioChunk({
+        data: {
+          name: `${file.name.replace(/\.[^.]+$/, "")}-${n}.wav`,
+          type: "audio/wav",
+          size: wav.size,
+          base64: await blobToBase64(wav),
+        },
+      });
+      if (text) parts.push(text);
+    }
+    const joined = parts.join("\n").trim();
+    if (!joined) throw new Error(`No speech was recovered from ${file.name}.`);
+    return `LECTURE TRANSCRIPT from ${file.name}:\n${joined}`;
+  } finally {
+    await ctx.close().catch(() => undefined);
+  }
+}
+
+export function fileIsAudio(file: File) {
+  return isAudioFile(file);
+}
