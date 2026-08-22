@@ -31,27 +31,42 @@ async function extractPdf(buf: Buffer): Promise<string> {
   return (text || "").toString();
 }
 
+async function sttOnce(key: string, buf: Buffer, filename: string, mime: string) {
+  const form = new FormData();
+  form.append("language", "en");
+  form.append("format", "true");
+  form.append("file", new File([new Uint8Array(buf)], filename, { type: mime }));
+  return fetch("https://api.x.ai/v1/stt", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+}
+
 async function transcribeAudio(name: string, mime: string, buf: Buffer): Promise<string> {
   const key = apiKey();
   if (!key) {
     return `[Audio uploaded: ${name}. Add GROK_API_KEY / XAI_API_KEY so Studious can transcribe lectures.]`;
   }
-  const form = new FormData();
-  form.append("language", "en");
-  form.append("file", new Blob([new Uint8Array(buf)], { type: mime || "audio/mp4" }), name);
-  const res = await fetch("https://api.x.ai/v1/stt", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    return `[Could not transcribe ${name} (${res.status}): ${err.slice(0, 220)}]`;
+  const attempts = [
+    { filename: name.replace(/\s+/g, "_"), mime: mime || "audio/mp4" },
+    { filename: "lecture.mp4", mime: "audio/mp4" },
+    { filename: "lecture.m4a", mime: "audio/mp4" },
+    { filename: "lecture.aac", mime: "audio/aac" },
+  ];
+  let lastErr = "";
+  for (const attempt of attempts) {
+    const res = await sttOnce(key, buf, attempt.filename, attempt.mime);
+    if (res.ok) {
+      const data = (await res.json()) as { text?: string };
+      const transcript = (data.text || "").trim();
+      if (transcript) return `LECTURE TRANSCRIPT from ${name}:\n${transcript}`;
+      lastErr = "empty transcript";
+      continue;
+    }
+    lastErr = `${res.status} ${((await res.text()) || "").slice(0, 180)}`;
   }
-  const data = (await res.json()) as { text?: string };
-  const transcript = (data.text || "").trim();
-  if (!transcript) return `[Audio ${name} was uploaded but the transcript came back empty.]`;
-  return `LECTURE TRANSCRIPT from ${name}:\n${transcript}`;
+  return `[Could not transcribe ${name}: ${lastErr}]`;
 }
 
 async function visionOcr(name: string, mime: string, base64: string): Promise<string> {

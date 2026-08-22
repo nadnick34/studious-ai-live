@@ -126,7 +126,18 @@ export async function fileToPayload(file: File): Promise<{
   }
 
   const buf = await file.arrayBuffer();
-  const max = 1_200_000;
+  const isAudio = file.type.startsWith("audio/") || /\.(mp3|m4a|wav|aac|mp4)$/i.test(file.name);
+  const max = isAudio ? 3_500_000 : 1_200_000;
+  if (isAudio && buf.byteLength > max) {
+    return {
+      name: file.name,
+      type: "text/plain",
+      size: file.size,
+      base64: btoa(
+        `AUDIO TOO LARGE: ${file.name} is ${Math.round(file.size / 1024)} KB. Export as MP3 under 3 MB, or upload a transcript .txt with the audio.`,
+      ),
+    };
+  }
   const bytes = new Uint8Array(buf.byteLength > max ? buf.slice(0, max) : buf);
   let binary = "";
   const chunk = 0x8000;
