@@ -31,6 +31,29 @@ async function extractPdf(buf: Buffer): Promise<string> {
   return (text || "").toString();
 }
 
+async function transcribeAudio(name: string, mime: string, buf: Buffer): Promise<string> {
+  const key = apiKey();
+  if (!key) {
+    return `[Audio uploaded: ${name}. Add GROK_API_KEY / XAI_API_KEY so Studious can transcribe lectures.]`;
+  }
+  const form = new FormData();
+  form.append("language", "en");
+  form.append("file", new Blob([new Uint8Array(buf)], { type: mime || "audio/mp4" }), name);
+  const res = await fetch("https://api.x.ai/v1/stt", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    return `[Could not transcribe ${name} (${res.status}): ${err.slice(0, 220)}]`;
+  }
+  const data = (await res.json()) as { text?: string };
+  const transcript = (data.text || "").trim();
+  if (!transcript) return `[Audio ${name} was uploaded but the transcript came back empty.]`;
+  return `LECTURE TRANSCRIPT from ${name}:\n${transcript}`;
+}
+
 async function visionOcr(name: string, mime: string, base64: string): Promise<string> {
   const key = apiKey();
   if (!key) {
@@ -91,6 +114,8 @@ async function processFile(file: FilePayload): Promise<{ heading: string; text: 
     }
   } else if (kind === "image") {
     text = await visionOcr(name, type || "image/jpeg", file.base64);
+  } else if (kind === "audio") {
+    text = await transcribeAudio(name, type || "audio/mp4", buf);
   } else {
     text = `[File recorded: ${name}, ${Math.round(buf.length / 1024)} KB.]`;
   }
@@ -102,7 +127,7 @@ async function processFile(file: FilePayload): Promise<{ heading: string; text: 
     kind,
     size: file.size || buf.length,
     addedAt: new Date().toISOString(),
-    extractedText: text.slice(0, 20000),
+    extractedText: text.slice(0, 80000),
     dataUrl: kind === "image" && file.base64.length < 900_000 ? `data:${type};base64,${file.base64}` : undefined,
   };
   return { heading, text, attachment };
