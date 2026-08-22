@@ -17,6 +17,7 @@ function ClassicalPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [set, setSet] = useState<StudySet | null>(null);
   const [tab, setTab] = useState<Tab>("conspectus");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     void Promise.all([getClassById({ data: classId }), getStudySetById({ data: setId })]).then(([c, s]) => {
@@ -46,7 +47,7 @@ function ClassicalPage() {
     return (
       <AppShell title="Classical Mode">
         <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-center">
-          <img src="/classical-wreath.png" alt="" className="mx-auto mb-3 h-12 w-auto" />
+          <img src="/classical-wreath.jpg" alt="" className="mx-auto mb-3 h-12 w-auto" />
           <p className="font-serif text-lg text-fg">No classical package yet</p>
           <p className="mt-2 text-sm text-muted">Open Classical Mode from the chapter list to generate The Conspectus.</p>
           <Link to="/class/$id" params={{ id: classId }} className="mt-4 inline-block text-sm text-teal hover:underline">
@@ -70,22 +71,36 @@ function ClassicalPage() {
         ← Back to class
       </Link>
 
-      <div className="print-hidden mb-4 rounded-xl border border-border border-l-4 border-l-amber-500 bg-card px-4 py-4">
-        <div className="flex items-center gap-3">
-          <img src="/classical-wreath.png" alt="" className="h-9 w-auto" />
-          <div>
-            <p className="text-[10px] font-semibold tracking-[0.18em] text-amber-800 uppercase dark:text-amber-200">
-              Classical Education
-            </p>
-            <h1 className="font-serif text-xl text-fg">{set.name}</h1>
-            <p className="text-xs text-muted">
-              {cls.code} · Conspectus · Orator · Socratic Tutor · Commonplace
-            </p>
+      <div className="print-hidden mb-3 rounded-xl border border-border border-l-4 border-l-amber-500 bg-card px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <img src="/classical-wreath.jpg" alt="" className="h-9 w-auto shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.18em] text-amber-800 uppercase dark:text-amber-200">
+                Classical Education
+              </p>
+              <h1 className="truncate font-serif text-xl text-fg">{set.name}</h1>
+              <p className="text-xs text-muted">{cls.code}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button variant="secondary" className="min-h-9 text-xs" onClick={() => window.print()}>
+              Print / PDF
+            </Button>
+            <button
+              type="button"
+              onClick={() => setInfoOpen(true)}
+              className="grid size-9 place-items-center rounded-lg border border-border text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:text-amber-200 dark:hover:bg-amber-900/30"
+              aria-label="About Classical Education"
+              title="About Classical Education"
+            >
+              i
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="print-hidden mb-4 flex gap-1 overflow-x-auto pb-1">
+      <div className="print-hidden mb-3 flex gap-1 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -108,7 +123,74 @@ function ClassicalPage() {
       {tab === "orator" && <OratorView classical={classical} chapterName={set.name} />}
       {tab === "socratic" && <SocraticView classical={classical} chapterName={set.name} />}
       {tab === "commonplace" && <CommonplaceView classical={classical} chapterName={set.name} />}
+
+      {infoOpen && <ClassicalInfoModal onClose={() => setInfoOpen(false)} />}
     </AppShell>
+  );
+}
+
+function ClassicalInfoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={onClose} />
+      <div className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border border-l-4 border-l-amber-500 bg-card p-5 shadow-2xl sm:p-6">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <img src="/classical-wreath.jpg" alt="" className="h-8 w-auto" />
+            <h2 className="font-serif text-lg font-semibold text-fg">Classical Education</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-sm text-muted hover:text-fg">
+            Close
+          </button>
+        </div>
+        <div className="space-y-4 text-sm leading-relaxed text-fg/90">
+          <p>
+            Classical education forms the mind through the <strong>Trivium</strong>: Grammar, Logic, and Rhetoric.
+            Students first master the language of a subject, then learn to reason about it, then speak and write with
+            clarity and force. The goal is mastery and understanding — not only test performance.
+          </p>
+          <div>
+            <h3 className="mb-1 font-semibold text-amber-900 dark:text-amber-100">The Trivium</h3>
+            <ul className="list-disc space-y-1 pl-5 text-muted">
+              <li>
+                <strong className="text-fg">Grammar</strong> — knowledge, definitions, lists, precise wording
+              </li>
+              <li>
+                <strong className="text-fg">Logic (Dialectic)</strong> — why, how, comparison, relationships, argument
+              </li>
+              <li>
+                <strong className="text-fg">Rhetoric</strong> — telling it back, explaining, speaking with order and force
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="mb-1 font-semibold text-amber-900 dark:text-amber-100">How each section works</h3>
+            <ul className="list-disc space-y-2 pl-5 text-muted">
+              <li>
+                <strong className="text-fg">The Conspectus</strong> — classical study notebook: memory-work, clean
+                outline, logic questions, Five Common Topics, tell-back narration, loci, and from-memory outline.
+              </li>
+              <li>
+                <strong className="text-fg">Orator’s Companion</strong> — two spoken tracks: slow precise recitation
+                (grammar) and narrative with the why (rhetoric).
+              </li>
+              <li>
+                <strong className="text-fg">Socratic Tutor</strong> — cards that ask you to recite, explain, compare, and
+                reason — not only term → definition.
+              </li>
+              <li>
+                <strong className="text-fg">Commonplace</strong> — striking sentences and a recitation queue so you build
+                a store of language and mark what you can say from memory.
+              </li>
+            </ul>
+          </div>
+          <p className="text-xs text-muted">
+            Practice follows classical habits: narration (tell-back), dialectic questions, invention with the Five Common
+            Topics, and recitation from memory.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -212,12 +294,6 @@ function ConspectusView({
 
   return (
     <div id="classical-conspectus-print">
-      <div className="print-hidden mb-3 flex justify-end">
-        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
-          Print / PDF Conspectus
-        </Button>
-      </div>
-
       <GoldSection title="Memory-work">
         <ol className="list-decimal space-y-1.5 pl-5 text-sm">
           {classical.conspectus.memoryWork.map((item, i) => (
@@ -389,63 +465,104 @@ function ConspectusView({
 
 function OratorView({ classical, chapterName }: { classical: ClassicalPackage; chapterName: string }) {
   const [busy, setBusy] = useState<"recitation" | "narration" | null>(null);
+  const [playing, setPlaying] = useState<"recitation" | "narration" | null>(null);
+  const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cacheRef = useRef<Partial<Record<"recitation" | "narration", string>>>({});
+
+  function stopAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlaying(null);
+    setPaused(false);
+  }
+
+  function pauseAudio() {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      setPaused(true);
+    }
+  }
+
+  function resumeAudio() {
+    if (audioRef.current && audioRef.current.paused) {
+      void audioRef.current.play();
+      setPaused(false);
+    }
+  }
 
   async function play(kind: "recitation" | "narration") {
     const text = kind === "recitation" ? classical.orator.recitationScript : classical.orator.narrationScript;
     if (!text.trim()) return;
-    setBusy(kind);
     setError(null);
+
+    if (playing === kind && paused) {
+      resumeAudio();
+      return;
+    }
+    if (playing === kind && !paused) {
+      pauseAudio();
+      return;
+    }
+
+    stopAudio();
+    setBusy(kind);
     try {
-      const result = await speakLecture({ data: { text, voice: kind === "recitation" ? "sal" : "eve" } });
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      let url = cacheRef.current[kind];
+      if (!url) {
+        const result = await speakLecture({ data: { text, voice: kind === "recitation" ? "sal" : "eve" } });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+        url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
+        cacheRef.current[kind] = url;
       }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-      const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
       const audio = new Audio(url);
       audioRef.current = audio;
+      audio.onended = () => {
+        setPlaying(null);
+        setPaused(false);
+      };
+      setPlaying(kind);
+      setPaused(false);
       await audio.play();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Playback failed");
+      setPlaying(null);
     } finally {
       setBusy(null);
     }
   }
 
+  function trackActions(kind: "recitation" | "narration") {
+    const isThis = playing === kind;
+    return (
+      <div className="print-hidden flex gap-1.5">
+        <Button className="text-xs" disabled={busy !== null && busy !== kind} onClick={() => void play(kind)}>
+          {busy === kind ? "Generating…" : isThis && !paused ? "Pause" : isThis && paused ? "Resume" : "Play"}
+        </Button>
+        {isThis && (
+          <Button variant="secondary" className="text-xs" onClick={stopAudio}>
+            Stop
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div id="classical-orator-print">
-      <div className="print-hidden mb-3 flex justify-end">
-        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
-          Print / PDF Orator
-        </Button>
-      </div>
       {error && <p className="mb-3 text-sm text-red">{error}</p>}
-      <GoldSection
-        title="Recitation track"
-        actions={
-          <Button className="print-hidden text-xs" disabled={busy !== null} onClick={() => void play("recitation")}>
-            {busy === "recitation" ? "Generating audio…" : "Play audio"}
-          </Button>
-        }
-      >
+      <GoldSection title="Recitation track" actions={trackActions("recitation")}>
         <p className="mb-2 text-xs text-muted">Grammar layer — speak slowly and precisely.</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{classical.orator.recitationScript}</p>
       </GoldSection>
-      <GoldSection
-        title="Narration track"
-        actions={
-          <Button className="print-hidden text-xs" disabled={busy !== null} onClick={() => void play("narration")}>
-            {busy === "narration" ? "Generating audio…" : "Play audio"}
-          </Button>
-        }
-      >
+      <GoldSection title="Narration track" actions={trackActions("narration")}>
         <p className="mb-2 text-xs text-muted">Story and argument — include the why.</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{classical.orator.narrationScript}</p>
       </GoldSection>
@@ -494,9 +611,6 @@ function SocraticView({ classical, chapterName }: { classical: ClassicalPackage;
           }}
         >
           {reversed ? "Front: answer first" : "Reverse flip"}
-        </Button>
-        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
-          Print / PDF
         </Button>
       </div>
 
@@ -559,11 +673,6 @@ function CommonplaceView({ classical, chapterName }: { classical: ClassicalPacka
   const [recited, setRecited] = useState<Record<string, boolean>>({});
   return (
     <div id="classical-commonplace-print">
-      <div className="print-hidden mb-3 flex justify-end">
-        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
-          Print / PDF Commonplace
-        </Button>
-      </div>
       <GoldSection title="Commonplace extracts">
         <p className="mb-3 text-xs text-muted">Striking sentences, definitions, and connections to keep.</p>
         <ul className="space-y-2">
