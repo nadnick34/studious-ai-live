@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { scoreClassicalWork, speakLecture } from "@/lib/ai";
 import { getClassById, getStudySetById } from "@/lib/data";
 import type { ClassicalPackage, ClassRecord, StudySet } from "@/lib/types";
 
@@ -16,10 +17,6 @@ function ClassicalPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [set, setSet] = useState<StudySet | null>(null);
   const [tab, setTab] = useState<Tab>("conspectus");
-  const [cardIndex, setCardIndex] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [tellBack, setTellBack] = useState("");
-  const [recited, setRecited] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     void Promise.all([getClassById({ data: classId }), getStudySetById({ data: setId })]).then(([c, s]) => {
@@ -29,9 +26,13 @@ function ClassicalPage() {
   }, [classId, setId]);
 
   const classical = set?.notes?.classical as ClassicalPackage | undefined;
-
-  const cards = classical?.socraticCards || [];
-  const card = cards[cardIndex];
+  const sourceSummary = useMemo(() => {
+    if (!set) return "";
+    return (set.notes?.sections || [])
+      .map((s) => [s.heading, s.body, ...(s.bullets || [])].filter(Boolean).join(" "))
+      .join("\n")
+      .slice(0, 10000);
+  }, [set]);
 
   if (!cls || !set) {
     return (
@@ -44,11 +45,10 @@ function ClassicalPage() {
   if (!classical) {
     return (
       <AppShell title="Classical Mode">
-        <div className="mx-auto max-w-lg rounded-xl border border-amber-200/40 bg-amber-50/80 p-6 text-center dark:bg-amber-950/30">
-          <p className="font-serif text-lg text-amber-950 dark:text-amber-50">No classical package yet</p>
-          <p className="mt-2 text-sm text-amber-900/80 dark:text-amber-100/80">
-            Return to the chapter list and open Classical Mode from the laurel icon to generate The Conspectus.
-          </p>
+        <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-6 text-center">
+          <img src="/classical-wreath.png" alt="" className="mx-auto mb-3 h-12 w-auto" />
+          <p className="font-serif text-lg text-fg">No classical package yet</p>
+          <p className="mt-2 text-sm text-muted">Open Classical Mode from the chapter list to generate The Conspectus.</p>
           <Link to="/class/$id" params={{ id: classId }} className="mt-4 inline-block text-sm text-teal hover:underline">
             ← Back to class
           </Link>
@@ -66,31 +66,35 @@ function ClassicalPage() {
 
   return (
     <AppShell title={`${set.name} · Classical`}>
-      <Link to="/class/$id" params={{ id: classId }} className="mb-3 inline-block text-sm text-teal hover:underline">
+      <Link to="/class/$id" params={{ id: classId }} className="print-hidden mb-3 inline-block text-sm text-teal hover:underline">
         ← Back to class
       </Link>
 
-      <div className="mb-4 overflow-hidden rounded-xl border border-amber-200/30">
-        <div
-          className="bg-cover bg-center px-4 py-5 text-white"
-          style={{ backgroundImage: "linear-gradient(rgba(20,12,4,0.72), rgba(20,12,4,0.82)), url(/roman-columns.jpg)" }}
-        >
-          <p className="text-[10px] font-semibold tracking-[0.2em] text-amber-200 uppercase">Classical Education</p>
-          <h1 className="font-serif text-xl sm:text-2xl">{set.name}</h1>
-          <p className="text-xs text-white/75">
-            {cls.code} · The Conspectus · Orator · Socratic Tutor · Commonplace
-          </p>
+      <div className="print-hidden mb-4 rounded-xl border border-border border-l-4 border-l-amber-500 bg-card px-4 py-4">
+        <div className="flex items-center gap-3">
+          <img src="/classical-wreath.png" alt="" className="h-9 w-auto" />
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-amber-800 uppercase dark:text-amber-200">
+              Classical Education
+            </p>
+            <h1 className="font-serif text-xl text-fg">{set.name}</h1>
+            <p className="text-xs text-muted">
+              {cls.code} · Conspectus · Orator · Socratic Tutor · Commonplace
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto pb-1">
+      <div className="print-hidden mb-4 flex gap-1 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-              tab === t.id ? "bg-amber-800 text-amber-50" : "bg-bg text-muted hover:text-fg"
+            className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+              tab === t.id
+                ? "border-amber-500/60 bg-amber-50 text-amber-950 dark:bg-amber-900/30 dark:text-amber-50"
+                : "border-border bg-card text-muted hover:text-fg"
             }`}
           >
             {t.label}
@@ -98,71 +102,136 @@ function ClassicalPage() {
         ))}
       </div>
 
-      {tab === "conspectus" && <ConspectusView classical={classical} tellBack={tellBack} setTellBack={setTellBack} />}
-      {tab === "orator" && <OratorView classical={classical} />}
-      {tab === "socratic" && (
-        <SocraticView
-          cards={cards}
-          card={card}
-          index={cardIndex}
-          flipped={flipped}
-          onFlip={() => setFlipped((v) => !v)}
-          onPrev={() => {
-            setFlipped(false);
-            setCardIndex((i) => Math.max(0, i - 1));
-          }}
-          onNext={() => {
-            setFlipped(false);
-            setCardIndex((i) => Math.min(cards.length - 1, i + 1));
-          }}
-        />
+      {tab === "conspectus" && (
+        <ConspectusView classical={classical} chapterName={set.name} sourceSummary={sourceSummary} />
       )}
-      {tab === "commonplace" && (
-        <CommonplaceView
-          classical={classical}
-          recited={recited}
-          onToggle={(id) => setRecited((prev) => ({ ...prev, [id]: !prev[id] }))}
-        />
-      )}
+      {tab === "orator" && <OratorView classical={classical} chapterName={set.name} />}
+      {tab === "socratic" && <SocraticView classical={classical} chapterName={set.name} />}
+      {tab === "commonplace" && <CommonplaceView classical={classical} chapterName={set.name} />}
     </AppShell>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function GoldSection({ title, children, actions }: { title: string; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <section className="card-surface mb-4 rounded-xl p-4 sm:p-5">
-      <h2 className="mb-3 font-serif text-base font-semibold text-amber-900 dark:text-amber-100">{title}</h2>
+    <section className="mb-4 rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-serif text-base font-semibold text-fg">{title}</h2>
+        {actions}
+      </div>
       {children}
     </section>
   );
 }
 
+type ScoreResult = {
+  score: number;
+  summary: string;
+  strengths: string[];
+  missing: string[];
+  whyPresent: boolean;
+};
+
 function ConspectusView({
   classical,
-  tellBack,
-  setTellBack,
+  chapterName,
+  sourceSummary,
 }: {
   classical: ClassicalPackage;
-  tellBack: string;
-  setTellBack: (v: string) => void;
+  chapterName: string;
+  sourceSummary: string;
 }) {
   const topics = classical.conspectus.fiveCommonTopics;
+  const [tellBack, setTellBack] = useState("");
+  const [tellScore, setTellScore] = useState<ScoreResult | null>(null);
+  const [tellBusy, setTellBusy] = useState(false);
+  const [outlineAnswers, setOutlineAnswers] = useState<Record<string, string>>({});
+  const [outlineScore, setOutlineScore] = useState<ScoreResult | null>(null);
+  const [outlineBusy, setOutlineBusy] = useState(false);
+
+  async function scoreTellBack() {
+    if (!tellBack.trim()) return;
+    setTellBusy(true);
+    try {
+      const result = await scoreClassicalWork({
+        data: {
+          mode: "tellback",
+          chapterName,
+          sourceSummary,
+          studentText: tellBack,
+          prompts: classical.conspectus.tellBackPrompts,
+        },
+      });
+      setTellScore(result);
+    } catch (err) {
+      setTellScore({
+        score: 0,
+        summary: err instanceof Error ? err.message : "Scoring failed",
+        strengths: [],
+        missing: [],
+        whyPresent: false,
+      });
+    } finally {
+      setTellBusy(false);
+    }
+  }
+
+  async function scoreOutline() {
+    const text = classical.fromMemoryOutline
+      .map((block, i) => {
+        const lines = Array.from({ length: block.blankBullets || 3 })
+          .map((_, j) => outlineAnswers[`${i}-${j}`] || "")
+          .filter(Boolean);
+        return `${block.heading}\n${lines.map((l) => `- ${l}`).join("\n")}`;
+      })
+      .join("\n\n");
+    if (!text.replace(/\s/g, "")) return;
+    setOutlineBusy(true);
+    try {
+      const result = await scoreClassicalWork({
+        data: {
+          mode: "outline",
+          chapterName,
+          sourceSummary,
+          studentText: text,
+        },
+      });
+      setOutlineScore(result);
+    } catch (err) {
+      setOutlineScore({
+        score: 0,
+        summary: err instanceof Error ? err.message : "Scoring failed",
+        strengths: [],
+        missing: [],
+        whyPresent: false,
+      });
+    } finally {
+      setOutlineBusy(false);
+    }
+  }
+
   return (
-    <div>
-      <Section title="Memory-work">
+    <div id="classical-conspectus-print">
+      <div className="print-hidden mb-3 flex justify-end">
+        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+          Print / PDF Conspectus
+        </Button>
+      </div>
+
+      <GoldSection title="Memory-work">
         <ol className="list-decimal space-y-1.5 pl-5 text-sm">
           {classical.conspectus.memoryWork.map((item, i) => (
             <li key={i}>{item}</li>
           ))}
         </ol>
-      </Section>
+      </GoldSection>
 
-      <Section title="Clean outline">
+      <GoldSection title="Clean outline">
         <div className="space-y-3">
           {classical.conspectus.outline.map((block, i) => (
             <div key={i}>
               <div className="text-sm font-semibold">{block.heading}</div>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-fg/90">
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
                 {block.bullets.map((b, j) => (
                   <li key={j}>{b}</li>
                 ))}
@@ -170,9 +239,9 @@ function ConspectusView({
             </div>
           ))}
         </div>
-      </Section>
+      </GoldSection>
 
-      <Section title="Logic page">
+      <GoldSection title="Logic page">
         <p className="mb-2 text-xs font-medium text-muted">Why / how / relationship</p>
         <ol className="mb-4 list-decimal space-y-1.5 pl-5 text-sm">
           {classical.conspectus.logicQuestions.map((q, i) => (
@@ -190,15 +259,34 @@ function ConspectusView({
               ["Testimony", topics.testimony],
             ] as const
           ).map(([label, value]) => (
-            <div key={label} className="rounded-lg border border-border bg-bg p-3">
+            <div key={label} className="rounded-lg border border-border border-l-2 border-l-amber-400 bg-bg p-3">
               <div className="text-[11px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{label}</div>
               <p className="mt-1 text-sm">{value || "—"}</p>
             </div>
           ))}
         </div>
-      </Section>
+      </GoldSection>
 
-      <Section title="Tell-back (narration)">
+      <GoldSection
+        title="Tell-back (narration)"
+        actions={
+          <div className="print-hidden flex gap-2">
+            <Button
+              variant="secondary"
+              className="text-xs"
+              onClick={() => {
+                setTellBack("");
+                setTellScore(null);
+              }}
+            >
+              Clear / Reset
+            </Button>
+            <Button className="text-xs" disabled={tellBusy || !tellBack.trim()} onClick={() => void scoreTellBack()}>
+              {tellBusy ? "Scoring…" : "AI Score"}
+            </Button>
+          </div>
+        }
+      >
         <p className="mb-2 text-xs text-muted">Source locked. Retell without looking back at the notes above.</p>
         <ul className="mb-3 list-disc space-y-1 pl-5 text-sm">
           {classical.conspectus.tellBackPrompts.map((p, i) => (
@@ -210,13 +298,29 @@ function ConspectusView({
           onChange={(e) => setTellBack(e.target.value)}
           rows={6}
           placeholder="Type your retelling here…"
-          className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-amber-700"
+          className="print-hidden w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-amber-600"
         />
-        <p className="mt-2 text-[11px] text-muted">Scoring against sequence and the “why” will come in the next pass.</p>
-      </Section>
+        {tellScore && (
+          <div className="mt-3 rounded-lg border border-border bg-bg p-3 text-sm">
+            <div className="font-semibold">Score: {tellScore.score}/100</div>
+            <p className="mt-1 text-muted">{tellScore.summary}</p>
+            {tellScore.strengths.length > 0 && (
+              <p className="mt-2 text-xs">
+                <span className="font-medium">Strengths:</span> {tellScore.strengths.join("; ")}
+              </p>
+            )}
+            {tellScore.missing.length > 0 && (
+              <p className="mt-1 text-xs">
+                <span className="font-medium">Missing:</span> {tellScore.missing.join("; ")}
+              </p>
+            )}
+            <p className="mt-1 text-xs">{tellScore.whyPresent ? "The why was present." : "The why was weak or missing."}</p>
+          </div>
+        )}
+      </GoldSection>
 
       {classical.conspectus.lociMap.length > 0 && (
-        <Section title="Loci map">
+        <GoldSection title="Loci map">
           <div className="grid gap-2 sm:grid-cols-2">
             {classical.conspectus.lociMap.map((row, i) => (
               <div key={i} className="rounded-lg border border-border bg-bg px-3 py-2 text-sm">
@@ -225,110 +329,242 @@ function ConspectusView({
               </div>
             ))}
           </div>
-        </Section>
+        </GoldSection>
       )}
 
       {classical.fromMemoryOutline.length > 0 && (
-        <Section title="From-memory outline">
-          <p className="mb-3 text-xs text-muted">Reconstruct without looking. Skeleton only.</p>
+        <GoldSection
+          title="From-memory outline"
+          actions={
+            <div className="print-hidden flex gap-2">
+              <Button
+                variant="secondary"
+                className="text-xs"
+                onClick={() => {
+                  setOutlineAnswers({});
+                  setOutlineScore(null);
+                }}
+              >
+                Clear / Reset
+              </Button>
+              <Button className="text-xs" disabled={outlineBusy} onClick={() => void scoreOutline()}>
+                {outlineBusy ? "Scoring…" : "AI Score"}
+              </Button>
+            </div>
+          }
+        >
+          <p className="mb-3 text-xs text-muted">Reconstruct without looking. Type into the blanks.</p>
           {classical.fromMemoryOutline.map((block, i) => (
-            <div key={i} className="mb-3">
-              <div className="text-sm font-semibold">{block.heading}</div>
-              <div className="mt-1 space-y-2">
+            <div key={i} className="mb-4">
+              <div className="mb-2 text-sm font-semibold">{block.heading}</div>
+              <div className="space-y-2">
                 {Array.from({ length: block.blankBullets || 3 }).map((_, j) => (
-                  <div key={j} className="h-8 rounded border border-dashed border-border bg-bg/50" />
+                  <input
+                    key={j}
+                    value={outlineAnswers[`${i}-${j}`] || ""}
+                    onChange={(e) => setOutlineAnswers((prev) => ({ ...prev, [`${i}-${j}`]: e.target.value }))}
+                    className="w-full rounded-lg border border-dashed border-border bg-bg px-3 py-2 text-sm outline-none focus:border-amber-600"
+                    placeholder={`Point ${j + 1}`}
+                  />
                 ))}
               </div>
             </div>
           ))}
-        </Section>
+          {outlineScore && (
+            <div className="rounded-lg border border-border bg-bg p-3 text-sm">
+              <div className="font-semibold">Score: {outlineScore.score}/100</div>
+              <p className="mt-1 text-muted">{outlineScore.summary}</p>
+              {outlineScore.missing.length > 0 && (
+                <p className="mt-1 text-xs">
+                  <span className="font-medium">Missing:</span> {outlineScore.missing.join("; ")}
+                </p>
+              )}
+            </div>
+          )}
+        </GoldSection>
       )}
     </div>
   );
 }
 
-function OratorView({ classical }: { classical: ClassicalPackage }) {
+function OratorView({ classical, chapterName }: { classical: ClassicalPackage; chapterName: string }) {
+  const [busy, setBusy] = useState<"recitation" | "narration" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  async function play(kind: "recitation" | "narration") {
+    const text = kind === "recitation" ? classical.orator.recitationScript : classical.orator.narrationScript;
+    if (!text.trim()) return;
+    setBusy(kind);
+    setError(null);
+    try {
+      const result = await speakLecture({ data: { text, voice: kind === "recitation" ? "sal" : "eve" } });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+      const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      await audio.play();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Playback failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <div>
-      <Section title="Recitation track">
+    <div id="classical-orator-print">
+      <div className="print-hidden mb-3 flex justify-end">
+        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+          Print / PDF Orator
+        </Button>
+      </div>
+      {error && <p className="mb-3 text-sm text-red">{error}</p>}
+      <GoldSection
+        title="Recitation track"
+        actions={
+          <Button className="print-hidden text-xs" disabled={busy !== null} onClick={() => void play("recitation")}>
+            {busy === "recitation" ? "Generating audio…" : "Play audio"}
+          </Button>
+        }
+      >
         <p className="mb-2 text-xs text-muted">Grammar layer — speak slowly and precisely.</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{classical.orator.recitationScript}</p>
-      </Section>
-      <Section title="Narration track">
+      </GoldSection>
+      <GoldSection
+        title="Narration track"
+        actions={
+          <Button className="print-hidden text-xs" disabled={busy !== null} onClick={() => void play("narration")}>
+            {busy === "narration" ? "Generating audio…" : "Play audio"}
+          </Button>
+        }
+      >
         <p className="mb-2 text-xs text-muted">Story and argument — include the why.</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{classical.orator.narrationScript}</p>
-      </Section>
+      </GoldSection>
     </div>
   );
 }
 
-function SocraticView({
-  cards,
-  card,
-  index,
-  flipped,
-  onFlip,
-  onPrev,
-  onNext,
-}: {
-  cards: ClassicalPackage["socraticCards"];
-  card?: ClassicalPackage["socraticCards"][number];
-  index: number;
-  flipped: boolean;
-  onFlip: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  if (!card) {
+function SocraticView({ classical, chapterName }: { classical: ClassicalPackage; chapterName: string }) {
+  const cards = classical.socraticCards || [];
+  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [reversed, setReversed] = useState(false);
+  const [mode, setMode] = useState<"cards" | "list">("cards");
+  const card = cards[index];
+
+  if (!cards.length) {
     return <p className="text-sm text-muted">No Socratic cards in this package.</p>;
   }
+
+  const front = reversed ? card.back : card.front;
+  const back = reversed ? card.front : card.back;
   const typeLabel =
     card.type === "recite"
       ? "Recite"
       : card.type === "explain"
-        ? "Explain in your own words"
+        ? "Explain"
         : card.type === "dialectic"
-          ? "Why / compare / what follows"
+          ? "Why / compare"
           : "Locus";
+
   return (
-    <div>
-      <p className="mb-3 text-xs text-muted">
-        Card {index + 1} of {cards.length} · {typeLabel}
-      </p>
-      <button
-        type="button"
-        onClick={onFlip}
-        className="card-surface flex min-h-48 w-full flex-col items-center justify-center rounded-xl p-6 text-center"
-      >
-        <div className="mb-2 text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{typeLabel}</div>
-        <p className="text-base font-medium">{flipped ? card.back : card.front}</p>
-        {card.locus && <p className="mt-3 text-xs text-muted">Locus: {card.locus}</p>}
-        <p className="mt-4 text-[11px] text-muted">{flipped ? "Model answer" : "Tap to reveal"}</p>
-      </button>
-      <div className="mt-3 flex justify-between gap-2">
-        <Button variant="secondary" onClick={onPrev} disabled={index === 0}>
-          Previous
+    <div id="classical-socratic-print">
+      <div className="print-hidden mb-3 flex flex-wrap gap-2">
+        <Button variant={mode === "cards" ? "primary" : "secondary"} className="text-xs" onClick={() => setMode("cards")}>
+          Cards
         </Button>
-        <Button variant="secondary" onClick={onNext} disabled={index >= cards.length - 1}>
-          Next
+        <Button variant={mode === "list" ? "primary" : "secondary"} className="text-xs" onClick={() => setMode("list")}>
+          List
+        </Button>
+        <Button
+          variant="secondary"
+          className="text-xs"
+          onClick={() => {
+            setReversed((v) => !v);
+            setFlipped(false);
+          }}
+        >
+          {reversed ? "Front: answer first" : "Reverse flip"}
+        </Button>
+        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+          Print / PDF
         </Button>
       </div>
+
+      {mode === "list" ? (
+        <div className="space-y-2">
+          {cards.map((c, i) => (
+            <div key={c.id || i} className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-3 text-sm">
+              <div className="text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{c.type}</div>
+              <div className="mt-1 font-medium">{c.front}</div>
+              <div className="mt-1 text-muted">{c.back}</div>
+              {c.locus && <div className="mt-1 text-xs text-muted">Locus: {c.locus}</div>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-muted">
+            Card {index + 1} of {cards.length} · {typeLabel}
+            {reversed ? " · reversed" : ""}
+          </p>
+          <button
+            type="button"
+            onClick={() => setFlipped((v) => !v)}
+            className="flex min-h-48 w-full flex-col items-center justify-center rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-6 text-center"
+          >
+            <div className="mb-2 text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{typeLabel}</div>
+            <p className="text-base font-medium">{flipped ? back : front}</p>
+            {card.locus && <p className="mt-3 text-xs text-muted">Locus: {card.locus}</p>}
+            <p className="mt-4 text-[11px] text-muted">{flipped ? "Answer side" : "Tap to flip"}</p>
+          </button>
+          <div className="mt-3 flex justify-between gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFlipped(false);
+                setIndex((i) => Math.max(0, i - 1));
+              }}
+              disabled={index === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFlipped(false);
+                setIndex((i) => Math.min(cards.length - 1, i + 1));
+              }}
+              disabled={index >= cards.length - 1}
+            >
+              Next
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function CommonplaceView({
-  classical,
-  recited,
-  onToggle,
-}: {
-  classical: ClassicalPackage;
-  recited: Record<string, boolean>;
-  onToggle: (id: string) => void;
-}) {
+function CommonplaceView({ classical, chapterName }: { classical: ClassicalPackage; chapterName: string }) {
+  const [recited, setRecited] = useState<Record<string, boolean>>({});
   return (
-    <div>
-      <Section title="Commonplace extracts">
+    <div id="classical-commonplace-print">
+      <div className="print-hidden mb-3 flex justify-end">
+        <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+          Print / PDF Commonplace
+        </Button>
+      </div>
+      <GoldSection title="Commonplace extracts">
         <p className="mb-3 text-xs text-muted">Striking sentences, definitions, and connections to keep.</p>
         <ul className="space-y-2">
           {classical.commonplace.map((item) => (
@@ -340,8 +576,8 @@ function CommonplaceView({
             </li>
           ))}
         </ul>
-      </Section>
-      <Section title="Recitation queue">
+      </GoldSection>
+      <GoldSection title="Recitation queue">
         <p className="mb-3 text-xs text-muted">Mark when said from memory — not merely flipped.</p>
         <ul className="space-y-2">
           {classical.recitationQueue.map((item) => (
@@ -350,7 +586,7 @@ function CommonplaceView({
                 type="checkbox"
                 className="mt-1"
                 checked={Boolean(recited[item.id])}
-                onChange={() => onToggle(item.id)}
+                onChange={() => setRecited((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
               />
               <div>
                 <div className="text-[10px] font-semibold text-muted uppercase">{item.kind}</div>
@@ -359,7 +595,7 @@ function CommonplaceView({
             </li>
           ))}
         </ul>
-      </Section>
+      </GoldSection>
     </div>
   );
 }

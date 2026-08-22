@@ -645,6 +645,77 @@ export const lookupProfessor = createServerFn({ method: "POST" })
     }
   });
 
+export const scoreClassicalWork = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      mode: "tellback" | "outline";
+      chapterName: string;
+      sourceSummary: string;
+      studentText: string;
+      prompts?: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    if (!key) {
+      return {
+        score: 0,
+        summary: "Scoring needs the xAI API key.",
+        strengths: [] as string[],
+        missing: [] as string[],
+        whyPresent: false,
+      };
+    }
+    const system =
+      data.mode === "tellback"
+        ? `You score a classical narration (tell-back). Judge sequence, completeness, and whether the WHY appears. Return ONLY JSON: {"score":0-100,"summary":"2-3 sentences","strengths":["..."],"missing":["..."],"whyPresent":true|false}`
+        : `You score a from-memory outline against the source. Judge structure and coverage. Return ONLY JSON: {"score":0-100,"summary":"2-3 sentences","strengths":["..."],"missing":["..."],"whyPresent":false}`;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 1200,
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: `Chapter: ${data.chapterName}\nPrompts: ${(data.prompts || []).join(" | ")}\n\nSOURCE:\n${data.sourceSummary.slice(0, 12000)}\n\nSTUDENT RESPONSE:\n${data.studentText.slice(0, 8000)}`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Scoring failed (${res.status}): ${err.slice(0, 180)}`);
+    }
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "{}";
+    try {
+      const parsed = JSON.parse(extractJsonObject(content)) as {
+        score?: number;
+        summary?: string;
+        strengths?: string[];
+        missing?: string[];
+        whyPresent?: boolean;
+      };
+      return {
+        score: Math.max(0, Math.min(100, Number(parsed.score) || 0)),
+        summary: parsed.summary || "",
+        strengths: parsed.strengths || [],
+        missing: parsed.missing || [],
+        whyPresent: Boolean(parsed.whyPresent),
+      };
+    } catch {
+      return { score: 0, summary: content.slice(0, 400), strengths: [], missing: [], whyPresent: false };
+    }
+  });
+
 export const speakLecture = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: { text: string; voice?: string }) => input)
