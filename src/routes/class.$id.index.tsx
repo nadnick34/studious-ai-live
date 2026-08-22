@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import {
@@ -300,6 +301,7 @@ function ChapterCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [classicalOpen, setClassicalOpen] = useState(false);
   const actions = [
     { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
     { to: "/class/$id/set/$setId/audio" as const, label: "Audio", icon: Headphones },
@@ -329,6 +331,15 @@ function ChapterCard({
           )}
         </div>
         <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            onClick={() => setClassicalOpen(true)}
+            className="grid size-10 place-items-center rounded-lg text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-900/30"
+            aria-label="Classical Education mode"
+            title="Classical Education"
+          >
+            <ClassicalModeIcon className="size-4" />
+          </button>
           <button type="button" onClick={onEdit} className="grid size-10 place-items-center rounded-lg text-teal hover:bg-bg" aria-label="Edit chapter">
             <Pencil className="size-4" />
           </button>
@@ -337,6 +348,9 @@ function ChapterCard({
           </button>
         </div>
       </div>
+      {classicalOpen && (
+        <ClassicalModeModal chapterName={set.name} onClose={() => setClassicalOpen(false)} />
+      )}
       <div className="mt-3 grid grid-cols-4 gap-1">
         {actions.map((a) => {
           const Icon = a.icon;
