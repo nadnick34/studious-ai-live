@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Archive, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { InfoButton, InfoModal } from "@/components/info-modal";
 import { Button } from "@/components/ui/button";
 import { createClass, listClasses, seedSampleClass, updateClass } from "@/lib/data";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
@@ -35,6 +36,7 @@ function DashboardPage() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showClassInfo, setShowClassInfo] = useState(false);
 
   async function refresh() {
     const rows = await listClasses({ data: false });
@@ -154,10 +156,13 @@ function DashboardPage() {
     <AppShell
       title="My Classes"
       right={
-        <Button onClick={openCreate} className="min-h-10 px-3 text-xs sm:text-sm">
-          <Plus className="size-4" />
-          New class
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <InfoButton onClick={() => setShowClassInfo(true)} label="How classes work" />
+          <Button onClick={openCreate} className="min-h-10 px-3 text-xs sm:text-sm">
+            <Plus className="size-4" />
+            New class
+          </Button>
+        </div>
       }
     >
       {loading ? (
@@ -308,6 +313,27 @@ function DashboardPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showClassInfo && (
+        <InfoModal title="Adding classes" onClose={() => setShowClassInfo(false)}>
+          <p>
+            Classes are the top-level folders for your courses. Create one class per course so materials, chapters, and
+            alerts stay organized.
+          </p>
+          <p className="font-medium text-fg">When you add a class, include:</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted">
+            <li>Course name and code (e.g. HIST102)</li>
+            <li>School, semester, and professor when you know them</li>
+            <li>Textbook if you have one</li>
+            <li>Syllabus (PDF or pasted text) so Studious can surface upcoming dates</li>
+            <li>Schedule and any misc notes that help you stay oriented</li>
+          </ul>
+          <p>
+            After the class exists, open it and add chapters with notes, PDFs, photos, and lecture audio. You can edit or
+            archive a class anytime from this list.
+          </p>
+        </InfoModal>
       )}
     </AppShell>
   );

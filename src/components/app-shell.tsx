@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { LogOut } from "lucide-react";
 import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
+import { signOut } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
@@ -81,7 +83,18 @@ function AppShellInner({
             </Link>
             <h1 className="hidden truncate text-[15px] font-semibold text-fg sm:block">{title || ""}</h1>
           </div>
-          <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">{right}</div>
+          <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">
+            {right}
+            <button
+              type="button"
+              onClick={() => void signOut("/")}
+              className="grid size-10 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg sm:hidden"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="size-5" />
+            </button>
+          </div>
         </header>
         {title && (
           <div className="px-4 pt-3 sm:hidden">

@@ -84,7 +84,7 @@ export function Sidebar({
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
       {NAV.map((item) => {
         const Icon = item.icon;
         const active = item.match(pathname);
@@ -102,6 +102,15 @@ export function BottomNav() {
           </Link>
         );
       })}
+      <button
+        type="button"
+        onClick={() => void signOut("/")}
+        className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted"
+        aria-label="Sign out"
+      >
+        <LogOut className="size-5" />
+        Sign out
+      </button>
     </nav>
   );
 }

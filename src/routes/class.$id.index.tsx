@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
+import { InfoButton, InfoModal } from "@/components/info-modal";
 import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import {
@@ -26,6 +27,7 @@ function ClassPage() {
   const navigate = useNavigate();
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [sets, setSets] = useState<StudySet[]>([]);
+  const [showChapterInfo, setShowChapterInfo] = useState(false);
   const [showCombine, setShowCombine] = useState(false);
   const [showFocus, setShowFocus] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -155,7 +157,8 @@ function ClassPage() {
     <AppShell
       title={cls.code}
       right={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <InfoButton onClick={() => setShowChapterInfo(true)} label="How chapters work" />
           <Link to="/class/$id/upload" params={{ id: classId }}>
             <Button className="min-h-10 px-3 text-xs sm:text-sm">
               <Plus className="size-4" />
@@ -286,6 +289,37 @@ function ClassPage() {
             await refresh();
           }}
         />
+      )}
+
+      {showChapterInfo && (
+        <InfoModal title="Chapters & study modes" onClose={() => setShowChapterInfo(false)}>
+          <p>
+            A <strong>chapter</strong> (or study set) is one unit of work — for example Chapter 2, Lecture 5, or Weeks
+            1–3. Upload everything for that unit, then generate notes, audio, flash cards, and a quiz.
+          </p>
+          <p className="font-medium text-fg">Best practice when adding a chapter</p>
+          <ul className="list-disc space-y-1 pl-5 text-muted">
+            <li>Name it clearly (e.g. “Chapter 2 – Cahokia”)</li>
+            <li>Upload notes, PDF pages, slides, photos of the board, and lecture audio together when you can</li>
+            <li>Prefer clearer audio or a transcript for long lectures</li>
+            <li>Generate once materials are in, then study in the mode that fits you</li>
+          </ul>
+          <p className="font-medium text-fg">Combine for midterm / final</p>
+          <p className="text-muted">
+            Select multiple chapters and merge them into one review package so midterm and final study pull from the
+            whole span of material.
+          </p>
+          <p className="font-medium text-fg">Custom focus</p>
+          <p className="text-muted">
+            Ask Studious to go deeper on a weak section or a specific topic. Useful when you already generated the unit
+            but need more practice in one area.
+          </p>
+          <p className="font-medium text-fg">Classical mode (laurel icon)</p>
+          <p className="text-muted">
+            Opens a Trivium-style path: The Conspectus (memory-work, outline, logic, tell-back), Orator’s Companion,
+            Socratic cards, and a Commonplace — aimed at mastery and narration, not only multiple choice.
+          </p>
+        </InfoModal>
       )}
     </AppShell>
   );
