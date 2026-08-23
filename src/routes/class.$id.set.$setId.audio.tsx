@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Square } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getClassById, getStudySetById } from "@/lib/data";
-import { speakLecture } from "@/lib/ai";
 import type { ClassRecord, StudySet } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/set/$setId/audio")({ component: AudioPage });
@@ -13,87 +12,107 @@ function AudioPage() {
   const { id: classId, setId } = Route.useParams();
   const [set, setSet] = useState<StudySet | null>(null);
   const [cls, setCls] = useState<ClassRecord | null>(null);
-  const [loadingAudio, setLoadingAudio] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const activeRef = useRef(false);
 
   useEffect(() => {
     void Promise.all([getStudySetById({ data: setId }), getClassById({ data: classId })]).then(([s, c]) => {
       setSet(s);
       setCls(c);
     });
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, [classId, setId]);
 
-  useEffect(() => {
-    if (!set?.audioScript || audioUrl || loadingAudio) return;
-    void ensureAudio();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set?.audioScript]);
-
-  async function ensureAudio(): Promise<string | null> {
-    if (audioUrl) return audioUrl;
-    if (!set?.audioScript) {
-      setError("No lecture script available for this set.");
-      return null;
+  function stopSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
-    setLoadingAudio(true);
-    setError(null);
-    try {
-      const result = await speakLecture({ data: { text: set.audioScript, voice: "eve" } });
-      if (!result.ok) {
-        setError(result.error);
-        setLoadingAudio(false);
-        return null;
-      }
-      const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
-      setAudioUrl(url);
-      setLoadingAudio(false);
-      return url;
-    } catch (err) {
-      setLoadingAudio(false);
-      setError(err instanceof Error ? err.message : "Audio generation failed");
-      return null;
+    activeRef.current = false;
+    setPlaying(false);
+    setPaused(false);
+  }
+
+  function pauseSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.pause();
+      setPaused(true);
     }
   }
 
-  async function handlePlayPause() {
-    const el = audioRef.current;
-    if (!el) return;
-    if (playing) {
-      el.pause();
-      setPlaying(false);
+  function resumeSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.resume();
+      setPaused(false);
+    }
+  }
+
+  function startSpeech() {
+    if (!set?.audioScript?.trim()) {
+      setError("No lecture script available for this set.");
       return;
     }
-    let url = audioUrl;
-    if (!url) {
-      url = await ensureAudio();
-      if (!url) return;
-      el.src = url;
-      await new Promise<void>((resolve) => {
-        el.onloadeddata = () => resolve();
-        el.load();
-      });
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setError("This browser does not support text-to-speech. Try Chrome or Edge.");
+      return;
     }
-    try {
-      await el.play();
-      setPlaying(true);
-    } catch {
-      setError("Playback failed. Check device sound and try again.");
-      setPlaying(false);
-    }
-  }
 
-  function formatTime(sec: number) {
-    if (!isFinite(sec) || sec < 0) return "0:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    if (playing && paused) {
+      resumeSpeech();
+      return;
+    }
+    if (playing && !paused) {
+      pauseSpeech();
+      return;
+    }
+
+    stopSpeech();
+    setError(null);
+
+    const utterance = new SpeechSynthesisUtterance(set.audioScript);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.lang = "en-US";
+
+    const voices = window.speechSynthesis.getVoices();
+    const preferred =
+      voices.find((v) => /en-US/i.test(v.lang) && /Google|Microsoft|Samantha|Natural/i.test(v.name)) ||
+      voices.find((v) => /en/i.test(v.lang));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onend = () => {
+      if (activeRef.current) {
+        activeRef.current = false;
+        setPlaying(false);
+        setPaused(false);
+      }
+    };
+    utterance.onerror = () => {
+      setError("Speech was interrupted or failed. Tap play again.");
+      activeRef.current = false;
+      setPlaying(false);
+      setPaused(false);
+    };
+
+    activeRef.current = true;
+    setPlaying(true);
+    setPaused(false);
+
+    if (voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const later = window.speechSynthesis.getVoices();
+        const v = later.find((x) => /en/i.test(x.lang));
+        if (v) utterance.voice = v;
+        window.speechSynthesis.speak(utterance);
+      };
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
   }
 
   if (!set || !cls) {
@@ -115,54 +134,40 @@ function AudioPage() {
       <div className="mx-auto max-w-md">
         <div className="card-surface rounded-xl p-8 text-center">
           <h2 className="mb-1 font-semibold text-fg">{set.name}</h2>
-          <p className="mb-6 text-xs text-muted">AI lecture audio</p>
-          <audio
-            ref={audioRef}
-            preload="none"
-            onTimeUpdate={(e) => {
-              const a = e.currentTarget;
-              setCurrentTime(a.currentTime);
-              if (a.duration) setProgress((a.currentTime / a.duration) * 100);
-            }}
-            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-            onEnded={() => { setPlaying(false); setProgress(100); }}
-            onPause={() => setPlaying(false)}
-            onPlay={() => setPlaying(true)}
-            className="hidden"
-          />
-          <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-bg">
-            <div className="h-full rounded-full bg-teal" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="mb-6 flex justify-between text-[10px] text-muted">
-            <span>{formatTime(currentTime)}</span>
-            <span>{duration ? formatTime(duration) : "—"}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handlePlayPause()}
-            disabled={loadingAudio}
-            className="mx-auto grid size-16 place-items-center rounded-full bg-teal text-white disabled:opacity-60"
-            aria-label={playing ? "Pause" : "Play"}
-          >
-            {playing ? <Pause className="size-6" /> : <Play className="size-6 ml-0.5" />}
-          </button>
-          <p className="mt-4 text-xs text-muted">
-            {loadingAudio ? "Generating audio…" : playing ? "Playing" : audioUrl ? "Ready — tap play" : "Tap play to generate audio"}
-          </p>
-          {error && <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-left text-xs text-red">{error}</div>}
-          <div className="mt-4">
-            <Button
-              variant="secondary"
-              className="text-xs"
-              disabled={loadingAudio}
-              onClick={async () => {
-                if (audioUrl) URL.revokeObjectURL(audioUrl);
-                setAudioUrl(null);
-                setProgress(0);
-                await ensureAudio();
-              }}
+          <p className="mb-6 text-xs text-muted">Lecture audio · device voice (instant)</p>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={startSpeech}
+              className="grid size-16 place-items-center rounded-full bg-teal text-white"
+              aria-label={playing && !paused ? "Pause" : "Play"}
             >
-              Regenerate audio
+              {playing && !paused ? <Pause className="size-6" /> : <Play className="size-6 ml-0.5" />}
+            </button>
+            {playing && (
+              <button
+                type="button"
+                onClick={stopSpeech}
+                className="grid size-12 place-items-center rounded-full border border-border bg-bg text-fg"
+                aria-label="Stop"
+              >
+                <Square className="size-4 fill-current" />
+              </button>
+            )}
+          </div>
+
+          <p className="mt-4 text-xs text-muted">
+            {!playing ? "Tap play to listen" : paused ? "Paused" : "Playing"}
+          </p>
+          {error && (
+            <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-left text-xs text-red dark:bg-red-950/30">
+              {error}
+            </div>
+          )}
+          <div className="mt-4">
+            <Button variant="secondary" className="text-xs" onClick={stopSpeech}>
+              Stop
             </Button>
           </div>
         </div>

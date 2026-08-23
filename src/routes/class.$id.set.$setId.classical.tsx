@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { scoreClassicalWork, speakLecture } from "@/lib/ai";
+import { scoreClassicalWork } from "@/lib/ai";
 import { getClassById, getStudySetById } from "@/lib/data";
 import type { ClassicalPackage, ClassRecord, StudySet } from "@/lib/types";
 
@@ -463,79 +463,95 @@ function ConspectusView({
   );
 }
 
-function OratorView({ classical, chapterName }: { classical: ClassicalPackage; chapterName: string }) {
-  const [busy, setBusy] = useState<"recitation" | "narration" | null>(null);
+function OratorView({ classical }: { classical: ClassicalPackage; chapterName: string }) {
   const [playing, setPlaying] = useState<"recitation" | "narration" | null>(null);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const cacheRef = useRef<Partial<Record<"recitation" | "narration", string>>>({});
+  const kindRef = useRef<"recitation" | "narration" | null>(null);
 
-  function stopAudio() {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+  function stopSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
     }
+    kindRef.current = null;
     setPlaying(null);
     setPaused(false);
   }
 
-  function pauseAudio() {
-    if (audioRef.current && !audioRef.current.paused) {
-      audioRef.current.pause();
+  function pauseSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.pause();
       setPaused(true);
     }
   }
 
-  function resumeAudio() {
-    if (audioRef.current && audioRef.current.paused) {
-      void audioRef.current.play();
+  function resumeSpeech() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.resume();
       setPaused(false);
     }
   }
 
-  async function play(kind: "recitation" | "narration") {
+  function play(kind: "recitation" | "narration") {
     const text = kind === "recitation" ? classical.orator.recitationScript : classical.orator.narrationScript;
     if (!text.trim()) return;
     setError(null);
 
-    if (playing === kind && paused) {
-      resumeAudio();
-      return;
-    }
-    if (playing === kind && !paused) {
-      pauseAudio();
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setError("This browser does not support text-to-speech. Try Chrome or Edge on desktop.");
       return;
     }
 
-    stopAudio();
-    setBusy(kind);
-    try {
-      let url = cacheRef.current[kind];
-      if (!url) {
-        const result = await speakLecture({ data: { text, voice: kind === "recitation" ? "sal" : "eve" } });
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
-        const bytes = Uint8Array.from(atob(result.audioBase64), (c) => c.charCodeAt(0));
-        url = URL.createObjectURL(new Blob([bytes], { type: result.mime }));
-        cacheRef.current[kind] = url;
-      }
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => {
+    if (playing === kind && paused) {
+      resumeSpeech();
+      return;
+    }
+    if (playing === kind && !paused) {
+      pauseSpeech();
+      return;
+    }
+
+    stopSpeech();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Recitation: slower and clearer; narration: natural pace
+    utterance.rate = kind === "recitation" ? 0.82 : 0.95;
+    utterance.pitch = 1;
+    utterance.lang = "en-US";
+
+    const voices = window.speechSynthesis.getVoices();
+    const preferred =
+      voices.find((v) => /en-US/i.test(v.lang) && /Google|Microsoft|Samantha|Natural/i.test(v.name)) ||
+      voices.find((v) => /en/i.test(v.lang));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onend = () => {
+      if (kindRef.current === kind) {
+        kindRef.current = null;
         setPlaying(null);
         setPaused(false);
-      };
-      setPlaying(kind);
-      setPaused(false);
-      await audio.play();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Playback failed");
+      }
+    };
+    utterance.onerror = () => {
+      setError("Speech was interrupted or failed. Tap Play again.");
+      kindRef.current = null;
       setPlaying(null);
-    } finally {
-      setBusy(null);
+      setPaused(false);
+    };
+
+    kindRef.current = kind;
+    setPlaying(kind);
+    setPaused(false);
+    // Some browsers need voices loaded first
+    if (voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const later = window.speechSynthesis.getVoices();
+        const v = later.find((x) => /en/i.test(x.lang));
+        if (v) utterance.voice = v;
+        window.speechSynthesis.speak(utterance);
+      };
+    } else {
+      window.speechSynthesis.speak(utterance);
     }
   }
 
@@ -543,11 +559,11 @@ function OratorView({ classical, chapterName }: { classical: ClassicalPackage; c
     const isThis = playing === kind;
     return (
       <div className="print-hidden flex gap-1.5">
-        <Button className="text-xs" disabled={busy !== null && busy !== kind} onClick={() => void play(kind)}>
-          {busy === kind ? "Generating…" : isThis && !paused ? "Pause" : isThis && paused ? "Resume" : "Play"}
+        <Button className="text-xs" onClick={() => play(kind)}>
+          {isThis && !paused ? "Pause" : isThis && paused ? "Resume" : "Play"}
         </Button>
         {isThis && (
-          <Button variant="secondary" className="text-xs" onClick={stopAudio}>
+          <Button variant="secondary" className="text-xs" onClick={stopSpeech}>
             Stop
           </Button>
         )}
@@ -558,8 +574,11 @@ function OratorView({ classical, chapterName }: { classical: ClassicalPackage; c
   return (
     <div id="classical-orator-print">
       {error && <p className="mb-3 text-sm text-red">{error}</p>}
+      <p className="print-hidden mb-3 text-xs text-muted">
+        Uses your device’s built-in voice — plays immediately, no generation wait.
+      </p>
       <GoldSection title="Recitation track" actions={trackActions("recitation")}>
-        <p className="mb-2 text-xs text-muted">Grammar layer — speak slowly and precisely.</p>
+        <p className="mb-2 text-xs text-muted">Grammar layer — spoken more slowly for precision.</p>
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{classical.orator.recitationScript}</p>
       </GoldSection>
       <GoldSection title="Narration track" actions={trackActions("narration")}>
