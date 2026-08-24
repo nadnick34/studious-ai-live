@@ -48,6 +48,8 @@ export interface SpatialPanel {
   emoji: string;
   /** Owl narrator line for this panel */
   owlSays?: string;
+  /** Generated cartoon image URL or data URL */
+  imageUrl?: string;
 }
 
 export interface SpatialQuestion {
@@ -61,6 +63,8 @@ export interface SpatialStory {
   title: string;
   panels: SpatialPanel[];
   questions: SpatialQuestion[];
+  /** Generated short story video URL when unlocked */
+  videoUrl?: string;
 }
 
 export interface StudyNotes {

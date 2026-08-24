@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { getClassById, getStudySetById } from "@/lib/data";
+import { generateSpatialImages, generateSpatialVideo } from "@/lib/ai";
+import { getClassById, getProfile, getStudySetById, updateStudySet } from "@/lib/data";
 import type { ClassRecord, SpatialPanel, SpatialQuestion, SpatialStory, StudySet } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/set/$setId/spatial")({
@@ -13,16 +14,13 @@ export const Route = createFileRoute("/class/$id/set/$setId/spatial")({
 function normalizeStory(raw: StudySet["notes"]["spatialLearning"]): SpatialStory | null {
   if (!raw) return null;
   if (Array.isArray(raw)) {
-    return {
-      title: "Picture story",
-      panels: raw,
-      questions: [],
-    };
+    return { title: "Picture story", panels: raw, questions: [] };
   }
   return {
     title: raw.title || "Picture story",
     panels: raw.panels || [],
     questions: (raw.questions || []).slice(0, 3),
+    videoUrl: raw.videoUrl,
   };
 }
 
@@ -30,11 +28,14 @@ function SpatialPage() {
   const { id: classId, setId } = Route.useParams();
   const [set, setSet] = useState<StudySet | null>(null);
   const [cls, setCls] = useState<ClassRecord | null>(null);
-  const { name: mascotName, src: owlSrc } = useKidsMascot();
+  const { name: mascotName, src: owlSrc, gender } = useKidsMascot();
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState(false);
   const [playingReel, setPlayingReel] = useState(false);
   const [reelIndex, setReelIndex] = useState(0);
+  const [imgBusy, setImgBusy] = useState(false);
+  const [vidBusy, setVidBusy] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -51,11 +52,72 @@ function SpatialPage() {
   const story = useMemo(() => (set ? normalizeStory(set.notes?.spatialLearning) : null), [set]);
   const panels = story?.panels || [];
   const questions = story?.questions || [];
+  const missingImages = panels.some((p) => !p.imageUrl);
 
   const allCorrect =
-    checked &&
-    questions.length === 3 &&
-    questions.every((q) => answers[q.id] === q.correctIndex);
+    checked && questions.length === 3 && questions.every((q) => answers[q.id] === q.correctIndex);
+
+  async function persistStory(next: SpatialStory) {
+    if (!set) return;
+    const notes = { ...set.notes, spatialLearning: next };
+    await updateStudySet({ data: { id: set.id, patch: { notes } } });
+    setSet({ ...set, notes });
+  }
+
+  async function handleGenerateImages() {
+    if (!story) return;
+    setImgBusy(true);
+    setMediaError(null);
+    try {
+      const profile = await getProfile();
+      const result = await generateSpatialImages({
+        data: { story, childGender: profile.childGender || gender },
+      });
+      if (!result.ok) {
+        setMediaError(result.error);
+        return;
+      }
+      await persistStory(result.story);
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : "Could not generate pictures");
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
+  async function handleGenerateVideo() {
+    if (!story) return;
+    setVidBusy(true);
+    setMediaError(null);
+    try {
+      const profile = await getProfile();
+      // Ensure pictures exist first
+      let current = story;
+      if (current.panels.some((p) => !p.imageUrl)) {
+        const imgs = await generateSpatialImages({
+          data: { story: current, childGender: profile.childGender || gender },
+        });
+        if (!imgs.ok) {
+          setMediaError(imgs.error);
+          return;
+        }
+        current = imgs.story;
+        await persistStory(current);
+      }
+      const result = await generateSpatialVideo({
+        data: { story: current, childGender: profile.childGender || gender },
+      });
+      if (!result.ok) {
+        setMediaError(result.error);
+        return;
+      }
+      await persistStory({ ...current, videoUrl: result.videoUrl });
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : "Could not generate video");
+    } finally {
+      setVidBusy(false);
+    }
+  }
 
   function selectAnswer(q: SpatialQuestion, optionIndex: number) {
     if (checked) return;
@@ -130,7 +192,7 @@ function SpatialPage() {
         <div>
           <p className="font-semibold text-fg">{mascotName} tells the story</p>
           <p className="text-xs text-muted">
-            Read the comic panels, then answer 3 questions. Get them all right to unlock the story video.
+            Read the comic, answer 3 questions, then unlock the short story video.
           </p>
         </div>
       </div>
@@ -142,6 +204,23 @@ function SpatialPage() {
       ) : (
         <div className="mx-auto max-w-2xl space-y-5">
           <h2 className="text-center font-serif text-xl font-semibold text-fg">{story.title}</h2>
+
+          {missingImages && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-center dark:bg-amber-950/30">
+              <p className="mb-2 text-sm text-amber-900 dark:text-amber-100">
+                Cartoon pictures are not drawn yet for this story.
+              </p>
+              <Button disabled={imgBusy} onClick={() => void handleGenerateImages()}>
+                {imgBusy ? "Drawing cartoons… (about 1–2 min)" : "Generate cartoon pictures"}
+              </Button>
+            </div>
+          )}
+
+          {mediaError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red dark:bg-red-950/30">
+              {mediaError}
+            </p>
+          )}
 
           <div className="space-y-4">
             {panels.map((panel, i) => (
@@ -206,15 +285,33 @@ function SpatialPage() {
                     <p className="mb-2 font-semibold text-green-800 dark:text-green-200">
                       Great job! {mascotName} is proud of you.
                     </p>
-                    <p className="mb-3 text-xs text-muted">
-                      You unlocked the short story video — a slideshow of the comic with {mascotName} reading aloud.
-                    </p>
-                    {!playingReel ? (
-                      <Button onClick={playStoryReel}>Play story video</Button>
+                    {story.videoUrl ? (
+                      <div className="space-y-3">
+                        <video
+                          key={story.videoUrl}
+                          src={story.videoUrl}
+                          controls
+                          playsInline
+                          className="mx-auto max-h-72 w-full rounded-xl bg-black"
+                        />
+                        <Button variant="secondary" onClick={playStoryReel}>
+                          Or play comic slideshow
+                        </Button>
+                      </div>
                     ) : (
-                      <Button variant="secondary" onClick={stopReel}>
-                        Stop video
-                      </Button>
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted">
+                          Unlock a short AI cartoon video of this story (takes a couple of minutes).
+                        </p>
+                        <Button disabled={vidBusy} onClick={() => void handleGenerateVideo()}>
+                          {vidBusy ? "Making story video…" : "Generate story video"}
+                        </Button>
+                        <div>
+                          <Button variant="secondary" className="mt-1" onClick={playStoryReel}>
+                            Play comic slideshow now
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -272,7 +369,7 @@ function ComicPanel({
     >
       <div className="flex items-stretch">
         <div className="flex w-20 shrink-0 flex-col items-center justify-center border-r-2 border-slate-200 bg-amber-50 p-2 dark:border-border dark:bg-amber-950/20">
-          <img src={owlSrc} alt={mascotName} className="h-14 w-14 rounded-full object-cover" />
+          <img src={owlSrc} alt={mascotName} className="h-14 w-14 rounded-full object-cover object-top" />
           <p className="mt-1 text-center text-[9px] font-semibold text-muted">{mascotName}</p>
         </div>
         <div className="min-w-0 flex-1 p-3 sm:p-4">
@@ -282,12 +379,21 @@ function ComicPanel({
               {panel.emoji || "🌟"}
             </span>
           </div>
-          <div className="mb-3 rounded-xl bg-gradient-to-br from-sky-50 to-amber-50 px-3 py-4 text-center dark:from-sky-950/30 dark:to-amber-950/20">
-            <p className="text-4xl" aria-hidden>
-              {panel.emoji || "📖"}
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{panel.visualDescription}</p>
-          </div>
+          {panel.imageUrl ? (
+            <img
+              src={panel.imageUrl}
+              alt={panel.title}
+              className="mb-3 w-full rounded-xl border border-border object-cover"
+            />
+          ) : (
+            <div className="mb-3 rounded-xl bg-gradient-to-br from-sky-50 to-amber-50 px-3 py-6 text-center dark:from-sky-950/30 dark:to-amber-950/20">
+              <p className="text-4xl" aria-hidden>
+                {panel.emoji || "📖"}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-muted">{panel.visualDescription}</p>
+              <p className="mt-1 text-[10px] text-muted">Picture will appear after you generate cartoons</p>
+            </div>
+          )}
           {panel.owlSays && (
             <div className="mb-2 rounded-xl rounded-tl-none border border-border bg-bg px-3 py-2 text-sm italic text-fg">
               “{panel.owlSays}”

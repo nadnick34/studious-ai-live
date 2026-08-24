@@ -5,7 +5,7 @@ import { buildGenerationPrompt, buildProfessorInsightPrompt } from "@/lib/prompt
 import { parseSyllabusLocally } from "@/lib/calendar";
 import { normalizeSlides } from "@/lib/slides";
 import { uid } from "@/lib/utils";
-import type { Attachment, ClassicalPackage, FilePayload, GeneratedPackage, Slide } from "@/lib/types";
+import type { Attachment, ClassicalPackage, FilePayload, GeneratedPackage, Slide, SpatialStory, SpatialPanel } from "@/lib/types";
 
 function apiKey() {
   return process.env.XAI_API_KEY || process.env.GROK_API_KEY || "";
@@ -175,6 +175,77 @@ export const extractMaterials = createServerFn({ method: "POST" })
       fileCount: attachments.length,
     };
   });
+
+async function generateCartoonImage(prompt: string): Promise<string | null> {
+  const key = apiKey();
+  if (!key) return null;
+  const res = await fetch("https://api.x.ai/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "grok-imagine-image",
+      prompt: prompt.slice(0, 2000),
+      n: 1,
+      aspect_ratio: "1:1",
+    }),
+  });
+  if (!res.ok) {
+    console.error("image gen failed", res.status, await res.text());
+    return null;
+  }
+  const body = (await res.json()) as { data?: { url?: string; b64_json?: string }[] };
+  const first = body.data?.[0];
+  if (first?.url) return first.url;
+  if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
+  return null;
+}
+
+function normalizeSpatialStory(raw: unknown): SpatialStory | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return {
+      title: "Picture story",
+      panels: raw as SpatialPanel[],
+      questions: [],
+    };
+  }
+  const s = raw as SpatialStory;
+  return {
+    title: s.title || "Picture story",
+    panels: Array.isArray(s.panels) ? s.panels : [],
+    questions: Array.isArray(s.questions) ? s.questions.slice(0, 3) : [],
+    videoUrl: s.videoUrl,
+  };
+}
+
+async function enrichSpatialImages(story: SpatialStory, gender?: string | null): Promise<SpatialStory> {
+  const owl =
+    gender === "girl"
+      ? "a cute friendly cartoon girl owl with a large pink bow on her head"
+      : "a cute friendly cartoon boy owl with blue glasses and a blue bowtie";
+  const panels: SpatialPanel[] = [];
+  for (const panel of story.panels.slice(0, 6)) {
+    if (panel.imageUrl) {
+      panels.push(panel);
+      continue;
+    }
+    const prompt = [
+      "Wholesome children's educational comic book panel, bright clean cartoon style,",
+      `${owl} as a friendly teacher guide in the scene,`,
+      panel.visualDescription || panel.caption || panel.title,
+      "family-friendly, traditional, no text overlays, no logos, pure illustration.",
+    ].join(" ");
+    const imageUrl = await generateCartoonImage(prompt);
+    panels.push({ ...panel, imageUrl: imageUrl || undefined });
+  }
+  // keep any remaining panels without images
+  for (const panel of story.panels.slice(6)) panels.push(panel);
+  return { ...story, panels };
+}
+
 
 function extractJsonObject(content: string): string {
   let cleaned = content.trim();
@@ -396,7 +467,15 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
         continue;
       }
       try {
-        return parseJsonContent(content);
+        const pkg = parseJsonContent(content);
+        if (data.kidsMode) {
+          const story = normalizeSpatialStory(pkg.notes?.spatialLearning);
+          if (story && story.panels.length) {
+            const enriched = await enrichSpatialImages(story, null);
+            pkg.notes = { ...pkg.notes, spatialLearning: enriched };
+          }
+        }
+        return pkg;
       } catch (err) {
         lastError = err instanceof Error ? err.message : "Could not parse study package";
       }
@@ -719,6 +798,94 @@ export const scoreClassicalWork = createServerFn({ method: "POST" })
       return { score: 0, summary: content.slice(0, 400), strengths: [], missing: [], whyPresent: false };
     }
   });
+
+
+export const generateSpatialImages = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { story: SpatialStory; childGender?: string | null }) => input)
+  .handler(async ({ data }) => {
+    const story = normalizeSpatialStory(data.story);
+    if (!story) return { ok: false as const, error: "No story to illustrate" };
+    if (!apiKey()) return { ok: false as const, error: "xAI API key required to generate cartoons" };
+    const enriched = await enrichSpatialImages(story, data.childGender);
+    return { ok: true as const, story: enriched };
+  });
+
+export const generateSpatialVideo = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { story: SpatialStory; childGender?: string | null }) => input)
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    if (!key) return { ok: false as const, error: "xAI API key required for story video" };
+    const story = normalizeSpatialStory(data.story);
+    if (!story || !story.panels.length) return { ok: false as const, error: "No story panels" };
+
+    const owl =
+      data.childGender === "girl"
+        ? "cute girl owl with a pink bow"
+        : "cute boy owl with glasses and bowtie";
+    const panelSummary = story.panels
+      .slice(0, 5)
+      .map((p, i) => `${i + 1}. ${p.title}: ${p.caption || p.owlSays || p.visualDescription}`)
+      .join(" ");
+    const prompt = [
+      `Wholesome children's educational short cartoon video about "${story.title}".`,
+      `A friendly ${owl} narrates and guides the lesson.`,
+      "Bright clean cartoon animation, family-friendly, traditional, no text on screen.",
+      "Story beats:",
+      panelSummary,
+    ].join(" ");
+
+    // Prefer image-to-video if first panel has an image
+    const firstImage = story.panels.find((p) => p.imageUrl)?.imageUrl;
+    const body: Record<string, unknown> = {
+      model: "grok-imagine-video",
+      prompt: prompt.slice(0, 2500),
+      duration: 8,
+    };
+    if (firstImage && firstImage.startsWith("http")) {
+      body.image = { url: firstImage };
+    }
+
+    const start = await fetch("https://api.x.ai/v1/videos/generations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!start.ok) {
+      const err = await start.text();
+      return { ok: false as const, error: `Video start failed (${start.status}): ${err.slice(0, 240)}` };
+    }
+    const startJson = (await start.json()) as { request_id?: string; id?: string };
+    const requestId = startJson.request_id || startJson.id;
+    if (!requestId) return { ok: false as const, error: "No video request id returned" };
+
+    for (let i = 0; i < 36; i += 1) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const poll = await fetch(`https://api.x.ai/v1/videos/${requestId}`, {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!poll.ok) continue;
+      const status = (await poll.json()) as {
+        status?: string;
+        video?: { url?: string };
+        url?: string;
+      };
+      if (status.status === "done" || status.status === "completed") {
+        const url = status.video?.url || status.url;
+        if (url) return { ok: true as const, videoUrl: url };
+        return { ok: false as const, error: "Video done but no URL" };
+      }
+      if (status.status === "failed" || status.status === "expired") {
+        return { ok: false as const, error: `Video ${status.status}` };
+      }
+    }
+    return { ok: false as const, error: "Video generation timed out — try again" };
+  });
+
 
 export const speakLecture = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
