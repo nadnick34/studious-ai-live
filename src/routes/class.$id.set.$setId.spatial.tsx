@@ -85,6 +85,40 @@ function SpatialPage() {
     }
   }
 
+
+  // Auto-draw cartoons when the page opens if any panel is missing art
+  useEffect(() => {
+    if (!set || !story || !panels.length) return;
+    if (!missingImages) return;
+    let cancelled = false;
+    void (async () => {
+      setImgBusy(true);
+      setMediaError(null);
+      try {
+        const profile = await getProfile();
+        const result = await generateSpatialImages({
+          data: { story, childGender: profile.childGender || gender },
+        });
+        if (cancelled) return;
+        if (!result.ok) {
+          setMediaError(result.error);
+          return;
+        }
+        const notes = { ...set.notes, spatialLearning: result.story };
+        await updateStudySet({ data: { id: set.id, patch: { notes } } });
+        if (!cancelled) setSet({ ...set, notes });
+      } catch (err) {
+        if (!cancelled) setMediaError(err instanceof Error ? err.message : "Could not generate pictures");
+      } finally {
+        if (!cancelled) setImgBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [set?.id, missingImages, panels.length]);
+
   async function handleGenerateVideo() {
     if (!story) return;
     setVidBusy(true);
@@ -205,14 +239,17 @@ function SpatialPage() {
         <div className="mx-auto max-w-2xl space-y-5">
           <h2 className="text-center font-serif text-xl font-semibold text-fg">{story.title}</h2>
 
-          {missingImages && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-center dark:bg-amber-950/30">
-              <p className="mb-2 text-sm text-amber-900 dark:text-amber-100">
-                Cartoon pictures are not drawn yet for this story.
+          {(missingImages || imgBusy) && (
+            <div className="rounded-xl border border-teal/30 bg-teal/5 p-4 text-center">
+              <div className="mb-2 flex justify-center">
+                <KidsMascot size="sm" />
+              </div>
+              <p className="text-sm font-medium text-fg">
+                {imgBusy
+                  ? `${mascotName} is drawing your cartoons…`
+                  : "Preparing story pictures…"}
               </p>
-              <Button disabled={imgBusy} onClick={() => void handleGenerateImages()}>
-                {imgBusy ? "Drawing cartoons… (about 1–2 min)" : "Generate cartoon pictures"}
-              </Button>
+              <p className="mt-1 text-xs text-muted">This runs automatically in the background.</p>
             </div>
           )}
 

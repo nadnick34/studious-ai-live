@@ -102,6 +102,7 @@ function UploadPage() {
               extractedText: extracted.text,
               kidsMode: Boolean(profile.kidsMode),
               childAge: profile.childAge,
+              childGender: profile.childGender,
             },
           });
           const { updateStudySet } = await import("@/lib/data");

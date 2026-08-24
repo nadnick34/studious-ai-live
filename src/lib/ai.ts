@@ -222,26 +222,31 @@ function normalizeSpatialStory(raw: unknown): SpatialStory | null {
 }
 
 async function enrichSpatialImages(story: SpatialStory, gender?: string | null): Promise<SpatialStory> {
-  const owl =
-    gender === "girl"
-      ? "a cute friendly cartoon girl owl with a large pink bow on her head"
-      : "a cute friendly cartoon boy owl with blue glasses and a blue bowtie";
+  const isGirl = gender === "girl";
+  const owlName = isGirl ? "Hootie" : "Professor Hoot";
+  const owlDesc = isGirl
+    ? "Hootie, a cute friendly cartoon girl owl with a large bright pink bow on her head (female character; refer to her as she)"
+    : "Professor Hoot, a cute friendly cartoon boy owl with blue round glasses and a blue bowtie (male character; refer to him as he)";
   const panels: SpatialPanel[] = [];
   for (const panel of story.panels.slice(0, 6)) {
     if (panel.imageUrl) {
       panels.push(panel);
       continue;
     }
+    const scene = (panel.visualDescription || panel.caption || panel.title || "")
+      .replace(/\bOliver\s+Owl\b/gi, owlName)
+      .replace(/\bOliver\b/gi, owlName);
     const prompt = [
-      "Wholesome children's educational comic book panel, bright clean cartoon style,",
-      `${owl} as a friendly teacher guide in the scene,`,
-      panel.visualDescription || panel.caption || panel.title,
-      "family-friendly, traditional, no text overlays, no logos, pure illustration.",
+      "Wholesome traditional children's educational comic book panel, bright clean cartoon style.",
+      `Main character is ONLY ${owlDesc}. Do not invent another owl name such as Oliver.`,
+      `Show ${owlName} clearly as the teacher guide in the scene.`,
+      scene,
+      "STRICT VISUAL RULES: no nametags, no name badges, no pronoun pins, no pronoun stickers, no written words of any kind on clothing or props, no logos, no political symbols.",
+      "Family-friendly, traditional, pure illustration only.",
     ].join(" ");
     const imageUrl = await generateCartoonImage(prompt);
     panels.push({ ...panel, imageUrl: imageUrl || undefined });
   }
-  // keep any remaining panels without images
   for (const panel of story.panels.slice(6)) panels.push(panel);
   return { ...story, panels };
 }
@@ -419,6 +424,7 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
       focusPrompt?: string;
       kidsMode?: boolean;
       childAge?: number | null;
+      childGender?: string | null;
     }) => input,
   )
   .handler(async ({ data }) => {
@@ -471,7 +477,8 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
         if (data.kidsMode) {
           const story = normalizeSpatialStory(pkg.notes?.spatialLearning);
           if (story && story.panels.length) {
-            const enriched = await enrichSpatialImages(story, null);
+            // Draw cartoons after notes; gender comes from request when provided
+            const enriched = await enrichSpatialImages(story, data.childGender ?? null);
             pkg.notes = { ...pkg.notes, spatialLearning: enriched };
           }
         }
@@ -820,18 +827,20 @@ export const generateSpatialVideo = createServerFn({ method: "POST" })
     const story = normalizeSpatialStory(data.story);
     if (!story || !story.panels.length) return { ok: false as const, error: "No story panels" };
 
-    const owl =
-      data.childGender === "girl"
-        ? "cute girl owl with a pink bow"
-        : "cute boy owl with glasses and bowtie";
+    const isGirl = data.childGender === "girl";
+    const owlName = isGirl ? "Hootie" : "Professor Hoot";
+    const owl = isGirl
+      ? "Hootie, a cute girl owl with a large pink bow (she)"
+      : "Professor Hoot, a cute boy owl with glasses and a blue bowtie (he)";
     const panelSummary = story.panels
       .slice(0, 5)
       .map((p, i) => `${i + 1}. ${p.title}: ${p.caption || p.owlSays || p.visualDescription}`)
       .join(" ");
     const prompt = [
-      `Wholesome children's educational short cartoon video about "${story.title}".`,
-      `A friendly ${owl} narrates and guides the lesson.`,
-      "Bright clean cartoon animation, family-friendly, traditional, no text on screen.",
+      `Wholesome traditional children's educational short cartoon video about "${story.title}".`,
+      `The only mascot is ${owl}. Never name the owl Oliver. Use ${owlName} only.`,
+      "No nametags, no pronoun pins, no text on screen.",
+      "Bright clean cartoon animation, family-friendly, traditional.",
       "Story beats:",
       panelSummary,
     ].join(" ");

@@ -112,6 +112,7 @@ KIDS MODE (age ${childAge ?? "9 or under"}):
 - flashcards MUST include "emoji" (one emoji that helps a child remember) and "color" (one of: blue, pink, green, yellow, purple, orange).
 - quiz explanations must encourage ("Great thinking!", "Almost — try this idea next time…").
 - CONTENT GUARDRAILS (strict): Keep everything wholesome, traditional, and family-friendly. Do NOT include LGBTQ+ themes or advocacy, sexual content, crude humor, graphic violence, or political / ideological messaging. Teach the academic material plainly with classic virtues: honesty, curiosity, diligence, kindness, respect for family and learning. No culture-war framing.
+- OWL MASCOT: The only mascot is "Hootie" (girl — she/her) or "Professor Hoot" (boy — he/him). Never invent other owl names (no Oliver Owl). Use she for Hootie and he for Professor Hoot. Use they/it only for non-human objects or groups of things, never as a person's identity. Never write pronoun nametags, badge text, or "he/they" style labels.
 - notes.spatialLearning must be a comic-book story object (not a bare array):
   {
     "title": "short story title",
@@ -120,7 +121,7 @@ KIDS MODE (age ${childAge ?? "9 or under"}):
         "id": "p1",
         "title": "panel title",
         "caption": "story caption under the picture",
-        "visualDescription": "detailed wholesome cartoon scene; include the friendly owl mascot guiding the lesson",
+        "visualDescription": "detailed wholesome cartoon scene with Hootie or Professor Hoot guiding the lesson; no nametags; no text on clothing",
         "emoji": "🌟",
         "owlSays": "what the owl narrator says in this panel"
       }
