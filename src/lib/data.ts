@@ -68,6 +68,10 @@ type ProfileRow = {
   role: string;
   edition: string;
   setup_complete: boolean;
+  for_child?: boolean;
+  child_age?: number | null;
+  child_gender?: string | null;
+  kids_mode?: boolean;
 };
 
 function emptyNotes(title: string): StudyNotes {
@@ -126,8 +130,18 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
       role: "student",
       edition: "student",
       setupComplete: false,
+      forChild: false,
+      childAge: null,
+      childGender: null,
+      kidsMode: false,
     };
   }
+  const childAge = row.child_age == null ? null : Number(row.child_age);
+  const forChild = Boolean(row.for_child);
+  const kidsMode =
+    Boolean(row.kids_mode) ||
+    forChild ||
+    (row.role === "student" && childAge != null && childAge <= 9);
   return {
     displayName: row.display_name,
     phone: row.phone || "",
@@ -140,6 +154,10 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
     role: (row.role as UserProfile["role"]) || "student",
     edition: row.edition === "teacher" ? "teacher" : "student",
     setupComplete: Boolean(row.setup_complete),
+    forChild,
+    childAge,
+    childGender: row.child_gender === "boy" || row.child_gender === "girl" ? row.child_gender : null,
+    kidsMode,
   };
 }
 
@@ -156,15 +174,23 @@ export const saveProfile = createServerFn({ method: "POST" })
   .validator((input: UserProfile) => input)
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    const childAge = data.childAge == null || data.childAge === ("" as unknown as number) ? null : Number(data.childAge);
+    const forChild = Boolean(data.forChild);
+    const kidsMode =
+      Boolean(data.kidsMode) ||
+      forChild ||
+      (data.role === "student" && childAge != null && !Number.isNaN(childAge) && childAge <= 9);
     await sql`
       insert into profiles (
         user_id, display_name, phone, sms_alerts, school_select, palette_id,
-        custom_school_name, school_logo_url, avatar_data_url, role, edition, setup_complete, updated_at
+        custom_school_name, school_logo_url, avatar_data_url, role, edition, setup_complete,
+        for_child, child_age, child_gender, kids_mode, updated_at
       ) values (
         ${context.userId}, ${data.displayName ?? null}, ${data.phone}, ${data.smsAlerts},
         ${data.schoolSelect}, ${data.paletteId ?? null}, ${data.customSchoolName ?? null},
         ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${data.role},
-        ${data.edition}, ${data.setupComplete}, now()
+        ${data.edition}, ${data.setupComplete},
+        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, now()
       )
       on conflict (user_id) do update set
         display_name = excluded.display_name,
@@ -178,6 +204,10 @@ export const saveProfile = createServerFn({ method: "POST" })
         role = excluded.role,
         edition = excluded.edition,
         setup_complete = excluded.setup_complete,
+        for_child = excluded.for_child,
+        child_age = excluded.child_age,
+        child_gender = excluded.child_gender,
+        kids_mode = excluded.kids_mode,
         updated_at = now()
     `;
     return { ok: true as const };

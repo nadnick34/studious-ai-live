@@ -108,3 +108,53 @@ html.dark ::-webkit-scrollbar-thumb { background: #475569; }
     background: white !important;
   }
 }
+
+/* Kids Mode — softer, larger type; gender accent skins */
+html.kids-mode {
+  --font-sans: "Nunito", "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+}
+
+html.kids-mode body {
+  font-size: 16.5px;
+}
+
+html.kids-mode h1,
+html.kids-mode h2,
+html.kids-mode h3 {
+  font-family: "Nunito", "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+html.kids-mode.kids-boy {
+  --teal: #2563eb;
+  --teal-hover: #1d4ed8;
+  --bg: #eff6ff;
+  --card: #ffffff;
+  --border: #bfdbfe;
+}
+
+html.kids-mode.kids-girl {
+  --teal: #db2777;
+  --teal-hover: #be185d;
+  --bg: #fdf2f8;
+  --card: #ffffff;
+  --border: #fbcfe8;
+}
+
+html.kids-mode.dark.kids-boy {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --border: #1e3a8a;
+  --teal: #60a5fa;
+  --teal-hover: #3b82f6;
+}
+
+html.kids-mode.dark.kids-girl {
+  --bg: #1f0a14;
+  --card: #2a1220;
+  --border: #9d174d;
+  --teal: #f472b6;
+  --teal-hover: #ec4899;
+}

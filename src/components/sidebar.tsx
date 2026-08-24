@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Archive, BookOpen, LogOut, Moon, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
-import type { UserProfile } from "@/lib/types";
+import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
 const NAV = [
   { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
@@ -27,11 +27,16 @@ export function Sidebar({
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col bg-slate text-white sm:flex">
-      <Link to="/dashboard" className="flex items-center gap-2 px-4 pt-5 pb-4">
-        <span className="rounded-lg bg-white px-2 py-1.5">
-          <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
-        </span>
-      </Link>
+      <div className="px-4 pt-5 pb-4">
+        <Link to="/dashboard" className="flex items-center gap-2">
+          <span className="rounded-lg bg-white px-2 py-1.5">
+            <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
+          </span>
+        </Link>
+        <p className="mt-2 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
+          {accountTypeLabel(profile)}
+        </p>
+      </div>
 
       <nav className="flex-1 space-y-1 px-2.5">
         {NAV.map((item) => {

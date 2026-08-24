@@ -7,7 +7,7 @@ import { signOut } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
-import type { UserProfile } from "@/lib/types";
+import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
 export function AppShell({
   title,
@@ -53,6 +53,10 @@ function AppShellInner({
         const brand = brandFromProfile(p);
         if (brand) persistBrand(brand);
         else hydrateBrand();
+        const kids = Boolean(p.kidsMode);
+        document.documentElement.classList.toggle("kids-mode", kids);
+        document.documentElement.classList.toggle("kids-boy", kids && p.childGender === "boy");
+        document.documentElement.classList.toggle("kids-girl", kids && p.childGender === "girl");
       })
       .catch(() => hydrateBrand());
   }, []);
@@ -81,6 +85,11 @@ function AppShellInner({
             <Link to="/dashboard" className="shrink-0 sm:hidden">
               <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
             </Link>
+            <div className="min-w-0 sm:hidden">
+              <p className="truncate text-[10px] font-semibold tracking-wide text-muted uppercase">
+                {accountTypeLabel(profile)}
+              </p>
+            </div>
             <h1 className="hidden truncate text-[15px] font-semibold text-fg sm:block">{title || ""}</h1>
           </div>
           <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">

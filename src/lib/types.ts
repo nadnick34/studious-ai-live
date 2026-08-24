@@ -1,5 +1,33 @@
-export type UserRole = "student" | "teacher" | "both" | "admin";
+export type UserRole = "student" | "teacher" | "professional" | "theologian" | "admin" | "both";
 export type EditionView = "student" | "teacher";
+export type ChildGender = "boy" | "girl";
+
+/** Display label for the account type chip under the logo */
+export function accountTypeLabel(profile?: {
+  role?: UserRole;
+  forChild?: boolean;
+  kidsMode?: boolean;
+  childAge?: number | null;
+} | null): string {
+  const role = profile?.role || "student";
+  if (profile?.forChild || profile?.kidsMode || (profile?.childAge != null && profile.childAge <= 9)) {
+    return "Student · Kids Mode";
+  }
+  switch (role) {
+    case "teacher":
+      return "Teacher";
+    case "professional":
+      return "Professional";
+    case "theologian":
+      return "Theologian";
+    case "admin":
+      return "Admin";
+    case "both":
+      return "Student & Teacher";
+    default:
+      return "Student";
+  }
+}
 
 export interface NotesSection {
   heading: string;
@@ -157,6 +185,13 @@ export interface UserProfile {
   role: UserRole;
   edition: EditionView;
   setupComplete: boolean;
+  /** Parent is setting this account up for a child */
+  forChild?: boolean;
+  /** Child age in years (Kids Mode when <= 9 and role is student) */
+  childAge?: number | null;
+  childGender?: ChildGender | null;
+  /** Derived / explicit kids skin */
+  kidsMode?: boolean;
 }
 
 export interface FilePayload {

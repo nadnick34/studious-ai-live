@@ -7,7 +7,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile, saveProfile } from "@/lib/data";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
-import type { UserProfile, UserRole } from "@/lib/types";
+import type { ChildGender, UserProfile, UserRole } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -20,6 +20,9 @@ function ProfilePage() {
   const [schoolSelect, setSchoolSelect] = useState("studious");
   const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState<UserRole>("student");
+  const [forChild, setForChild] = useState(false);
+  const [childAge, setChildAge] = useState<string>("");
+  const [childGender, setChildGender] = useState<ChildGender | "">("");
   const [customName, setCustomName] = useState("");
   const [paletteId, setPaletteId] = useState("studious");
   const [saving, setSaving] = useState(false);
@@ -36,7 +39,10 @@ function ProfilePage() {
       setSmsAlerts(p.smsAlerts);
       setSchoolSelect(p.schoolSelect);
       setAvatar(p.avatarDataUrl || "");
-      setRole(p.role);
+      setRole(p.role === "both" ? "student" : p.role);
+      setForChild(Boolean(p.forChild));
+      setChildAge(p.childAge != null ? String(p.childAge) : "");
+      setChildGender(p.childGender || "");
       setCustomName(p.customSchoolName || "");
       setPaletteId(p.paletteId || "studious");
     });
@@ -45,6 +51,9 @@ function ProfilePage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    const ageNum = childAge.trim() === "" ? null : Number(childAge);
+    const kidsMode =
+      role === "student" && (forChild || (ageNum != null && !Number.isNaN(ageNum) && ageNum <= 9));
     const next: UserProfile = {
       displayName: user?.displayName,
       phone,
@@ -56,6 +65,10 @@ function ProfilePage() {
       role,
       edition: role === "teacher" ? "teacher" : "student",
       setupComplete: true,
+      forChild: role === "student" ? forChild : false,
+      childAge: role === "student" ? ageNum : null,
+      childGender: role === "student" && (childGender === "boy" || childGender === "girl") ? childGender : null,
+      kidsMode,
     };
     await saveProfile({ data: next });
     if (schoolSelect === "custom") {
@@ -64,6 +77,10 @@ function ProfilePage() {
     } else {
       persistBrand(getStockById(schoolSelect) || DEFAULT_BRAND);
     }
+    // Apply kids skin immediately for local testing
+    document.documentElement.classList.toggle("kids-mode", Boolean(kidsMode));
+    document.documentElement.classList.toggle("kids-boy", Boolean(kidsMode && next.childGender === "boy"));
+    document.documentElement.classList.toggle("kids-girl", Boolean(kidsMode && next.childGender === "girl"));
     setSaving(false);
     if (next.edition === "teacher") await navigate({ to: "/coming-soon" });
     else await navigate({ to: "/dashboard" });
@@ -104,7 +121,7 @@ function ProfilePage() {
   return (
     <AppShell title="Profile">
       <div className="mx-auto max-w-xl space-y-5">
-  <p className="text-xs font-medium text-teal">App update: August 20</p>
+        <p className="text-xs font-medium text-teal">App update: August 20</p>
         <form onSubmit={handleSave} className="card-surface space-y-5 rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-teal text-lg font-semibold text-white">
@@ -132,17 +149,80 @@ function ProfilePage() {
           <ReadOnly label="Name" value={name} />
           <ReadOnly label="Email" value={email} />
           <div>
-            <label className="mb-1 block text-xs text-muted">I am a</label>
+            <label className="mb-1 block text-xs text-muted">Account type</label>
             <select
               className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
+              onChange={(e) => {
+                const next = e.target.value as UserRole;
+                setRole(next);
+                if (next !== "student") {
+                  setForChild(false);
+                  setChildAge("");
+                  setChildGender("");
+                }
+              }}
             >
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
-              <option value="both">Student & Teacher</option>
+              <option value="professional">Professional</option>
+              <option value="theologian">Theologian</option>
             </select>
+            <p className="mt-1 text-[11px] text-muted">
+              Teacher, Professional, and Theologian modes will be customized later. Core study tools work for all types
+              now.
+            </p>
           </div>
+          {role === "student" && (
+            <div className="space-y-3 rounded-xl border border-border bg-bg p-3">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={forChild}
+                  onChange={(e) => setForChild(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">Create for child</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Parent is setting up this account for a child. Ages 9 and under use Kids Mode.
+                  </span>
+                </span>
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-muted">Child age</label>
+                  <input
+                    type="number"
+                    min={3}
+                    max={18}
+                    value={childAge}
+                    onChange={(e) => setChildAge(e.target.value)}
+                    placeholder="e.g. 8"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-muted">Boy or girl</label>
+                  <select
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+                    value={childGender}
+                    onChange={(e) => setChildGender(e.target.value as ChildGender | "")}
+                  >
+                    <option value="">Prefer not to say</option>
+                    <option value="boy">Boy (blue theme)</option>
+                    <option value="girl">Girl (pink theme)</option>
+                  </select>
+                </div>
+              </div>
+              {(forChild || (childAge !== "" && Number(childAge) <= 9)) && (
+                <p className="text-xs text-teal">
+                  Kids Mode will be on{childGender === "boy" ? " with a blue skin" : childGender === "girl" ? " with a pink skin" : ""}.
+                  Layout and tools will keep getting friendlier for this age group.
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs text-muted">School</label>
             <select
