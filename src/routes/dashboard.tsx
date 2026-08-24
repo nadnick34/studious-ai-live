@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
+import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { createClass, listClasses, seedSampleClass, updateClass } from "@/lib/data";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
@@ -37,6 +38,7 @@ function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showClassInfo, setShowClassInfo] = useState(false);
+  const { kidsMode, name: mascotName } = useKidsMascot();
 
   async function refresh() {
     const rows = await listClasses({ data: false });
@@ -168,8 +170,18 @@ function DashboardPage() {
       {loading ? (
         <p className="py-16 text-center text-sm text-muted">Loading classes…</p>
       ) : classes.length === 0 ? (
-        <div className="mx-auto max-w-md py-16 text-center">
-          <p className="mb-4 text-muted">No classes yet. Create your first class to get started.</p>
+        <div className="mx-auto flex max-w-md flex-col items-center py-10 text-center sm:py-16">
+          {kidsMode ? (
+            <>
+              <KidsMascot size="hero" showName />
+              <h2 className="mt-4 text-xl font-bold text-fg">Welcome! I’m {mascotName}</h2>
+              <p className="mt-2 mb-6 text-sm text-muted">
+                I’m glad you’re here. Let’s add your first class and start learning together.
+              </p>
+            </>
+          ) : (
+            <p className="mb-4 text-muted">No classes yet. Create your first class to get started.</p>
+          )}
           <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
             <Button onClick={openCreate}>
               <Plus className="size-4" />

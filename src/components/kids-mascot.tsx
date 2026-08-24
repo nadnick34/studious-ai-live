@@ -19,17 +19,43 @@ export function useKidsMascot() {
 export function KidsMascot({
   size = "md",
   className = "",
+  showName = false,
 }: {
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "hero";
   className?: string;
+  showName?: boolean;
 }) {
   const { src, name } = useKidsMascot();
-  const dim = size === "sm" ? "h-12 w-12" : size === "lg" ? "h-24 w-24" : "h-16 w-16";
+  const dim =
+    size === "sm"
+      ? "h-12 w-12"
+      : size === "lg"
+        ? "h-28 w-28"
+        : size === "hero"
+          ? "h-40 w-40 sm:h-48 sm:w-48"
+          : "h-16 w-16";
   return (
-    <img
-      src={src}
-      alt={name}
-      className={`${dim} rounded-full object-cover shadow-sm ring-2 ring-white ${className}`}
-    />
+    <div className={`inline-flex flex-col items-center ${className}`}>
+      <img
+        src={src}
+        alt={name}
+        className={`${dim} rounded-full bg-white object-cover object-top shadow-md ring-4 ring-white`}
+      />
+      {showName && <p className="mt-2 text-sm font-semibold text-fg">{name}</p>}
+    </div>
+  );
+}
+
+export function KidsOwlBanner({ message }: { message?: string }) {
+  const { kidsMode, name } = useKidsMascot();
+  if (!kidsMode) return null;
+  return (
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border-2 border-teal/25 bg-gradient-to-r from-teal/5 to-card px-3 py-2.5">
+      <KidsMascot size="md" />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-fg">{name} is here to help</p>
+        <p className="text-xs text-muted">{message || "Let’s learn something new today!"}</p>
+      </div>
+    </div>
   );
 }

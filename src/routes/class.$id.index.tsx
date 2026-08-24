@@ -4,6 +4,7 @@ import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, 
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
+import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import {
@@ -199,6 +200,8 @@ function ClassPage() {
       <h2 className="mb-5 text-lg font-bold text-fg">
         {cls.code} – {cls.name}
       </h2>
+
+      <KidsOwlBanner message="Open a chapter or add a new one. I’ll help you study!" />
 
       {sets.length === 0 ? (
         <div className="card-surface rounded-xl px-4 py-12 text-center text-sm text-muted">

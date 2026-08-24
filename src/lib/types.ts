@@ -46,6 +46,21 @@ export interface SpatialPanel {
   /** What a cartoon should show — used for spatial learning UI */
   visualDescription: string;
   emoji: string;
+  /** Owl narrator line for this panel */
+  owlSays?: string;
+}
+
+export interface SpatialQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export interface SpatialStory {
+  title: string;
+  panels: SpatialPanel[];
+  questions: SpatialQuestion[];
 }
 
 export interface StudyNotes {
@@ -55,8 +70,8 @@ export interface StudyNotes {
   otherResources: { title: string; url?: string }[];
   /** Classical Education package for this chapter, when generated */
   classical?: ClassicalPackage;
-  /** Kids Mode: spatial / cartoon learning panels */
-  spatialLearning?: SpatialPanel[];
+  /** Kids Mode: spatial / cartoon learning (legacy panel array or full story) */
+  spatialLearning?: SpatialPanel[] | SpatialStory;
 }
 
 export type SocraticCardType = "recite" | "explain" | "dialectic" | "locus";

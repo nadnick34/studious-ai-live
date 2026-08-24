@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { getClassById, getStudySetById } from "@/lib/data";
 import type { ClassRecord, NotesSection, StudySet } from "@/lib/types";
@@ -43,6 +44,10 @@ function NotesPage() {
           ← Back to class
         </Link>
         <span className="text-xs text-muted">{cls.code}</span>
+      </div>
+
+      <div className="print-hidden mx-auto max-w-3xl">
+        <KidsOwlBanner message="Read the notes carefully. Tap Spatial for the comic story!" />
       </div>
 
       <div className="notes-sheet mx-auto max-w-3xl rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">

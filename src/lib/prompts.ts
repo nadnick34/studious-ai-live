@@ -111,9 +111,27 @@ KIDS MODE (age ${childAge ?? "9 or under"}):
 - Still accurate to the uploaded material — simplify wording, do not invent a different topic.
 - flashcards MUST include "emoji" (one emoji that helps a child remember) and "color" (one of: blue, pink, green, yellow, purple, orange).
 - quiz explanations must encourage ("Great thinking!", "Almost — try this idea next time…").
-- Also return notes.spatialLearning: 4–8 cartoon story panels:
-  [{ "id":"p1", "title":"…", "caption":"kid-friendly line", "visualDescription":"what the cartoon shows", "emoji":"…" }]
-- audioScript becomes a short read-aloud story version of the unit for a parent/child to listen to.
+- CONTENT GUARDRAILS (strict): Keep everything wholesome, traditional, and family-friendly. Do NOT include LGBTQ+ themes or advocacy, sexual content, crude humor, graphic violence, or political / ideological messaging. Teach the academic material plainly with classic virtues: honesty, curiosity, diligence, kindness, respect for family and learning. No culture-war framing.
+- notes.spatialLearning must be a comic-book story object (not a bare array):
+  {
+    "title": "short story title",
+    "panels": [
+      {
+        "id": "p1",
+        "title": "panel title",
+        "caption": "story caption under the picture",
+        "visualDescription": "detailed wholesome cartoon scene; include the friendly owl mascot guiding the lesson",
+        "emoji": "🌟",
+        "owlSays": "what the owl narrator says in this panel"
+      }
+    ],
+    "questions": [
+      { "id": "sq1", "question": "…", "options": ["A","B","C"], "correctIndex": 0 }
+    ]
+  }
+  - 5–8 panels in story order.
+  - Exactly 3 comprehension questions about the lesson.
+- audioScript becomes a short read-aloud story for parent/child listening.
 `
     : ""
 }
@@ -148,7 +166,11 @@ Return JSON:
       }
     ],
     "otherResources": [{ "title": "string", "url": "optional" }],
-    "spatialLearning": [{ "id": "p1", "title": "string", "caption": "string", "visualDescription": "string", "emoji": "🌟" }]
+    "spatialLearning": {
+      "title": "story title",
+      "panels": [{ "id": "p1", "title": "string", "caption": "string", "visualDescription": "string", "emoji": "🌟", "owlSays": "string" }],
+      "questions": [{ "id": "sq1", "question": "string", "options": ["A","B","C"], "correctIndex": 0 }]
+    }
   },
   "slides": [
     {
