@@ -10,8 +10,10 @@ export function buildGenerationPrompt(input: {
   sourceFiles: string[];
   extractedText?: string;
   focusPrompt?: string;
+  kidsMode?: boolean;
+  childAge?: number | null;
 }) {
-  const { className, classCode, subject, setName, sourceFiles, extractedText, focusPrompt } = input;
+  const { className, classCode, subject, setName, sourceFiles, extractedText, focusPrompt, kidsMode, childAge } = input;
 
   const focusBlock = focusPrompt
     ? `\n\nCUSTOM FOCUS REQUEST FROM THE STUDENT:\n"${focusPrompt}"\n\nStay inside the uploaded sources. Go deeper only on what the instructor actually said about this focus. Do not add textbook filler.`
@@ -100,9 +102,24 @@ QUIZ and FLASH CARDS: terms, dates, assignments, and claims from the uploads. Do
 OTHER RESOURCES: optional, labeled as outside the uploads. Do not let them rewrite the main notes.
 
 If unsure whether something is in the uploads, omit it from the main notes rather than guess.
+${
+  kidsMode
+    ? `
+KIDS MODE (age ${childAge ?? "9 or under"}):
+- Rewrite ALL notes, quiz, flash cards, and audio in warm, simple, age-appropriate language a child can understand.
+- Short sentences. Friendly tone. No jargon unless you explain it with a kid-friendly example.
+- Still accurate to the uploaded material — simplify wording, do not invent a different topic.
+- flashcards MUST include "emoji" (one emoji that helps a child remember) and "color" (one of: blue, pink, green, yellow, purple, orange).
+- quiz explanations must encourage ("Great thinking!", "Almost — try this idea next time…").
+- Also return notes.spatialLearning: 4–8 cartoon story panels:
+  [{ "id":"p1", "title":"…", "caption":"kid-friendly line", "visualDescription":"what the cartoon shows", "emoji":"…" }]
+- audioScript becomes a short read-aloud story version of the unit for a parent/child to listen to.
+`
+    : ""
+}
 Return ONLY valid JSON. No markdown fences.`;
 
-  const user = `Generate a full study package from these uploaded class materials. Use every upload (notes, audio, slides, textbook PDFs). Label anything not in the uploads.
+  const user = `Generate a full study package from these uploaded class materials. Use every upload (notes, audio, slides, textbook PDFs). Label anything not in the uploads.${kidsMode ? " This is KIDS MODE — age-appropriate language throughout." : ""}
 
 Class: ${classCode} – ${className}
 Subject: ${subject}
@@ -130,7 +147,8 @@ Return JSON:
         "reference": "optional"
       }
     ],
-    "otherResources": [{ "title": "string", "url": "optional" }]
+    "otherResources": [{ "title": "string", "url": "optional" }],
+    "spatialLearning": [{ "id": "p1", "title": "string", "caption": "string", "visualDescription": "string", "emoji": "🌟" }]
   },
   "slides": [
     {
@@ -146,7 +164,7 @@ Return JSON:
   ],
   "audioScript": "continuous spoken lecture script",
   "quiz": [{ "id": "q1", "question": "string", "options": ["A","B","C","D"], "correctIndex": 0, "explanation": "string" }],
-  "flashcards": [{ "id": "f1", "term": "string", "definition": "string" }]
+  "flashcards": [{ "id": "f1", "term": "string", "definition": "string", "emoji": "optional", "color": "optional blue|pink|green|yellow|purple|orange" }]
 }`;
 
   return { system, user };

@@ -90,6 +90,8 @@ function UploadPage() {
       });
       void (async () => {
         try {
+          const { getProfile } = await import("@/lib/data");
+          const profile = await getProfile();
           const generated = await generateStudyPackage({
             data: {
               className: cls.name,
@@ -98,6 +100,8 @@ function UploadPage() {
               setName: name.trim(),
               sourceFiles: extracted.attachments.map((a) => a.name),
               extractedText: extracted.text,
+              kidsMode: Boolean(profile.kidsMode),
+              childAge: profile.childAge,
             },
           });
           const { updateStudySet } = await import("@/lib/data");
@@ -118,7 +122,13 @@ function UploadPage() {
       })();
       await navigate({ to: "/class/$id", params: { id: classId } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : JSON.stringify(err) || "Something went wrong while reading or transcribing the lecture.";
+      setError(msg);
       setGenerating(false);
       setStatus("");
     }

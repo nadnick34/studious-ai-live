@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
@@ -10,6 +10,7 @@ import {
   createStudySet,
   deleteStudySet,
   getClassById,
+  getProfile,
   listStudySets,
   touchClass,
   updateStudySet,
@@ -70,6 +71,7 @@ function ClassPage() {
     setBusy(true);
     const setName = focusName.trim() || `Focus: ${focusText.trim().slice(0, 40)}`;
     try {
+      const profile = await getProfile();
       const generated = await generateStudyPackage({
         data: {
           className: cls.name,
@@ -78,6 +80,8 @@ function ClassPage() {
           setName,
           sourceFiles: ["Custom Focus"],
           focusPrompt: focusText.trim(),
+          kidsMode: Boolean(profile.kidsMode),
+          childAge: profile.childAge,
         },
       });
       const set = await createStudySet({
@@ -115,6 +119,7 @@ function ClassPage() {
     setStatus("Combining selected chapters…");
     setError(null);
     try {
+      const profile = await getProfile();
       const generated = await generateStudyPackage({
         data: {
           className: cls.name,
@@ -124,6 +129,8 @@ function ClassPage() {
           sourceFiles: chosen.map((s) => s.name),
           extractedText,
           focusPrompt: "Combine these chapter notes into one comprehensive midterm/final review.",
+          kidsMode: Boolean(profile.kidsMode),
+          childAge: profile.childAge,
         },
       });
       const set = await createStudySet({
@@ -339,12 +346,23 @@ function ChapterCard({
   onDelete: () => void;
 }) {
   const [classicalOpen, setClassicalOpen] = useState(false);
-  const actions = [
-    { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
-    { to: "/class/$id/set/$setId/audio" as const, label: "Audio", icon: Headphones },
-    { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
-    { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
-  ];
+  const [kidsMode, setKidsMode] = useState(false);
+  useEffect(() => {
+    void getProfile().then((p) => setKidsMode(Boolean(p.kidsMode)));
+  }, []);
+  const actions = kidsMode
+    ? [
+        { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
+        { to: "/class/$id/set/$setId/spatial" as const, label: "Spatial", icon: Shapes },
+        { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
+        { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
+      ]
+    : [
+        { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
+        { to: "/class/$id/set/$setId/audio" as const, label: "Audio", icon: Headphones },
+        { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
+        { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
+      ];
   return (
     <article className="card-surface rounded-xl p-4">
       <div className="flex items-start justify-between gap-3">
@@ -461,6 +479,7 @@ function EditChapterModal({
       const sourceFiles = nextAttachments.map((a) => a.name);
       if (rebuild) {
         const existingText = nextAttachments.map((a) => a.extractedText || a.name).join("\n\n");
+        const profile = await getProfile();
         const generated = await generateStudyPackage({
           data: {
             className: cls.name,
@@ -470,6 +489,8 @@ function EditChapterModal({
             sourceFiles,
             extractedText: [existingText, extractedExtra].filter(Boolean).join("\n"),
             focusPrompt: set.focusPrompt,
+            kidsMode: Boolean(profile.kidsMode),
+            childAge: profile.childAge,
           },
         });
         await updateStudySet({

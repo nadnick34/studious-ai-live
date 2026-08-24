@@ -209,7 +209,9 @@ function ProfilePage() {
                     value={childGender}
                     onChange={(e) => setChildGender(e.target.value as ChildGender | "")}
                   >
-                    <option value="">Prefer not to say</option>
+                    <option value="" disabled>
+                      Choose one
+                    </option>
                     <option value="boy">Boy (blue theme)</option>
                     <option value="girl">Girl (pink theme)</option>
                   </select>

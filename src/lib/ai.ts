@@ -346,6 +346,8 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
       sourceFiles: string[];
       extractedText?: string;
       focusPrompt?: string;
+      kidsMode?: boolean;
+      childAge?: number | null;
     }) => input,
   )
   .handler(async ({ data }) => {
@@ -357,6 +359,8 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
       sourceFiles: data.sourceFiles || [],
       extractedText: data.extractedText,
       focusPrompt: data.focusPrompt,
+      kidsMode: data.kidsMode,
+      childAge: data.childAge,
     });
 
     const key = apiKey();

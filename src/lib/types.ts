@@ -39,6 +39,15 @@ export interface NotesSection {
   table?: { headers: string[]; rows: string[][] };
 }
 
+export interface SpatialPanel {
+  id: string;
+  title: string;
+  caption: string;
+  /** What a cartoon should show — used for spatial learning UI */
+  visualDescription: string;
+  emoji: string;
+}
+
 export interface StudyNotes {
   title: string;
   subtitle: string;
@@ -46,6 +55,8 @@ export interface StudyNotes {
   otherResources: { title: string; url?: string }[];
   /** Classical Education package for this chapter, when generated */
   classical?: ClassicalPackage;
+  /** Kids Mode: spatial / cartoon learning panels */
+  spatialLearning?: SpatialPanel[];
 }
 
 export type SocraticCardType = "recite" | "explain" | "dialectic" | "locus";
@@ -96,6 +107,10 @@ export interface FlashCard {
   id: string;
   term: string;
   definition: string;
+  /** Kids Mode visual cue */
+  emoji?: string;
+  /** Tailwind-ish color hint: blue, pink, green, yellow, purple, orange */
+  color?: string;
 }
 
 export interface Slide {

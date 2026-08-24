@@ -1,9 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { getClassById, getStudySetById } from "@/lib/data";
 import type { ClassRecord, StudySet } from "@/lib/types";
+
+const COLOR_MAP: Record<string, string> = {
+  blue: "from-sky-100 to-blue-200 border-blue-300",
+  pink: "from-pink-100 to-rose-200 border-pink-300",
+  green: "from-emerald-100 to-green-200 border-emerald-300",
+  yellow: "from-amber-50 to-yellow-200 border-amber-300",
+  purple: "from-violet-100 to-purple-200 border-violet-300",
+  orange: "from-orange-100 to-orange-200 border-orange-300",
+};
 
 export const Route = createFileRoute("/class/$id/set/$setId/flashcards")({ component: FlashCardsPage });
 
@@ -15,6 +25,7 @@ function FlashCardsPage() {
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<"study" | "print">("study");
   const [reversed, setReversed] = useState(false);
+  const { kidsMode } = useKidsMascot();
 
   useEffect(() => {
     void Promise.all([getStudySetById({ data: setId }), getClassById({ data: classId })]).then(([s, c]) => {
@@ -81,17 +92,34 @@ function FlashCardsPage() {
 
       {mode === "study" ? (
         <div className="mx-auto max-w-md">
+          {kidsMode && (
+            <div className="mb-3 flex items-center justify-center gap-2">
+              <KidsMascot size="sm" />
+              <p className="text-sm font-medium text-teal">Tap the bright card to flip!</p>
+            </div>
+          )}
           <div className="mb-3 text-center text-xs text-muted">
             Card {index + 1} of {total} · Tap to flip
           </div>
           <button
             type="button"
             onClick={() => setFlipped(!flipped)}
-            className="flex min-h-[220px] w-full items-center justify-center rounded-2xl border border-border bg-card p-8 text-center shadow-md"
+            className={`flex min-h-[220px] w-full items-center justify-center rounded-3xl border-2 p-8 text-center shadow-md ${
+              kidsMode
+                ? `bg-gradient-to-br ${COLOR_MAP[card.color || "blue"] || COLOR_MAP.blue}`
+                : "border-border bg-card"
+            }`}
           >
             <div>
+              {kidsMode && card.emoji && !flipped && (
+                <div className="mb-3 text-5xl" aria-hidden>
+                  {card.emoji}
+                </div>
+              )}
               <div className="mb-2 text-[10px] tracking-wide text-muted uppercase">{flipped ? backLabel : frontLabel}</div>
-              <div className="text-lg leading-relaxed font-semibold text-fg">{flipped ? backText : frontText}</div>
+              <div className={`leading-relaxed font-semibold text-fg ${kidsMode ? "text-xl" : "text-lg"}`}>
+                {flipped ? backText : frontText}
+              </div>
             </div>
           </button>
           <div className="mt-5 flex justify-between gap-2">

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { getClassById, getStudySetById } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ function QuizPage() {
   const [revealed, setRevealed] = useState(false);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  const { kidsMode, name: mascotName } = useKidsMascot();
 
   useEffect(() => {
     void Promise.all([getStudySetById({ data: setId }), getClassById({ data: classId })]).then(([s, c]) => {
@@ -73,16 +75,27 @@ function QuizPage() {
       </div>
       <div className="mx-auto max-w-lg">
         {finished ? (
-          <div className="card-surface rounded-xl p-8 text-center">
+          <div className={`rounded-xl p-8 text-center ${kidsMode ? "border-2 border-teal/40 bg-gradient-to-b from-teal/10 to-card" : "card-surface"}`}>
+            {kidsMode && (
+              <div className="mb-3 flex justify-center">
+                <KidsMascot size="lg" />
+              </div>
+            )}
             <div className="mb-1 text-3xl font-bold text-fg">
               {score}/{total}
             </div>
             <p className="mb-6 text-sm text-muted">
-              {score === total
-                ? "Perfect — you’ve mastered this material."
-                : score >= total * 0.7
-                  ? "Solid work. Review the missed items and try again."
-                  : "Keep going. Revisit the notes and audio, then retake the quiz."}
+              {kidsMode
+                ? score === total
+                  ? `${mascotName} is so proud — perfect score!`
+                  : score >= total / 2
+                    ? `Nice work! ${mascotName} knows you’re learning.`
+                    : `Keep going — ${mascotName} believes in you. Try again!`
+                : score === total
+                  ? "Perfect — you’ve mastered this material."
+                  : score >= total * 0.7
+                    ? "Solid work. Review the missed items and try again."
+                    : "Keep going. Revisit the notes and audio, then retake the quiz."}
             </p>
             <div className="flex justify-center gap-2">
               <Button variant="secondary" onClick={restart}>Retake quiz</Button>
@@ -92,15 +105,21 @@ function QuizPage() {
             </div>
           </div>
         ) : (
-          <div className="card-surface rounded-xl p-6">
-            <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-bg">
+          <div className={`rounded-xl p-6 ${kidsMode ? "border-2 border-teal/30 bg-gradient-to-b from-white to-teal/5 dark:from-card dark:to-teal/10" : "card-surface"}`}>
+            {kidsMode && (
+              <div className="mb-3 flex items-center gap-2">
+                <KidsMascot size="sm" />
+                <p className="text-sm font-medium text-teal">You can do this!</p>
+              </div>
+            )}
+            <div className="mb-5 h-2 overflow-hidden rounded-full bg-bg">
               <div className="h-full rounded-full bg-teal transition-all" style={{ width: `${((index + (revealed ? 1 : 0)) / total) * 100}%` }} />
             </div>
             <div className="mb-2 text-xs text-muted">Question {index + 1} of {total}</div>
-            <h2 className="mb-5 text-base leading-snug font-semibold text-fg">{q.question}</h2>
+            <h2 className={`mb-5 leading-snug font-semibold text-fg ${kidsMode ? "text-lg" : "text-base"}`}>{q.question}</h2>
             <div className="space-y-2.5">
               {q.options.map((opt, i) => {
-                let style = "border-border hover:border-teal";
+                let style = kidsMode ? "border-2 border-border hover:border-teal bg-white dark:bg-card" : "border-border hover:border-teal";
                 if (revealed) {
                   if (i === q.correctIndex) style = "border-green-400 bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200";
                   else if (i === selected) style = "border-red-300 bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-200";
@@ -114,7 +133,11 @@ function QuizPage() {
                     type="button"
                     onClick={() => handleSelect(i)}
                     disabled={revealed}
-                    className={cn("w-full rounded-lg border px-4 py-3 text-left text-sm transition-colors", style)}
+                    className={cn(
+                      "w-full border px-4 py-3 text-left text-sm transition-colors",
+                      kidsMode ? "rounded-2xl font-medium" : "rounded-lg",
+                      style,
+                    )}
                   >
                     {opt}
                   </button>
@@ -122,7 +145,9 @@ function QuizPage() {
               })}
             </div>
             {revealed && q.explanation && (
-              <p className="mt-4 rounded-lg bg-bg p-3 text-xs text-muted">{q.explanation}</p>
+              <p className={`mt-4 rounded-xl p-3 text-sm ${kidsMode ? "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100" : "bg-bg text-xs text-muted"}`}>
+                {q.explanation}
+              </p>
             )}
             <div className="mt-6 flex items-center justify-between">
               <Link to="/class/$id" params={{ id: classId }} className="text-sm text-muted">
