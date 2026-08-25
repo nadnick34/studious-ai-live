@@ -25,13 +25,90 @@ function decodeBase64(b64: string) {
   return Buffer.from(b64, "base64");
 }
 
-async function extractPdf(buf: Buffer): Promise<string> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
-  const pdf = await getDocumentProxy(new Uint8Array(buf));
-  const result = await extractText(pdf, { mergePages: true });
-  const text = Array.isArray(result.text) ? result.text.join("\n") : result.text;
-  return (text || "").toString();
+function ascii85DecodeBuffer(input: Buffer): Buffer {
+  const cleaned = input
+    .toString("latin1")
+    .replace(/\s+/g, "")
+    .replace(/~>$/, "");
+  const out: number[] = [];
+  let i = 0;
+  while (i < cleaned.length) {
+    if (cleaned[i] === "z") {
+      out.push(0, 0, 0, 0);
+      i += 1;
+      continue;
+    }
+    const slice = cleaned.slice(i, i + 5);
+    const pad = 5 - slice.length;
+    const full = slice.length < 5 ? slice + "u".repeat(pad) : slice;
+    let n = 0;
+    for (let j = 0; j < 5; j++) n = n * 85 + (full.charCodeAt(j) - 33);
+    const part = [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+    out.push(...part.slice(0, 4 - (pad || 0)));
+    i += 5;
+  }
+  return Buffer.from(out);
 }
+
+function extractPdfHeuristic(buf: Buffer): string {
+  const src = buf.toString("latin1");
+  const texts: string[] = [];
+  const objs = src.split(/endobj/g);
+  for (const body of objs) {
+    if (!body.includes("stream")) continue;
+    const sm = body.search(/stream\r?\n/);
+    const em = body.lastIndexOf("endstream");
+    if (sm < 0 || em < 0) continue;
+    let rawStr = body.slice(body.slice(sm).search(/\n/) + sm + 1, em);
+    rawStr = rawStr.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+    let payload = Buffer.from(rawStr, "latin1");
+    try {
+      if (body.includes("/ASCII85Decode")) payload = ascii85DecodeBuffer(payload);
+      if (body.includes("/FlateDecode")) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const zlib = require("zlib") as typeof import("zlib");
+        payload = zlib.inflateSync(payload);
+      }
+    } catch {
+      continue;
+    }
+    const s = payload.toString("latin1");
+    for (const m of s.matchAll(/\((?:\\.|[^\\)])*\)\s*Tj/g)) {
+      const inner = m[0].match(/\((.*)\)\s*Tj/s);
+      if (inner) {
+        const t = inner[1].replace(/\\\(/g, "(").replace(/\\\)/g, ")");
+        if (t.trim()) texts.push(t);
+      }
+    }
+    for (const m of s.matchAll(/\[(.*?)\]\s*TJ/gs)) {
+      for (const p of m[1].matchAll(/\((?:\\.|[^\\)])*\)/g)) {
+        const t = p[0].slice(1, -1).replace(/\\\(/g, "(").replace(/\\\)/g, ")");
+        if (t.trim()) texts.push(t);
+      }
+    }
+  }
+  return texts.join("\n").replace(/\s+\n/g, "\n").trim();
+}
+
+async function extractPdf(buf: Buffer): Promise<string> {
+  try {
+    const heuristic = extractPdfHeuristic(buf);
+    if (heuristic && heuristic.length > 20) return heuristic;
+  } catch {
+    /* continue */
+  }
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const result = await extractText(pdf, { mergePages: true });
+    const text = Array.isArray(result.text) ? result.text.join("\n") : result.text;
+    if (text && String(text).trim()) return String(text);
+  } catch {
+    /* continue */
+  }
+  return "";
+}
+
 
 async function sttOnce(key: string, buf: Buffer, filename: string, mime: string) {
   const form = new FormData();

@@ -123,28 +123,8 @@ export async function fileToPayload(file: File): Promise<{
   size: number;
   base64: string;
 }> {
-  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-  if (isPdf) {
-    try {
-      const text = await extractPdfText(file);
-      if (text.length > 40) {
-        const clipped = text.slice(0, 60000);
-        const bytes = new TextEncoder().encode(clipped);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        }
-        return {
-          name: file.name,
-          type: "text/plain",
-          size: bytes.length,
-          base64: btoa(binary),
-        };
-      }
-    } catch {
-      /* fall through and send a truncated PDF */
-    }
-  }
+  // PDFs are sent as binary so the server can extract text (including ReportLab homework PDFs).
+
 
   const buf = await file.arrayBuffer();
   const isAudio = file.type.startsWith("audio/") || /\.(mp3|m4a|wav|aac|mp4)$/i.test(file.name);
