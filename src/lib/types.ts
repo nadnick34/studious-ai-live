@@ -242,3 +242,39 @@ export interface GeneratedPackage {
   flashcards: FlashCard[];
   slides: Slide[];
 }
+
+export interface AssignmentGuidance {
+  summary: string;
+  steps: string[];
+  ideas: string[];
+  tips: string[];
+  checklist: string[];
+  warnings?: string[];
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  submittedAt: string;
+  fileNames: string[];
+  workText: string;
+  feedback: AssignmentFeedback;
+}
+
+export interface AssignmentFeedback {
+  overall: string;
+  strengths: string[];
+  improvements: string[];
+  scoreHint?: string;
+  nextSteps: string[];
+}
+
+export interface AssignmentRecord {
+  id: string;
+  classId: string;
+  title: string;
+  createdAt: string;
+  instructionsText: string;
+  sourceFiles: string[];
+  guidance?: AssignmentGuidance | null;
+  submissions: AssignmentSubmission[];
+}

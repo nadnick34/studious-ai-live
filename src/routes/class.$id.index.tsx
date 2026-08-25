@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
+import { BookOpen, ClipboardList, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
@@ -167,6 +167,12 @@ function ClassPage() {
       right={
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowChapterInfo(true)} label="How chapters work" />
+          <Link to="/class/$id/assignments" params={{ id: classId }}>
+            <Button variant="secondary" className="min-h-10 px-3 text-xs sm:text-sm">
+              <ClipboardList className="size-4" />
+              Assignments
+            </Button>
+          </Link>
           <Link to="/class/$id/upload" params={{ id: classId }}>
             <Button className="min-h-10 px-3 text-xs sm:text-sm">
               <Plus className="size-4" />

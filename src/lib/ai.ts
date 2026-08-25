@@ -927,3 +927,110 @@ export const speakLecture = createServerFn({ method: "POST" })
     const buf = Buffer.from(await res.arrayBuffer());
     return { ok: true as const, mime: "audio/mpeg", audioBase64: buf.toString("base64") };
   });
+
+import { buildAssignmentCheckPrompt, buildAssignmentGuidancePrompt } from "@/lib/assignment-prompts";
+import type { AssignmentFeedback, AssignmentGuidance } from "@/lib/types";
+
+export const generateAssignmentGuidance = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      className: string;
+      classCode: string;
+      subject: string;
+      title: string;
+      instructionsText: string;
+      kidsMode?: boolean;
+      childAge?: number | null;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const { system, user } = buildAssignmentGuidancePrompt(data);
+    if (!key) {
+      return {
+        summary: "Read the instructions carefully and list every required part before you start.",
+        steps: ["List the requirements", "Gather sources or notes", "Draft", "Revise", "Check the rubric"],
+        ideas: ["Focus on clarity and complete answers to every prompt item"],
+        tips: ["Save a checklist from the instructions and tick each item off"],
+        checklist: ["Name on paper", "All questions answered", "Citations if required"],
+        warnings: ["Missing API key — this is a generic plan until AI is available"],
+      } satisfies AssignmentGuidance;
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.3,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Guidance failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(extractJsonObject(content)) as AssignmentGuidance;
+    return {
+      summary: parsed.summary || "",
+      steps: parsed.steps || [],
+      ideas: parsed.ideas || [],
+      tips: parsed.tips || [],
+      checklist: parsed.checklist || [],
+      warnings: parsed.warnings || [],
+    };
+  });
+
+export const checkAssignmentWork = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      className: string;
+      classCode: string;
+      subject: string;
+      title: string;
+      instructionsText: string;
+      workText: string;
+      kidsMode?: boolean;
+      childAge?: number | null;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const { system, user } = buildAssignmentCheckPrompt(data);
+    if (!key) {
+      return {
+        overall: "AI checking needs an API key. Review the instructions checklist yourself for now.",
+        strengths: ["You submitted work for review"],
+        improvements: ["Compare each instruction bullet to your draft"],
+        nextSteps: ["Re-read the prompt", "Fix gaps", "Ask a teacher or parent to look over it"],
+      } satisfies AssignmentFeedback;
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Check failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(extractJsonObject(content)) as AssignmentFeedback;
+    return {
+      overall: parsed.overall || "",
+      strengths: parsed.strengths || [],
+      improvements: parsed.improvements || [],
+      scoreHint: parsed.scoreHint,
+      nextSteps: parsed.nextSteps || [],
+    };
+  });

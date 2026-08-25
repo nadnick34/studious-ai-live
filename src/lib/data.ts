@@ -4,6 +4,9 @@ import { getSql } from "@/lib/db";
 import { parseJson, uid } from "@/lib/utils";
 import { SAMPLE_PACKAGE } from "@/lib/seed";
 import type {
+  AssignmentGuidance,
+  AssignmentRecord,
+  AssignmentSubmission,
   Attachment,
   ClassAlert,
   ClassRecord,
@@ -503,4 +506,140 @@ export const seedSampleClass = createServerFn({ method: "POST" })
       )
     `;
     return { created: true as const, classId };
+  });
+
+type AssignmentRow = {
+  id: string;
+  user_id: string;
+  class_id: string;
+  title: string;
+  created_at: string;
+  instructions_text: string;
+  source_files: unknown;
+  guidance: unknown;
+  submissions: unknown;
+};
+
+function mapAssignment(row: AssignmentRow): AssignmentRecord {
+  return {
+    id: row.id,
+    classId: row.class_id,
+    title: row.title,
+    createdAt: row.created_at,
+    instructionsText: row.instructions_text || "",
+    sourceFiles: parseJson<string[]>(row.source_files, []),
+    guidance: (row.guidance as AssignmentGuidance | null) || null,
+    submissions: parseJson<AssignmentSubmission[]>(row.submissions, []),
+  };
+}
+
+export const listAssignments = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((classId: string) => classId)
+  .handler(async ({ context, data: classId }) => {
+    const sql = await getSql();
+    const rows = await sql<AssignmentRow>`
+      select * from assignments
+      where user_id = ${context.userId} and class_id = ${classId}
+      order by created_at desc
+    `;
+    return rows.map(mapAssignment);
+  });
+
+export const getAssignmentById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<AssignmentRow>`
+      select * from assignments where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapAssignment(rows[0]) : null;
+  });
+
+export const createAssignment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      classId: string;
+      title: string;
+      instructionsText: string;
+      sourceFiles?: string[];
+      guidance?: AssignmentGuidance | null;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("asg");
+    const createdAt = new Date().toISOString();
+    await sql`
+      insert into assignments (
+        id, user_id, class_id, title, created_at, instructions_text, source_files, guidance, submissions
+      ) values (
+        ${id}, ${context.userId}, ${data.classId}, ${data.title.trim()}, ${createdAt},
+        ${data.instructionsText || ""},
+        ${JSON.stringify(data.sourceFiles || [])}::jsonb,
+        ${data.guidance ? JSON.stringify(data.guidance) : null}::jsonb,
+        ${JSON.stringify([])}::jsonb
+      )
+    `;
+    return {
+      id,
+      classId: data.classId,
+      title: data.title.trim(),
+      createdAt,
+      instructionsText: data.instructionsText || "",
+      sourceFiles: data.sourceFiles || [],
+      guidance: data.guidance || null,
+      submissions: [],
+    } satisfies AssignmentRecord;
+  });
+
+export const updateAssignment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      id: string;
+      patch: Partial<{
+        title: string;
+        instructionsText: string;
+        sourceFiles: string[];
+        guidance: AssignmentGuidance | null;
+        submissions: AssignmentSubmission[];
+      }>;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const rows = await sql<AssignmentRow>`
+      select * from assignments where id = ${data.id} and user_id = ${context.userId} limit 1
+    `;
+    const row = rows[0];
+    if (!row) return { ok: false as const };
+    const next = {
+      title: data.patch.title ?? row.title,
+      instructions_text: data.patch.instructionsText ?? row.instructions_text,
+      source_files: data.patch.sourceFiles ?? parseJson<string[]>(row.source_files, []),
+      guidance: data.patch.guidance !== undefined ? data.patch.guidance : row.guidance,
+      submissions: data.patch.submissions ?? parseJson<AssignmentSubmission[]>(row.submissions, []),
+    };
+    await sql`
+      update assignments set
+        title = ${next.title},
+        instructions_text = ${next.instructions_text},
+        source_files = ${JSON.stringify(next.source_files)}::jsonb,
+        guidance = ${next.guidance ? JSON.stringify(next.guidance) : null}::jsonb,
+        submissions = ${JSON.stringify(next.submissions)}::jsonb
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ok: true as const };
+  });
+
+export const deleteAssignment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    await sql`delete from assignments where id = ${id} and user_id = ${context.userId}`;
+    return { ok: true as const };
   });
