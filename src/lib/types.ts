@@ -269,12 +269,21 @@ export interface AssignmentSubmission {
   feedback: AssignmentFeedback;
 }
 
+/** Unified three-section assignment report */
 export interface AssignmentFeedback {
-  overall: string;
-  strengths: string[];
-  improvements: string[];
-  scoreHint?: string;
-  nextSteps: string[];
+  /** 1. Review of Assignment — based on instructions; "TBD" if none */
+  reviewOfAssignment: string;
+  /** Structured review pieces when instructions exist */
+  reviewSummary?: string;
+  reviewSteps?: string[];
+  problemGuides?: AssignmentProblemGuide[];
+  /** 2. Assignment Assessment — based on completed work */
+  assignmentAssessment: string;
+  strengths?: string[];
+  issues?: string[];
+  /** 3. The Extra Mile — or "N/A" */
+  extraMile: string;
+  extraMileTips?: string[];
 }
 
 export interface AssignmentRecord {
@@ -286,4 +295,6 @@ export interface AssignmentRecord {
   sourceFiles: string[];
   guidance?: AssignmentGuidance | null;
   submissions: AssignmentSubmission[];
+  /** Latest unified report (assistant + checker) */
+  latestReport?: AssignmentFeedback | null;
 }

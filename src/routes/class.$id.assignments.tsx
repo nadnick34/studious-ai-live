@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { extractMaterials, generateAssignmentGuidance } from "@/lib/ai";
+import { extractMaterials, analyzeAssignment } from "@/lib/ai";
 import {
   createAssignment,
   deleteAssignment,
@@ -74,7 +74,7 @@ function AssignmentsPage() {
       }
       setStatus("Analyzing assignment and building how-to guidance…");
       const profile = await getProfile();
-      const guidance = await generateAssignmentGuidance({
+      const report = await analyzeAssignment({
         data: {
           className: cls.name,
           classCode: cls.code,
@@ -85,6 +85,15 @@ function AssignmentsPage() {
           childAge: profile.childAge,
         },
       });
+      const guidance = {
+        summary: report.reviewOfAssignment === "TBD" ? "" : report.reviewOfAssignment,
+        steps: report.reviewSteps || [],
+        ideas: [] as string[],
+        tips: [] as string[],
+        checklist: [] as string[],
+        warnings: [] as string[],
+        problemGuides: report.problemGuides || [],
+      };
       const asg = await createAssignment({
         data: {
           classId,

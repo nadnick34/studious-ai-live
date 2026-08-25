@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { buildClassicalPrompt } from "@/lib/classical-prompts";
+import { buildAssignmentUnifiedPrompt } from "@/lib/assignment-prompts";
 import { buildGenerationPrompt, buildProfessorInsightPrompt } from "@/lib/prompts";
 import { parseSyllabusLocally } from "@/lib/calendar";
 import { normalizeSlides } from "@/lib/slides";
 import { uid } from "@/lib/utils";
-import type { Attachment, ClassicalPackage, FilePayload, GeneratedPackage, Slide, SpatialStory, SpatialPanel } from "@/lib/types";
+import type { AssignmentFeedback, AssignmentGuidance, Attachment, ClassicalPackage, FilePayload, GeneratedPackage, Slide, SpatialStory, SpatialPanel } from "@/lib/types";
 
 function apiKey() {
   return process.env.XAI_API_KEY || process.env.GROK_API_KEY || "";
@@ -132,10 +133,14 @@ async function processFile(file: FilePayload): Promise<{ heading: string; text: 
     try {
       text = await extractPdf(buf);
       if (!text.trim()) {
-        text = `[PDF had little extractable text. It may be a scan. Treat the filename as context.]`;
+        // Some "PDFs" are image-only; still record that so the client can show a clear message
+        text = `[PDF "${name}" had no extractable text layer. It may be a scanned image PDF. Re-upload as a photo/scan of each page, or export a text PDF.]`;
+      } else {
+        text = `PDF CONTENT from ${name}:
+${text}`;
       }
     } catch (err) {
-      text = `[Could not parse PDF: ${err instanceof Error ? err.message : "parse error"}]`;
+      text = `[Could not parse PDF ${name}: ${err instanceof Error ? err.message : "parse error"}. Try photo/scan of the pages or a different PDF export.]`;
     }
   } else if (kind === "image") {
     text = await visionOcr(name, type || "image/jpeg", file.base64);
@@ -937,9 +942,86 @@ export const speakLecture = createServerFn({ method: "POST" })
     return { ok: true as const, mime: "audio/mpeg", audioBase64: buf.toString("base64") };
   });
 
-import { buildAssignmentCheckPrompt, buildAssignmentGuidancePrompt } from "@/lib/assignment-prompts";
-import type { AssignmentFeedback, AssignmentGuidance } from "@/lib/types";
 
+
+function normalizeAssignmentReport(parsed: Partial<AssignmentFeedback>): AssignmentFeedback {
+  return {
+    reviewOfAssignment: (parsed.reviewOfAssignment || "").trim() || "TBD",
+    reviewSummary: parsed.reviewSummary,
+    reviewSteps: parsed.reviewSteps || [],
+    problemGuides: parsed.problemGuides || [],
+    assignmentAssessment: (parsed.assignmentAssessment || "").trim() || "TBD",
+    strengths: parsed.strengths || [],
+    issues: parsed.issues || [],
+    extraMile: (parsed.extraMile || "").trim() || "N/A",
+    extraMileTips: parsed.extraMileTips || [],
+  };
+}
+
+export const analyzeAssignment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      className: string;
+      classCode: string;
+      subject: string;
+      title: string;
+      instructionsText?: string;
+      workText?: string;
+      kidsMode?: boolean;
+      childAge?: number | null;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const hasInstructions = Boolean((data.instructionsText || "").trim());
+    const hasWork = Boolean((data.workText || "").trim());
+    if (!hasInstructions && !hasWork) {
+      return normalizeAssignmentReport({
+        reviewOfAssignment: "TBD",
+        assignmentAssessment: "TBD",
+        extraMile: "N/A",
+      });
+    }
+    const { system, user } = buildAssignmentUnifiedPrompt(data);
+    if (!key) {
+      return normalizeAssignmentReport({
+        reviewOfAssignment: hasInstructions
+          ? "Read every direction and list each required part before you start. (AI key not configured — generic guidance only.)"
+          : "TBD",
+        reviewSteps: hasInstructions ? ["List requirements", "Gather materials", "Draft", "Check the rubric"] : [],
+        assignmentAssessment: hasWork
+          ? "Compare your work to each instruction item. (AI key not configured — generic check only.)"
+          : "TBD",
+        strengths: hasWork ? ["You submitted work for review"] : [],
+        issues: hasWork ? ["Verify every required question is answered"] : [],
+        extraMile: "N/A",
+      });
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 5000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Assignment analysis failed (${res.status}): ${err.slice(0, 200)}`);
+    }
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(extractJsonObject(content)) as Partial<AssignmentFeedback>;
+    return normalizeAssignmentReport(parsed);
+  });
+
+/** Compatibility wrappers */
 export const generateAssignmentGuidance = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(
@@ -954,16 +1036,19 @@ export const generateAssignmentGuidance = createServerFn({ method: "POST" })
     }) => input,
   )
   .handler(async ({ data }) => {
+    const report = await (analyzeAssignment as any).handler?.({ data: { ...data, workText: "" } });
+    // call internal logic via fetch-style is hard; inline duplicate call
     const key = apiKey();
-    const { system, user } = buildAssignmentGuidancePrompt(data);
+    const { system, user } = buildAssignmentUnifiedPrompt({ ...data, workText: "" });
     if (!key) {
       return {
         summary: "Read the instructions carefully and list every required part before you start.",
         steps: ["List the requirements", "Gather sources or notes", "Draft", "Revise", "Check the rubric"],
-        ideas: ["Focus on clarity and complete answers to every prompt item"],
-        tips: ["Save a checklist from the instructions and tick each item off"],
-        checklist: ["Name on paper", "All questions answered", "Citations if required"],
-        warnings: ["Missing API key — this is a generic plan until AI is available"],
+        ideas: ["Focus on clarity and complete answers"],
+        tips: ["Tick off each instruction item"],
+        checklist: ["All questions answered"],
+        warnings: [],
+        problemGuides: [],
       } satisfies AssignmentGuidance;
     }
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -971,8 +1056,8 @@ export const generateAssignmentGuidance = createServerFn({ method: "POST" })
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "grok-4.5",
-        temperature: 0.3,
-        max_tokens: 4000,
+        temperature: 0.25,
+        max_tokens: 5000,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -982,16 +1067,17 @@ export const generateAssignmentGuidance = createServerFn({ method: "POST" })
     if (!res.ok) throw new Error(`Guidance failed (${res.status})`);
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
-    const parsed = JSON.parse(extractJsonObject(content)) as AssignmentGuidance;
+    const parsed = JSON.parse(extractJsonObject(content)) as Partial<AssignmentFeedback>;
+    const report2 = normalizeAssignmentReport(parsed);
     return {
-      summary: parsed.summary || "",
-      steps: parsed.steps || [],
-      ideas: parsed.ideas || [],
-      tips: parsed.tips || [],
-      checklist: parsed.checklist || [],
-      warnings: parsed.warnings || [],
-      problemGuides: Array.isArray(parsed.problemGuides) ? parsed.problemGuides : [],
-    };
+      summary: report2.reviewOfAssignment === "TBD" ? "" : report2.reviewOfAssignment,
+      steps: report2.reviewSteps || [],
+      ideas: [],
+      tips: [],
+      checklist: [],
+      warnings: [],
+      problemGuides: report2.problemGuides || [],
+    } satisfies AssignmentGuidance;
   });
 
 export const checkAssignmentWork = createServerFn({ method: "POST" })
@@ -1010,14 +1096,15 @@ export const checkAssignmentWork = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const key = apiKey();
-    const { system, user } = buildAssignmentCheckPrompt(data);
+    const { system, user } = buildAssignmentUnifiedPrompt(data);
     if (!key) {
-      return {
-        overall: "AI checking needs an API key. Review the instructions checklist yourself for now.",
-        strengths: ["You submitted work for review"],
-        improvements: ["Compare each instruction bullet to your draft"],
-        nextSteps: ["Re-read the prompt", "Fix gaps", "Ask a teacher or parent to look over it"],
-      } satisfies AssignmentFeedback;
+      return normalizeAssignmentReport({
+        reviewOfAssignment: data.instructionsText?.trim() ? "See assignment sheet." : "TBD",
+        assignmentAssessment: "Compare your work to each required item.",
+        strengths: ["Work submitted"],
+        issues: ["Manual review recommended"],
+        extraMile: "N/A",
+      });
     }
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
@@ -1025,7 +1112,7 @@ export const checkAssignmentWork = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model: "grok-4.5",
         temperature: 0.25,
-        max_tokens: 4000,
+        max_tokens: 5000,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -1035,12 +1122,6 @@ export const checkAssignmentWork = createServerFn({ method: "POST" })
     if (!res.ok) throw new Error(`Check failed (${res.status})`);
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
-    const parsed = JSON.parse(extractJsonObject(content)) as AssignmentFeedback;
-    return {
-      overall: parsed.overall || "",
-      strengths: parsed.strengths || [],
-      improvements: parsed.improvements || [],
-      scoreHint: parsed.scoreHint,
-      nextSteps: parsed.nextSteps || [],
-    };
+    const parsed = JSON.parse(extractJsonObject(content)) as Partial<AssignmentFeedback>;
+    return normalizeAssignmentReport(parsed);
   });

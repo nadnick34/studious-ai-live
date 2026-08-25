@@ -1,27 +1,39 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { KidsOwlBanner, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
-import { checkAssignmentWork, extractMaterials } from "@/lib/ai";
+import { analyzeAssignment, extractMaterials } from "@/lib/ai";
 import { getAssignmentById, getClassById, getProfile, updateAssignment } from "@/lib/data";
 import { uid } from "@/lib/utils";
-import type { AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
+import type { AssignmentFeedback, AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/assignment/$assignmentId")({
   component: AssignmentDetailPage,
 });
 
+async function extractFromCapture(items: CapturedFile[]): Promise<{ text: string; names: string[] }> {
+  if (!items.length) return { text: "", names: [] };
+  const payloads = await capturedToPayloads(items);
+  const extracted = await extractMaterials({ data: { files: payloads } });
+  const names = extracted.attachments.map((a) => a.name);
+  const text = (extracted.text || "").trim();
+  return { text, names };
+}
+
 function AssignmentDetailPage() {
   const { id: classId, assignmentId } = Route.useParams();
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [asg, setAsg] = useState<AssignmentRecord | null>(null);
-  const [workText, setWorkText] = useState("");
-  const [captured, setCaptured] = useState<CapturedFile[]>([]);
+  const [instructionPaste, setInstructionPaste] = useState("");
+  const [instructionFiles, setInstructionFiles] = useState<CapturedFile[]>([]);
+  const [workPaste, setWorkPaste] = useState("");
+  const [workFiles, setWorkFiles] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<AssignmentFeedback | null>(null);
   const { kidsMode, name: mascotName } = useKidsMascot();
 
   useEffect(() => {
@@ -29,62 +41,115 @@ function AssignmentDetailPage() {
       ([c, a]) => {
         setCls(c);
         setAsg(a);
+        if (a?.submissions?.[0]?.feedback) setReport(a.submissions[0].feedback);
       },
     );
   }, [classId, assignmentId]);
 
-  async function handleCheck() {
+  async function runAnalysis(mode: "instructions" | "work" | "both") {
     if (!cls || !asg) return;
-    if (!workText.trim() && captured.length === 0) {
-      setError("Paste, upload, photograph, or scan your finished work first.");
-      return;
-    }
     setBusy(true);
     setError(null);
-    setStatus(captured.length ? "Reading your work…" : null);
+    setStatus("Reading uploads…");
     try {
-      let combined = workText.trim();
-      const sourceFiles: string[] = [];
-      if (captured.length) {
-        const payloads = await capturedToPayloads(captured);
-        const extracted = await extractMaterials({ data: { files: payloads } });
-        sourceFiles.push(...extracted.attachments.map((a) => a.name));
-        if (extracted.text?.trim()) {
-          combined = [combined, extracted.text.trim()].filter(Boolean).join("\n\n");
+      let instructionsText = asg.instructionsText || "";
+      let workText = "";
+      const sourceFiles = [...(asg.sourceFiles || [])];
+
+      if (mode === "instructions" || mode === "both") {
+        const fromFiles = await extractFromCapture(instructionFiles);
+        const combined = [instructionPaste.trim(), fromFiles.text].filter(Boolean).join("\n\n");
+        if (combined) {
+          instructionsText = [instructionsText, combined].filter(Boolean).join("\n\n").slice(0, 60000);
+          sourceFiles.push(...fromFiles.names);
         }
       }
-      if (!combined.trim()) {
-        setError("Could not read enough text from your work. Paste it or try a clearer photo/scan.");
+
+      if (mode === "work" || mode === "both") {
+        const fromFiles = await extractFromCapture(workFiles);
+        workText = [workPaste.trim(), fromFiles.text].filter(Boolean).join("\n\n").slice(0, 60000);
+        if (!workText && mode === "work") {
+          setError("Could not read your completed work. Upload a clearer PDF, photo, or scan, or paste the text.");
+          return;
+        }
+      }
+
+      if (mode === "instructions" && !instructionsText.trim()) {
+        setError("Could not read assignment instructions. Try a text PDF, photo, or scan of the sheet.");
         return;
       }
-      setStatus("Checking against the assignment…");
+
+      if (!instructionsText.trim() && !workText.trim()) {
+        setError("Add instructions and/or completed work (PDF, photo, scan, or paste).");
+        return;
+      }
+
+      setStatus("Analyzing…");
       const profile = await getProfile();
-      const feedback = await checkAssignmentWork({
+      const feedback = await analyzeAssignment({
         data: {
           className: cls.name,
           classCode: cls.code,
           subject: cls.subject,
           title: asg.title,
-          instructionsText: asg.instructionsText,
-          workText: combined.slice(0, 50000),
+          instructionsText: instructionsText.trim() || undefined,
+          workText: workText.trim() || undefined,
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
         },
       });
-      const submission: AssignmentSubmission = {
-        id: uid("sub"),
-        submittedAt: new Date().toISOString(),
-        fileNames: sourceFiles,
-        workText: combined.slice(0, 20000),
-        feedback,
-      };
-      const submissions = [submission, ...(asg.submissions || [])];
-      await updateAssignment({ data: { id: asg.id, patch: { submissions } } });
-      setAsg({ ...asg, submissions });
-      setWorkText("");
-      setCaptured([]);
+
+      const submission: AssignmentSubmission | null = workText.trim()
+        ? {
+            id: uid("sub"),
+            submittedAt: new Date().toISOString(),
+            fileNames: workFiles.map((f) => f.file.name),
+            workText: workText.trim().slice(0, 20000),
+            feedback,
+          }
+        : null;
+
+      const guidance =
+        feedback.reviewOfAssignment && feedback.reviewOfAssignment !== "TBD"
+          ? {
+              summary: feedback.reviewOfAssignment,
+              steps: feedback.reviewSteps || [],
+              ideas: [] as string[],
+              tips: [] as string[],
+              checklist: [] as string[],
+              warnings: [] as string[],
+              problemGuides: feedback.problemGuides || [],
+            }
+          : asg.guidance;
+
+      const submissions = submission ? [submission, ...(asg.submissions || [])] : asg.submissions || [];
+
+      await updateAssignment({
+        data: {
+          id: asg.id,
+          patch: {
+            instructionsText,
+            sourceFiles: Array.from(new Set(sourceFiles)),
+            guidance: guidance || null,
+            submissions,
+          },
+        },
+      });
+
+      setAsg({
+        ...asg,
+        instructionsText,
+        sourceFiles: Array.from(new Set(sourceFiles)),
+        guidance: guidance || null,
+        submissions,
+      });
+      setReport(feedback);
+      setInstructionPaste("");
+      setInstructionFiles([]);
+      setWorkPaste("");
+      setWorkFiles([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Check failed");
+      setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setBusy(false);
       setStatus(null);
@@ -99,8 +164,6 @@ function AssignmentDetailPage() {
     );
   }
 
-  const g = asg.guidance;
-
   return (
     <AppShell title={asg.title}>
       <div className="mb-4 flex items-center justify-between">
@@ -113,117 +176,145 @@ function AssignmentDetailPage() {
       <KidsOwlBanner
         message={
           kidsMode
-            ? `${mascotName} can help you plan — then check your work when you’re done.`
-            : "Plan first. Check your finished draft before you turn it in."
+            ? `${mascotName} can review the sheet and your finished work — together or one at a time.`
+            : "Upload instructions, completed work, or both — anytime for this assignment."
         }
       />
 
       <div className="mx-auto max-w-2xl space-y-5">
         <section className="rounded-xl border border-border bg-card p-4">
-          <h2 className="mb-2 text-lg font-semibold text-fg">{asg.title}</h2>
+          <h2 className="mb-1 text-lg font-semibold text-fg">{asg.title}</h2>
           {asg.sourceFiles?.length > 0 && (
-            <p className="mb-2 text-xs text-muted">Sources: {asg.sourceFiles.join(", ")}</p>
+            <p className="mb-2 text-xs text-muted">Files: {asg.sourceFiles.join(", ")}</p>
           )}
-          <details className="text-sm">
-            <summary className="cursor-pointer text-teal">View instructions</summary>
-            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-bg p-3 text-xs text-fg">
-              {asg.instructionsText}
-            </pre>
-          </details>
+          {asg.instructionsText ? (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-teal">View saved instructions / sheet text</summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg p-3 text-xs">{asg.instructionsText}</pre>
+            </details>
+          ) : (
+            <p className="text-sm text-muted">No instructions saved yet — upload the sheet below.</p>
+          )}
         </section>
 
-        {g && (
-          <section className="rounded-xl border border-border bg-card p-4 space-y-4">
-            <h3 className="font-semibold text-fg">Recommendations & plan</h3>
-            <p className="text-sm leading-relaxed text-fg/90">{g.summary}</p>
-            <Block title="Steps" items={g.steps} />
-            <Block title="Ideas" items={g.ideas} />
-            <Block title="Tips" items={g.tips} />
-            <Block title="Checklist" items={g.checklist} />
-            {g.warnings && g.warnings.length > 0 && <Block title="Watch-outs" items={g.warnings} />}
-
-            {g.problemGuides && g.problemGuides.length > 0 && (
-              <div className="space-y-3 border-t border-border pt-4">
-                <h4 className="text-sm font-semibold text-fg">Problem-by-problem how-tos</h4>
-                <p className="text-xs text-muted">
-                  Based on the questions and problems on your uploaded sheet. Examples show the approach — not a full
-                  answer key.
-                </p>
-                {g.problemGuides.map((pg, i) => (
-                  <div key={pg.id || i} className="rounded-xl border border-border bg-bg p-3 space-y-2">
-                    <p className="text-sm font-semibold text-fg">
-                      {i + 1}. {pg.problem}
-                    </p>
-                    <div>
-                      <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">How to</p>
-                      <p className="text-sm text-fg/90">{pg.howTo}</p>
-                    </div>
-                    <div className="rounded-lg border border-teal/20 bg-teal/5 px-3 py-2">
-                      <p className="text-[11px] font-semibold tracking-wide text-teal uppercase">Example</p>
-                      <p className="text-sm text-fg/90">{pg.example}</p>
-                    </div>
-                    {pg.tips && pg.tips.length > 0 && <Block title="Tips" items={pg.tips} />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        <section className="rounded-xl border-2 border-teal/30 bg-card p-4 space-y-3">
-          <h3 className="font-semibold text-fg">Assignment checker</h3>
-          <p className="text-xs text-muted">
-            Upload or paste your finished work. Studious will compare it to the instructions and suggest improvements —
-            it will not write the paper for you.
-          </p>
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted">Upload finished work (files, photo, or scan)</p>
-            <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
-          </div>
+        <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <h3 className="font-semibold text-fg">1. Assignment instructions / problems</h3>
+          <p className="text-xs text-muted">PDF, photo, or scan of the directions and/or problem set.</p>
+          <CaptureBar items={instructionFiles} onChange={setInstructionFiles} disabled={busy} />
           <textarea
-            className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm"
-            placeholder="Optional: paste extra text from your draft…"
-            value={workText}
-            onChange={(e) => setWorkText(e.target.value)}
+            className="min-h-20 w-full rounded-lg border border-border px-3 py-2 text-sm"
+            placeholder="Optional: paste instructions here…"
+            value={instructionPaste}
+            onChange={(e) => setInstructionPaste(e.target.value)}
             disabled={busy}
           />
-          {status && <p className="text-xs text-teal">{status}</p>}
-          {error && <p className="text-sm text-red">{error}</p>}
-          <Button disabled={busy} onClick={() => void handleCheck()}>
-            {busy ? "Checking…" : "Check my work"}
+          <Button variant="secondary" disabled={busy} onClick={() => void runAnalysis("instructions")}>
+            {busy ? "Working…" : "Review assignment"}
           </Button>
         </section>
 
-        {asg.submissions?.length > 0 && (
-          <section className="space-y-3">
-            <h3 className="font-semibold text-fg">Previous checks</h3>
-            {asg.submissions.map((s) => (
-              <div key={s.id} className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs text-muted">{new Date(s.submittedAt).toLocaleString()}</p>
-                <p className="text-sm font-medium text-fg">{s.feedback.overall}</p>
-                {s.feedback.scoreHint && <p className="text-xs text-teal">{s.feedback.scoreHint}</p>}
-                <Block title="Strengths" items={s.feedback.strengths} />
-                <Block title="Improvements" items={s.feedback.improvements} />
-                <Block title="Next steps" items={s.feedback.nextSteps} />
-              </div>
-            ))}
-          </section>
-        )}
+        <section className="space-y-3 rounded-xl border-2 border-teal/30 bg-card p-4">
+          <h3 className="font-semibold text-fg">2. Completed work</h3>
+          <p className="text-xs text-muted">PDF, photo, or scan of what you finished — can be added later.</p>
+          <CaptureBar items={workFiles} onChange={setWorkFiles} disabled={busy} />
+          <textarea
+            className="min-h-20 w-full rounded-lg border border-border px-3 py-2 text-sm"
+            placeholder="Optional: paste your answers here…"
+            value={workPaste}
+            onChange={(e) => setWorkPaste(e.target.value)}
+            disabled={busy}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={() => void runAnalysis("work")}>
+              {busy ? "Working…" : "Assess completed work"}
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => void runAnalysis("both")}>
+              Analyze both
+            </Button>
+          </div>
+        </section>
+
+        {status && <p className="text-xs text-teal">{status}</p>}
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red dark:bg-red-950/30">{error}</p>}
+
+        {report && <ReportView report={report} />}
       </div>
     </AppShell>
   );
 }
 
-function Block({ title, items }: { title: string; items: string[] }) {
-  if (!items?.length) return null;
+function ReportView({ report }: { report: AssignmentFeedback }) {
   return (
-    <div>
-      <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">{title}</h4>
-      <ul className="list-disc space-y-1 pl-5 text-sm text-fg/90">
-        {items.map((item, i) => (
-          <li key={i}>{item}</li>
-        ))}
-      </ul>
-    </div>
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4">
+      <h3 className="font-semibold text-fg">Feedback</h3>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">1. Review of Assignment</h4>
+        <p className="text-sm text-fg/90">{report.reviewOfAssignment}</p>
+        {report.reviewSteps && report.reviewSteps.length > 0 && (
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+            {report.reviewSteps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
+        {report.problemGuides && report.problemGuides.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {report.problemGuides.map((pg, i) => (
+              <div key={pg.id || i} className="rounded-lg border border-border bg-card p-2 text-sm">
+                <p className="font-medium">
+                  {i + 1}. {pg.problem}
+                </p>
+                <p className="mt-1 text-fg/90">
+                  <span className="text-xs font-semibold text-muted">How to: </span>
+                  {pg.howTo}
+                </p>
+                <p className="mt-1 text-fg/90">
+                  <span className="text-xs font-semibold text-teal">Example: </span>
+                  {pg.example}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">2. Assignment Assessment</h4>
+        <p className="text-sm text-fg/90">{report.assignmentAssessment}</p>
+        {report.strengths && report.strengths.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-green-700 dark:text-green-300">What looks good</p>
+            <ul className="list-disc pl-5 text-sm">
+              {report.strengths.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {report.issues && report.issues.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">What to fix</p>
+            <ul className="list-disc pl-5 text-sm">
+              {report.issues.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">3. The Extra Mile</h4>
+        <p className="text-sm text-fg/90">{report.extraMile}</p>
+        {report.extraMileTips && report.extraMileTips.length > 0 && report.extraMile !== "N/A" && (
+          <ul className="mt-2 list-disc pl-5 text-sm">
+            {report.extraMileTips.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
