@@ -243,6 +243,14 @@ export interface GeneratedPackage {
   slides: Slide[];
 }
 
+export interface AssignmentProblemGuide {
+  id: string;
+  problem: string;
+  howTo: string;
+  example: string;
+  tips?: string[];
+}
+
 export interface AssignmentGuidance {
   summary: string;
   steps: string[];
@@ -250,6 +258,7 @@ export interface AssignmentGuidance {
   tips: string[];
   checklist: string[];
   warnings?: string[];
+  problemGuides?: AssignmentProblemGuide[];
 }
 
 export interface AssignmentSubmission {

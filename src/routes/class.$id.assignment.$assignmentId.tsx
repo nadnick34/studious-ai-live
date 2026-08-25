@@ -144,6 +144,32 @@ function AssignmentDetailPage() {
             <Block title="Tips" items={g.tips} />
             <Block title="Checklist" items={g.checklist} />
             {g.warnings && g.warnings.length > 0 && <Block title="Watch-outs" items={g.warnings} />}
+
+            {g.problemGuides && g.problemGuides.length > 0 && (
+              <div className="space-y-3 border-t border-border pt-4">
+                <h4 className="text-sm font-semibold text-fg">Problem-by-problem how-tos</h4>
+                <p className="text-xs text-muted">
+                  Based on the questions and problems on your uploaded sheet. Examples show the approach — not a full
+                  answer key.
+                </p>
+                {g.problemGuides.map((pg, i) => (
+                  <div key={pg.id || i} className="rounded-xl border border-border bg-bg p-3 space-y-2">
+                    <p className="text-sm font-semibold text-fg">
+                      {i + 1}. {pg.problem}
+                    </p>
+                    <div>
+                      <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">How to</p>
+                      <p className="text-sm text-fg/90">{pg.howTo}</p>
+                    </div>
+                    <div className="rounded-lg border border-teal/20 bg-teal/5 px-3 py-2">
+                      <p className="text-[11px] font-semibold tracking-wide text-teal uppercase">Example</p>
+                      <p className="text-sm text-fg/90">{pg.example}</p>
+                    </div>
+                    {pg.tips && pg.tips.length > 0 && <Block title="Tips" items={pg.tips} />}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 

@@ -981,6 +981,7 @@ export const generateAssignmentGuidance = createServerFn({ method: "POST" })
       tips: parsed.tips || [],
       checklist: parsed.checklist || [],
       warnings: parsed.warnings || [],
+      problemGuides: Array.isArray(parsed.problemGuides) ? parsed.problemGuides : [],
     };
   });
 

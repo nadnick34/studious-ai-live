@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ClipboardList, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { generateAssignmentGuidance } from "@/lib/ai";
+import { extractMaterials, generateAssignmentGuidance } from "@/lib/ai";
 import {
   createAssignment,
   deleteAssignment,
@@ -12,7 +13,6 @@ import {
   getProfile,
   listAssignments,
 } from "@/lib/data";
-import { extractPdfText, uid } from "@/lib/utils";
 import type { AssignmentRecord, ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/assignments")({
@@ -27,8 +27,9 @@ function AssignmentsPage() {
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [fileNames, setFileNames] = useState<string[]>([]);
+  const [captured, setCaptured] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
@@ -44,37 +45,34 @@ function AssignmentsPage() {
     void refresh();
   }, [classId]);
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const names: string[] = [];
-    let text = instructions;
-    for (const f of files) {
-      names.push(f.name);
-      try {
-        if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
-          text += `\n\n--- ${f.name} ---\n` + (await extractPdfText(f));
-        } else if (f.type.startsWith("text/") || /\.(txt|md|docx?)$/i.test(f.name)) {
-          text += `\n\n--- ${f.name} ---\n` + (await f.text());
-        } else if (f.type.startsWith("image/")) {
-          text += `\n\n[Image uploaded: ${f.name}. Describe any written instructions if needed.]`;
-        }
-      } catch {
-        text += `\n\n[Could not read ${f.name}]`;
-      }
-    }
-    setFileNames((prev) => [...prev, ...names]);
-    setInstructions(text.slice(0, 60000));
-  }
-
   async function handleCreate() {
-    if (!cls || !title.trim() || !instructions.trim()) {
-      setError("Add a title and assignment instructions (paste or upload).");
+    if (!cls || !title.trim()) {
+      setError("Add an assignment title.");
+      return;
+    }
+    if (!instructions.trim() && captured.length === 0) {
+      setError("Upload, photograph, scan, or paste the assignment instructions and/or problem sheet.");
       return;
     }
     setBusy(true);
     setError(null);
+    setStatus("Reading uploads…");
     try {
+      let combined = instructions.trim();
+      const sourceFiles: string[] = [];
+      if (captured.length) {
+        const payloads = await capturedToPayloads(captured);
+        const extracted = await extractMaterials({ data: { files: payloads } });
+        sourceFiles.push(...extracted.attachments.map((a) => a.name));
+        if (extracted.text?.trim()) {
+          combined = [combined, extracted.text.trim()].filter(Boolean).join("\n\n");
+        }
+      }
+      if (!combined.trim()) {
+        setError("Could not read enough text from the uploads. Paste the instructions or try clearer photos.");
+        return;
+      }
+      setStatus("Analyzing assignment and building how-to guidance…");
       const profile = await getProfile();
       const guidance = await generateAssignmentGuidance({
         data: {
@@ -82,7 +80,7 @@ function AssignmentsPage() {
           classCode: cls.code,
           subject: cls.subject,
           title: title.trim(),
-          instructionsText: instructions.trim(),
+          instructionsText: combined.slice(0, 55000),
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
         },
@@ -91,20 +89,24 @@ function AssignmentsPage() {
         data: {
           classId,
           title: title.trim(),
-          instructionsText: instructions.trim(),
-          sourceFiles: fileNames,
+          instructionsText: combined.slice(0, 60000),
+          sourceFiles,
           guidance,
         },
       });
       setShowNew(false);
       setTitle("");
       setInstructions("");
-      setFileNames([]);
-      await navigate({ to: "/class/$id/assignment/$assignmentId", params: { id: classId, assignmentId: asg.id } });
+      setCaptured([]);
+      await navigate({
+        to: "/class/$id/assignment/$assignmentId",
+        params: { id: classId, assignmentId: asg.id },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create assignment help");
     } finally {
       setBusy(false);
+      setStatus(null);
     }
   }
 
@@ -133,11 +135,11 @@ function AssignmentsPage() {
         <span className="text-xs text-muted">{cls.code}</span>
       </div>
 
-      <KidsOwlBanner message="Upload the assignment sheet, get a plan, then check your finished work." />
+      <KidsOwlBanner message="Upload the sheet or problems — get how-tos and examples, then check your finished work." />
 
       <p className="mb-4 text-sm text-muted">
-        Upload or paste the assignment instructions. Studious gives recommendations and ideas — then you can upload
-        finished work for feedback. It does not write the assignment for you.
+        Upload the assignment instructions and/or the actual questions and problems (files, photo, or scan). Studious
+        analyzes the sheet and gives brief how-tos with examples. It does not complete the assignment for you.
       </p>
 
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red dark:bg-red-950/30">{error}</p>}
@@ -150,24 +152,26 @@ function AssignmentsPage() {
             placeholder="Assignment title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            className="min-h-36 w-full rounded-lg border border-border px-3 py-2 text-sm"
-            placeholder="Paste assignment instructions here…"
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
+            disabled={busy}
           />
           <div>
-            <label className="mb-1 block text-xs text-muted">Or upload sheet (PDF, text, image)</label>
-            <input type="file" multiple accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.doc,.docx" onChange={(e) => void onFile(e)} />
-            {fileNames.length > 0 && <p className="mt-1 text-xs text-muted">{fileNames.join(", ")}</p>}
+            <p className="mb-2 text-xs font-medium text-muted">Upload instructions and/or problem sheet</p>
+            <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
           </div>
+          <textarea
+            className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm"
+            placeholder="Optional: paste extra instructions or questions here…"
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            disabled={busy}
+          />
+          {status && <p className="text-xs text-teal">{status}</p>}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowNew(false)}>
+            <Button variant="secondary" disabled={busy} onClick={() => setShowNew(false)}>
               Cancel
             </Button>
             <Button disabled={busy} onClick={() => void handleCreate()}>
-              {busy ? "Building plan…" : "Get recommendations"}
+              {busy ? "Working…" : "Analyze & get how-tos"}
             </Button>
           </div>
         </div>
@@ -176,7 +180,7 @@ function AssignmentsPage() {
       {rows.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-4 py-12 text-center text-sm text-muted">
           <ClipboardList className="mx-auto mb-3 size-8 opacity-50" />
-          No assignments yet. Add one to get a plan and later check your work.
+          No assignments yet. Add one to get problem-by-problem guidance.
         </div>
       ) : (
         <div className="space-y-3">
@@ -189,7 +193,10 @@ function AssignmentsPage() {
               >
                 <div className="font-semibold text-fg">{a.title}</div>
                 <div className="text-xs text-muted">
-                  {a.submissions.length ? `${a.submissions.length} check(s)` : "Plan ready"} ·{" "}
+                  {a.guidance?.problemGuides?.length
+                    ? `${a.guidance.problemGuides.length} problem guide(s)`
+                    : "Plan ready"}
+                  {a.submissions.length ? ` · ${a.submissions.length} check(s)` : ""} ·{" "}
                   {new Date(a.createdAt).toLocaleDateString()}
                 </div>
               </Link>
