@@ -1,11 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, LogOut, Moon, Sun, UserRound } from "lucide-react";
+import { Archive, BookOpen, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
 const NAV = [
   { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
+  { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
   { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
   { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
 ];
@@ -89,7 +90,7 @@ export function Sidebar({
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
       {NAV.map((item) => {
         const Icon = item.icon;
         const active = item.match(pathname);
