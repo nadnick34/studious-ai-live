@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
-import { createClass, createStudySet, getProfile, listClasses, listStudySets } from "@/lib/data";
+import { createClass, createStudySet, getProfile, listClasses, listStudySets, updateStudySet } from "@/lib/data";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
 import { uid } from "@/lib/utils";
 import type { Attachment, ClassRecord, StudySet } from "@/lib/types";
@@ -199,41 +199,82 @@ function NotesPage() {
         setError("Nothing to generate from. Add notes, audio, or files.");
         return;
       }
-      setStatus("Building study materials…");
-      const profile = await getProfile();
-      const generated = await generateStudyPackage({
-        data: {
-          className: opts.className,
-          classCode: opts.classCode,
-          subject: opts.subject,
-          setName: opts.chapterName,
-          sourceFiles: attachments.map((a) => a.name),
-          extractedText: sourceText,
-          kidsMode: Boolean(profile.kidsMode),
-          childAge: profile.childAge,
-          childGender: profile.childGender,
+
+      setStatus("Saving chapter — generation continues in the background…");
+      const pending = {
+        notes: {
+          title: opts.chapterName,
+          subtitle: "Generating… you can leave this page.",
+          sections: [
+            {
+              heading: "Working",
+              body: "Studious AI is writing notes, quiz, and flash cards from your session. Refresh the class page in a few minutes.",
+              layout: "stack" as const,
+              bullets: ["Typed notes, recordings, and uploads are included.", "This can take several minutes for long sessions."],
+            },
+          ],
+          otherResources: [],
         },
-      });
-      setStatus("Saving chapter…");
+        audioScript: "",
+        quiz: [],
+        flashcards: [],
+        slides: [],
+      };
+
       const set = await createStudySet({
         data: {
           classId: opts.classId,
           name: opts.chapterName,
-          generated,
+          generated: pending,
           sourceFiles: attachments.map((a) => a.name),
           attachments,
         },
       });
+
+      // Continue AI generation without blocking the UI
+      void (async () => {
+        try {
+          const profile = await getProfile();
+          const generated = await generateStudyPackage({
+            data: {
+              className: opts.className,
+              classCode: opts.classCode,
+              subject: opts.subject,
+              setName: opts.chapterName,
+              sourceFiles: attachments.map((a) => a.name),
+              extractedText: sourceText,
+              kidsMode: Boolean(profile.kidsMode),
+              childAge: profile.childAge,
+              childGender: profile.childGender,
+            },
+          });
+          await updateStudySet({
+            data: {
+              id: set.id,
+              patch: {
+                notes: generated.notes,
+                audioScript: generated.audioScript,
+                quiz: generated.quiz,
+                flashcards: generated.flashcards,
+              },
+            },
+          });
+        } catch {
+          /* class page still shows the pending chapter row */
+        }
+      })();
+
       setShowComplete(false);
       setText("");
       setFiles([]);
       setAudioBlobs([]);
       setTranscriptParts([]);
       setRecSeconds(0);
-      await navigate({ to: "/class/$id/set/$setId", params: { id: opts.classId, setId: set.id } });
+      setBusy(false);
+      setStatus(null);
+      await navigate({ to: "/class/$id", params: { id: opts.classId } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not complete session");
-    } finally {
       setBusy(false);
       setStatus(null);
     }
