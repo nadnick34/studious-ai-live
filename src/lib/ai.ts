@@ -1,3 +1,4 @@
+import { inflateSync } from "node:zlib";
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { buildClassicalPrompt } from "@/lib/classical-prompts";
@@ -65,9 +66,7 @@ function extractPdfHeuristic(buf: Buffer): string {
     try {
       if (body.includes("/ASCII85Decode")) payload = ascii85DecodeBuffer(payload);
       if (body.includes("/FlateDecode")) {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const zlib = require("zlib") as typeof import("zlib");
-        payload = zlib.inflateSync(payload);
+        payload = inflateSync(payload);
       }
     } catch {
       continue;
