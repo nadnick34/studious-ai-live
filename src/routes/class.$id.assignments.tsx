@@ -1,19 +1,20 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ClipboardList, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
-import { KidsOwlBanner } from "@/components/kids-mascot";
+import { KidsOwlBanner, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { extractMaterials, analyzeAssignment } from "@/lib/ai";
+import { analyzeAssignment, extractMaterials } from "@/lib/ai";
 import {
   createAssignment,
   deleteAssignment,
   getClassById,
   getProfile,
   listAssignments,
+  updateAssignment,
 } from "@/lib/data";
-import type { AssignmentRecord, ClassRecord } from "@/lib/types";
+import { uid } from "@/lib/utils";
+import type { AssignmentFeedback, AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/assignments")({
   component: AssignmentsPage,
@@ -21,16 +22,16 @@ export const Route = createFileRoute("/class/$id/assignments")({
 
 function AssignmentsPage() {
   const { id: classId } = Route.useParams();
-  const navigate = useNavigate();
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [rows, setRows] = useState<AssignmentRecord[]>([]);
-  const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState("");
-  const [instructions, setInstructions] = useState("");
+  const [paste, setPaste] = useState("");
   const [captured, setCaptured] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<AssignmentFeedback | null>(null);
+  const { kidsMode, name: mascotName } = useKidsMascot();
 
   async function refresh() {
     const [c, list] = await Promise.all([
@@ -45,74 +46,95 @@ function AssignmentsPage() {
     void refresh();
   }, [classId]);
 
-  async function handleCreate() {
-    if (!cls || !title.trim()) {
-      setError("Add an assignment title.");
+  async function handleAnalyze() {
+    if (!cls) return;
+    if (!title.trim()) {
+      setError("Add a short title (e.g. Chapter 1 homework).");
       return;
     }
-    if (!instructions.trim() && captured.length === 0) {
-      setError("Upload, photograph, scan, or paste the assignment instructions and/or problem sheet.");
+    if (!paste.trim() && captured.length === 0) {
+      setError("Upload or paste the assignment sheet and/or completed work.");
       return;
     }
     setBusy(true);
     setError(null);
     setStatus("Reading uploads…");
     try {
-      let combined = instructions.trim();
+      let material = paste.trim();
       const sourceFiles: string[] = [];
       if (captured.length) {
         const payloads = await capturedToPayloads(captured);
         const extracted = await extractMaterials({ data: { files: payloads } });
         sourceFiles.push(...extracted.attachments.map((a) => a.name));
         if (extracted.text?.trim()) {
-          combined = [combined, extracted.text.trim()].filter(Boolean).join("\n\n");
+          material = [material, extracted.text.trim()].filter(Boolean).join("\n\n");
         }
       }
-      if (!combined.trim()) {
-        setError("Could not read enough text from the uploads. Paste the instructions or try clearer photos.");
+      if (!material.trim()) {
+        setError("Could not read text from the upload. Try a clearer PDF, photo, or paste the text.");
         return;
       }
-      setStatus("Analyzing assignment and building how-to guidance…");
+
+      setStatus("Analyzing…");
       const profile = await getProfile();
-      const report = await analyzeAssignment({
+      const feedback = await analyzeAssignment({
         data: {
           className: cls.name,
           classCode: cls.code,
           subject: cls.subject,
           title: title.trim(),
-          instructionsText: combined.slice(0, 55000),
+          // Single material blob — model classifies blank vs completed
+          instructionsText: material.slice(0, 55000),
+          workText: material.slice(0, 55000),
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
+          singleMaterial: true,
         },
       });
-      const guidance = {
-        summary: report.reviewOfAssignment === "TBD" ? "" : report.reviewOfAssignment,
-        steps: report.reviewSteps || [],
-        ideas: [] as string[],
-        tips: [] as string[],
-        checklist: [] as string[],
-        warnings: [] as string[],
-        problemGuides: report.problemGuides || [],
+
+      const submission: AssignmentSubmission = {
+        id: uid("sub"),
+        submittedAt: new Date().toISOString(),
+        fileNames: sourceFiles,
+        workText: material.slice(0, 20000),
+        feedback,
       };
+
+      const guidance =
+        feedback.reviewOfAssignment && feedback.reviewOfAssignment !== "TBD"
+          ? {
+              summary: feedback.reviewOfAssignment,
+              steps: feedback.reviewSteps || [],
+              ideas: [] as string[],
+              tips: [] as string[],
+              checklist: [] as string[],
+              warnings: [] as string[],
+              problemGuides: feedback.problemGuides || [],
+            }
+          : null;
+
       const asg = await createAssignment({
         data: {
           classId,
           title: title.trim(),
-          instructionsText: combined.slice(0, 60000),
+          instructionsText: material.slice(0, 60000),
           sourceFiles,
           guidance,
         },
       });
-      setShowNew(false);
-      setTitle("");
-      setInstructions("");
-      setCaptured([]);
-      await navigate({
-        to: "/class/$id/assignment/$assignmentId",
-        params: { id: classId, assignmentId: asg.id },
+      await updateAssignment({
+        data: {
+          id: asg.id,
+          patch: { submissions: [submission] },
+        },
       });
+
+      setReport(feedback);
+      setPaste("");
+      setCaptured([]);
+      await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create assignment help");
+      setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setBusy(false);
       setStatus(null);
@@ -121,22 +143,14 @@ function AssignmentsPage() {
 
   if (!cls) {
     return (
-      <AppShell title="Assignments">
+      <AppShell title="Assignment assistant">
         <p className="text-sm text-muted">Loading…</p>
       </AppShell>
     );
   }
 
   return (
-    <AppShell
-      title="Assignment Assistant"
-      right={
-        <Button className="min-h-10 text-xs" onClick={() => setShowNew(true)}>
-          <Plus className="size-4" />
-          New assignment
-        </Button>
-      }
-    >
+    <AppShell title="Assignment assistant">
       <div className="mb-4 flex items-center justify-between">
         <Link to="/class/$id" params={{ id: classId }} className="text-sm text-teal hover:underline">
           ← Back to class
@@ -144,86 +158,152 @@ function AssignmentsPage() {
         <span className="text-xs text-muted">{cls.code}</span>
       </div>
 
-      <KidsOwlBanner message="Upload the sheet or problems — get how-tos and examples, then check your finished work." />
+      <KidsOwlBanner
+        message={
+          kidsMode
+            ? `${mascotName} can read the sheet or your finished work in one place.`
+            : "Upload the blank sheet, completed work, or both in one box — Studious figures out which is which."
+        }
+      />
 
-      <p className="mb-4 text-sm text-muted">
-        Upload the assignment instructions and/or the actual questions and problems (files, photo, or scan). Studious
-        analyzes the sheet and gives brief how-tos with examples. It does not complete the assignment for you.
-      </p>
-
-      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red dark:bg-red-950/30">{error}</p>}
-
-      {showNew && (
-        <div className="mb-5 space-y-3 rounded-xl border border-border bg-card p-4">
-          <h3 className="font-semibold text-fg">New assignment help</h3>
+      <div className="mx-auto max-w-2xl space-y-4">
+        <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <h2 className="font-semibold text-fg">Assignment material</h2>
+          <p className="text-xs text-muted">
+            One upload for everything: directions, blank problems, and/or finished answers (PDF, photo, or scan).
+          </p>
           <input
             className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            placeholder="Assignment title"
+            placeholder="Title (e.g. Chapter 1 homework)"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={busy}
           />
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted">Upload instructions and/or problem sheet</p>
-            <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
-          </div>
+          <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
           <textarea
             className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm"
-            placeholder="Optional: paste extra instructions or questions here…"
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Optional: paste text from the assignment or your answers…"
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
             disabled={busy}
           />
           {status && <p className="text-xs text-teal">{status}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" disabled={busy} onClick={() => setShowNew(false)}>
-              Cancel
-            </Button>
-            <Button disabled={busy} onClick={() => void handleCreate()}>
-              {busy ? "Working…" : "Analyze & get how-tos"}
-            </Button>
-          </div>
-        </div>
-      )}
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red dark:bg-red-950/30">{error}</p>}
+          <Button disabled={busy} onClick={() => void handleAnalyze()}>
+            {busy ? "Working…" : "Analyze"}
+          </Button>
+        </section>
 
-      {rows.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-4 py-12 text-center text-sm text-muted">
-          <ClipboardList className="mx-auto mb-3 size-8 opacity-50" />
-          No assignments yet. Add one to get problem-by-problem guidance.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {rows.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-              <Link
-                to="/class/$id/assignment/$assignmentId"
-                params={{ id: classId, assignmentId: a.id }}
-                className="min-w-0 flex-1"
-              >
-                <div className="font-semibold text-fg">{a.title}</div>
-                <div className="text-xs text-muted">
-                  {a.guidance?.problemGuides?.length
-                    ? `${a.guidance.problemGuides.length} problem guide(s)`
-                    : "Plan ready"}
-                  {a.submissions.length ? ` · ${a.submissions.length} check(s)` : ""} ·{" "}
-                  {new Date(a.createdAt).toLocaleDateString()}
-                </div>
-              </Link>
-              <button
-                type="button"
-                className="text-muted hover:text-red"
-                aria-label="Delete"
-                onClick={() => {
-                  if (!confirm(`Delete “${a.title}”?`)) return;
-                  void deleteAssignment({ data: a.id }).then(refresh);
-                }}
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+        {report && <ReportView report={report} />}
+
+        {rows.length > 0 && (
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold text-fg">Recent</h3>
+            {rows.slice(0, 8).map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => {
+                    const last = a.submissions?.[0]?.feedback;
+                    if (last) setReport(last);
+                    setTitle(a.title);
+                  }}
+                >
+                  <div className="truncate font-medium text-fg">{a.title}</div>
+                  <div className="text-xs text-muted">{new Date(a.createdAt).toLocaleString()}</div>
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted hover:text-red"
+                  onClick={() => {
+                    if (!confirm(`Delete “${a.title}”?`)) return;
+                    void deleteAssignment({ data: a.id }).then(refresh);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
     </AppShell>
+  );
+}
+
+function ReportView({ report }: { report: AssignmentFeedback }) {
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4">
+      <h3 className="font-semibold text-fg">Feedback</h3>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">1. Review of Assignment</h4>
+        <p className="text-sm text-fg/90">{report.reviewOfAssignment}</p>
+        {report.reviewSteps && report.reviewSteps.length > 0 && (
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+            {report.reviewSteps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
+        {report.problemGuides && report.problemGuides.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {report.problemGuides.map((pg, i) => (
+              <div key={pg.id || i} className="rounded-lg border border-border bg-card p-2 text-sm">
+                <p className="font-medium">
+                  {i + 1}. {pg.problem}
+                </p>
+                <p className="mt-1 text-fg/90">
+                  <span className="text-xs font-semibold text-muted">How to: </span>
+                  {pg.howTo}
+                </p>
+                <p className="mt-1 text-fg/90">
+                  <span className="text-xs font-semibold text-teal">Example: </span>
+                  {pg.example}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">2. Completed Work Assessment</h4>
+        <p className="text-sm text-fg/90">{report.assignmentAssessment}</p>
+        {report.strengths && report.strengths.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-green-700 dark:text-green-300">What looks good</p>
+            <ul className="list-disc pl-5 text-sm">
+              {report.strengths.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {report.issues && report.issues.length > 0 && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">What to fix</p>
+            <ul className="list-disc pl-5 text-sm">
+              {report.issues.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-bg p-3">
+        <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">3. The Extra Mile</h4>
+        <p className="text-sm text-fg/90">{report.extraMile}</p>
+        {report.extraMileTips && report.extraMileTips.length > 0 && report.extraMile !== "N/A" && (
+          <ul className="mt-2 list-disc pl-5 text-sm">
+            {report.extraMileTips.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }

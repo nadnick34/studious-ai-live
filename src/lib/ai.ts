@@ -1046,6 +1046,7 @@ export const analyzeAssignment = createServerFn({ method: "POST" })
       workText?: string;
       kidsMode?: boolean;
       childAge?: number | null;
+      singleMaterial?: boolean;
     }) => input,
   )
   .handler(async ({ data }) => {
