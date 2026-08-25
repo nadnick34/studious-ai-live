@@ -13,9 +13,10 @@ export type CapturedFile = {
 };
 
 async function toPayload(item: CapturedFile): Promise<FilePayload> {
-  if (item.file.type.startsWith("image/")) {
-    const dataUrl = await compressImageFile(item.file);
-    return dataUrlToPayload(dataUrl, item.file.name);
+  if (item.file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(item.file.name)) {
+    const dataUrl = await compressDocumentImage(item.file);
+    const name = item.file.name || `${item.mode}-${Date.now()}.jpg`;
+    return dataUrlToPayload(dataUrl, name.replace(/\.(heic|heif)$/i, ".jpg"));
   }
   return fileToPayload(item.file);
 }
