@@ -193,6 +193,12 @@ function ClassPage() {
           <Button variant="secondary" className="justify-start" onClick={() => { setShowMore(false); setShowCombine(true); }}>
             Combine for midterm / final
           </Button>
+          <Link to="/class/$id/assignments" params={{ id: classId }} onClick={() => setShowMore(false)}>
+            <Button variant="secondary" className="w-full justify-start">
+              <ClipboardList className="size-4" />
+              Assignment assistant
+            </Button>
+          </Link>
         </div>
       )}
 
@@ -359,14 +365,12 @@ function ChapterCard({
         { to: "/class/$id/set/$setId/spatial" as const, label: "Spatial", icon: Shapes },
         { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
         { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
-        { to: "/class/$id/assignments" as const, label: "Assign", icon: ClipboardList },
       ]
     : [
         { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
         { to: "/class/$id/set/$setId/audio" as const, label: "Audio", icon: Headphones },
         { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
         { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
-        { to: "/class/$id/assignments" as const, label: "Assign", icon: ClipboardList },
       ];
   return (
     <article className="card-surface rounded-xl p-4">
@@ -414,12 +418,11 @@ function ChapterCard({
       <div className="mt-3 grid grid-cols-4 gap-1">
         {actions.map((a) => {
           const Icon = a.icon;
-          const isAssign = a.label === "Assign";
           return (
             <Link
               key={a.label}
               to={a.to}
-              params={isAssign ? { id: classId } : { id: classId, setId: set.id }}
+              params={{ id: classId, setId: set.id }}
               className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[11px] font-medium text-fg hover:bg-teal/10 hover:text-teal"
             >
               <Icon className="size-4" />
