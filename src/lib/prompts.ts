@@ -113,25 +113,24 @@ KIDS MODE (age ${childAge ?? "9 or under"}):
 - quiz explanations must encourage ("Great thinking!", "Almost — try this idea next time…").
 - CONTENT GUARDRAILS (strict): Keep everything wholesome, traditional, and family-friendly. Do NOT include LGBTQ+ themes or advocacy, sexual content, crude humor, graphic violence, or political / ideological messaging. Teach the academic material plainly with classic virtues: honesty, curiosity, diligence, kindness, respect for family and learning. No culture-war framing.
 - OWL MASCOT: The only mascot is "Hootie" (girl — she/her) or "Professor Hoot" (boy — he/him). Never invent other owl names (no Oliver Owl). Use she for Hootie and he for Professor Hoot. Use they/it only for non-human objects or groups of things, never as a person's identity. Never write pronoun nametags, badge text, or "he/they" style labels.
-- notes.spatialLearning must be a comic-book story object (not a bare array):
+- notes.spatialLearning must be a concept-comic object (not a bare array):
   {
-    "title": "short story title",
+    "title": "short title for the concept pictures",
     "panels": [
       {
         "id": "p1",
-        "title": "panel title",
-        "caption": "story caption under the picture",
-        "visualDescription": "detailed wholesome cartoon scene with Hootie or Professor Hoot guiding the lesson; no nametags; no text on clothing",
+        "title": "key concept name",
+        "caption": "plain explanation of the idea and how to use it",
+        "visualDescription": "detailed wholesome cartoon/comic scene where Hootie or Professor Hoot clearly demonstrates the key concept and how to apply it; no nametags; no text on clothing",
         "emoji": "🌟",
-        "owlSays": "what the owl narrator says in this panel"
+        "owlSays": "one short line the owl says that teaches the concept"
       }
     ],
-    "questions": [
-      { "id": "sq1", "question": "…", "options": ["A","B","C"], "correctIndex": 0 }
-    ]
+    "questions": []
   }
-  - 5–8 panels in story order.
-  - Exactly 3 comprehension questions about the lesson.
+  - Exactly 1 or 2 panels only (never more).
+  - Each panel must teach a KEY CONCEPT from the uploaded material and show HOW TO APPLY it (not a long multi-panel story).
+  - No quiz questions and no video script in spatialLearning.
 - audioScript becomes a short read-aloud story for parent/child listening.
 `
     : ""
@@ -168,9 +167,9 @@ Return JSON:
     ],
     "otherResources": [{ "title": "string", "url": "optional" }],
     "spatialLearning": {
-      "title": "story title",
-      "panels": [{ "id": "p1", "title": "string", "caption": "string", "visualDescription": "string", "emoji": "🌟", "owlSays": "string" }],
-      "questions": [{ "id": "sq1", "question": "string", "options": ["A","B","C"], "correctIndex": 0 }]
+      "title": "concept pictures title",
+      "panels": [{ "id": "p1", "title": "key concept", "caption": "explain + how to apply", "visualDescription": "string", "emoji": "🌟", "owlSays": "string" }],
+      "questions": []
     }
   },
   "slides": [

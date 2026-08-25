@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { KidsOwlBanner, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { checkAssignmentWork } from "@/lib/ai";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
+import { checkAssignmentWork, extractMaterials } from "@/lib/ai";
 import { getAssignmentById, getClassById, getProfile, updateAssignment } from "@/lib/data";
-import { extractPdfText, uid } from "@/lib/utils";
+import { uid } from "@/lib/utils";
 import type { AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/assignment/$assignmentId")({
@@ -17,8 +18,9 @@ function AssignmentDetailPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [asg, setAsg] = useState<AssignmentRecord | null>(null);
   const [workText, setWorkText] = useState("");
-  const [fileNames, setFileNames] = useState<string[]>([]);
+  const [captured, setCaptured] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { kidsMode, name: mascotName } = useKidsMascot();
 
@@ -31,37 +33,31 @@ function AssignmentDetailPage() {
     );
   }, [classId, assignmentId]);
 
-  async function onWorkFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const names: string[] = [];
-    let text = workText;
-    for (const f of files) {
-      names.push(f.name);
-      try {
-        if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
-          text += `\n\n--- ${f.name} ---\n` + (await extractPdfText(f));
-        } else if (f.type.startsWith("text/") || /\.(txt|md)$/i.test(f.name)) {
-          text += `\n\n--- ${f.name} ---\n` + (await f.text());
-        } else {
-          text += `\n\n[Uploaded file: ${f.name}]`;
-        }
-      } catch {
-        text += `\n\n[Could not read ${f.name}]`;
-      }
-    }
-    setFileNames((prev) => [...prev, ...names]);
-    setWorkText(text.slice(0, 60000));
-  }
-
   async function handleCheck() {
-    if (!cls || !asg || !workText.trim()) {
-      setError("Paste or upload your finished work first.");
+    if (!cls || !asg) return;
+    if (!workText.trim() && captured.length === 0) {
+      setError("Paste, upload, photograph, or scan your finished work first.");
       return;
     }
     setBusy(true);
     setError(null);
+    setStatus(captured.length ? "Reading your work…" : null);
     try {
+      let combined = workText.trim();
+      const sourceFiles: string[] = [];
+      if (captured.length) {
+        const payloads = await capturedToPayloads(captured);
+        const extracted = await extractMaterials({ data: { files: payloads } });
+        sourceFiles.push(...extracted.attachments.map((a) => a.name));
+        if (extracted.text?.trim()) {
+          combined = [combined, extracted.text.trim()].filter(Boolean).join("\n\n");
+        }
+      }
+      if (!combined.trim()) {
+        setError("Could not read enough text from your work. Paste it or try a clearer photo/scan.");
+        return;
+      }
+      setStatus("Checking against the assignment…");
       const profile = await getProfile();
       const feedback = await checkAssignmentWork({
         data: {
@@ -70,7 +66,7 @@ function AssignmentDetailPage() {
           subject: cls.subject,
           title: asg.title,
           instructionsText: asg.instructionsText,
-          workText: workText.trim(),
+          workText: combined.slice(0, 50000),
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
         },
@@ -78,19 +74,20 @@ function AssignmentDetailPage() {
       const submission: AssignmentSubmission = {
         id: uid("sub"),
         submittedAt: new Date().toISOString(),
-        fileNames,
-        workText: workText.trim().slice(0, 20000),
+        fileNames: sourceFiles,
+        workText: combined.slice(0, 20000),
         feedback,
       };
       const submissions = [submission, ...(asg.submissions || [])];
       await updateAssignment({ data: { id: asg.id, patch: { submissions } } });
       setAsg({ ...asg, submissions });
       setWorkText("");
-      setFileNames([]);
+      setCaptured([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Check failed");
     } finally {
       setBusy(false);
+      setStatus(null);
     }
   }
 
@@ -179,14 +176,18 @@ function AssignmentDetailPage() {
             Upload or paste your finished work. Studious will compare it to the instructions and suggest improvements —
             it will not write the paper for you.
           </p>
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Upload finished work (files, photo, or scan)</p>
+            <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
+          </div>
           <textarea
-            className="min-h-40 w-full rounded-lg border border-border px-3 py-2 text-sm"
-            placeholder="Paste your draft or finished work…"
+            className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm"
+            placeholder="Optional: paste extra text from your draft…"
             value={workText}
             onChange={(e) => setWorkText(e.target.value)}
+            disabled={busy}
           />
-          <input type="file" multiple accept=".pdf,.txt,.md,.doc,.docx,.png,.jpg,.jpeg" onChange={(e) => void onWorkFile(e)} />
-          {fileNames.length > 0 && <p className="text-xs text-muted">{fileNames.join(", ")}</p>}
+          {status && <p className="text-xs text-teal">{status}</p>}
           {error && <p className="text-sm text-red">{error}</p>}
           <Button disabled={busy} onClick={() => void handleCheck()}>
             {busy ? "Checking…" : "Check my work"}

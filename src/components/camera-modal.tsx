@@ -58,12 +58,12 @@ export function CameraModal({
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-        const file = new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" });
+        const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
         onCapture(file);
         onClose();
       },
       "image/jpeg",
-      0.86,
+      0.95,
     );
   }
 

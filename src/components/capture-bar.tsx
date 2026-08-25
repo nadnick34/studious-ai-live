@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, FilePlus2, ScanLine, X } from "lucide-react";
 import { CameraModal } from "@/components/camera-modal";
-import { compressImageFile } from "@/lib/utils";
+import { compressDocumentImage } from "@/lib/utils";
 import type { FilePayload } from "@/lib/types";
 import { dataUrlToPayload, fileToPayload } from "@/lib/utils";
 
@@ -93,7 +93,7 @@ export function CaptureBar({
         </button>
       </div>
       <p className="text-[11px] leading-relaxed text-muted">
-        Files, a live photo, or a page scan. Scans are read for text when you generate.
+        Files, photo, or scan. For worksheets, fill the frame with the page, good light, and avoid blur — photos are read for text the same way scans are.
       </p>
 
       <input

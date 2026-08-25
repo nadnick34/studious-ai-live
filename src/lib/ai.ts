@@ -83,15 +83,24 @@ async function visionOcr(name: string, mime: string, base64: string): Promise<st
     },
     body: JSON.stringify({
       model: "grok-4.5",
-      temperature: 0.1,
-      max_tokens: 4000,
+      temperature: 0.05,
+      max_tokens: 8000,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: `Extract ALL readable text from this photo/scan of class materials named "${name}". Preserve headings, lists, tables, and labels. If handwriting is present, transcribe it as best you can. Return plain text only.`,
+              text: `You are reading a photo or scan of school materials named "${name}" (assignment sheet, worksheet, notes, or textbook page).
+
+Extract ALL readable text accurately. Include:
+- Titles, headings, directions, and rubrics
+- Numbered/lettered questions and problems in order
+- Tables, labels, formulas, and captions
+- Handwriting when present (best-effort transcription)
+
+If the photo is dim, tilted, or partially cut off, still recover every word you can and note [unclear] only where a word is illegible.
+Do not summarize. Do not skip problems. Return plain text only, preserving original order.`,
             },
             {
               type: "image_url",
@@ -228,7 +237,7 @@ async function enrichSpatialImages(story: SpatialStory, gender?: string | null):
     ? "Hootie, a cute friendly cartoon girl owl with a large bright pink bow on her head (female character; refer to her as she)"
     : "Professor Hoot, a cute friendly cartoon boy owl with blue round glasses and a blue bowtie (male character; refer to him as he)";
   const panels: SpatialPanel[] = [];
-  for (const panel of story.panels.slice(0, 6)) {
+  for (const panel of story.panels.slice(0, 2)) {
     if (panel.imageUrl) {
       panels.push(panel);
       continue;
@@ -237,9 +246,9 @@ async function enrichSpatialImages(story: SpatialStory, gender?: string | null):
       .replace(/\bOliver\s+Owl\b/gi, owlName)
       .replace(/\bOliver\b/gi, owlName);
     const prompt = [
-      "Wholesome traditional children's educational comic book panel, bright clean cartoon style.",
+      "Wholesome traditional children's educational comic panel that TEACHES one key concept, bright clean cartoon style.",
       `Main character is ONLY ${owlDesc}. Do not invent another owl name such as Oliver.`,
-      `Show ${owlName} clearly as the teacher guide in the scene.`,
+      `Show ${owlName} clearly demonstrating the concept and how to apply it.`,
       scene,
       "STRICT VISUAL RULES: no nametags, no name badges, no pronoun pins, no pronoun stickers, no written words of any kind on clothing or props, no logos, no political symbols.",
       "Family-friendly, traditional, pure illustration only.",
@@ -247,7 +256,7 @@ async function enrichSpatialImages(story: SpatialStory, gender?: string | null):
     const imageUrl = await generateCartoonImage(prompt);
     panels.push({ ...panel, imageUrl: imageUrl || undefined });
   }
-  for (const panel of story.panels.slice(6)) panels.push(panel);
+  for (const panel of story.panels.slice(2)) panels.push({ ...panel, imageUrl: panel.imageUrl });
   return { ...story, panels };
 }
 

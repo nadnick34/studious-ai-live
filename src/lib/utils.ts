@@ -78,6 +78,27 @@ export async function compressImageFile(file: File, max = 1280, quality = 0.78):
   }
 }
 
+/** Higher-res compression for photos/scans that must be OCR'd (assignments, notes, worksheets). */
+export async function compressDocumentImage(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    const max = 2400;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas");
+    ctx.filter = "contrast(1.12) brightness(1.04) saturate(0.92)";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    ctx.filter = "none";
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
