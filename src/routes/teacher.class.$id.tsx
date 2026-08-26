@@ -10,6 +10,7 @@ import {
   getTeacherClassById,
   getTeacherClassStats,
   listTeacherAssessments,
+  remapResultsToRoster,
 } from "@/lib/data";
 import {
   ASSESSMENT_TYPES,
@@ -46,6 +47,7 @@ function TeacherClassPage() {
   const [cls, setCls] = useState<TeacherClass | null>(null);
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
   const [stats, setStats] = useState<{
     classAverage: number;
     studentCount: number;
@@ -82,6 +84,20 @@ function TeacherClassPage() {
     void reload().catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load class"));
   }, [id]);
 
+  function namesLikelySame(a: string, b: string) {
+    const na = a.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const nb = b.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    const ta = na.split(" ");
+    const tb = nb.split(" ");
+    const lastA = ta[ta.length - 1];
+    const lastB = tb[tb.length - 1];
+    const firstA = ta[0];
+    const firstB = tb[0];
+    return lastA === lastB && (firstA === firstB || firstA[0] === firstB[0]);
+  }
+
   const studentResults = useMemo(() => {
     if (!selectedName) return [];
     const rows: {
@@ -94,7 +110,7 @@ function TeacherClassPage() {
       missed: { question: string; studentAnswer?: string; correct: string }[];
     }[] = [];
     for (const a of assessments) {
-      const r = (a.results || []).find((x) => x.studentName === selectedName);
+      const r = (a.results || []).find((x) => namesLikelySame(x.studentName, selectedName));
       if (r) {
         rows.push({
           assessment: a.name,
@@ -183,7 +199,7 @@ function TeacherClassPage() {
         },
       });
 
-      const results = Array.isArray(graded.results) ? graded.results : [];
+      let results = Array.isArray(graded.results) ? graded.results : [];
       if (!results.length) {
         const hint = (graded as { _rawPreview?: string })._rawPreview;
         throw new Error(
@@ -191,6 +207,8 @@ function TeacherClassPage() {
             (hint ? `Model note: ${hint.slice(0, 180)}` : "Try fewer pages or clearer PDFs."),
         );
       }
+
+      results = await remapResultsToRoster({ data: { classId: id, results } });
 
       setStatus(`Saving ${results.length} student result(s) and updating roster…`);
       const assessment = await createTeacherAssessment({
@@ -373,6 +391,7 @@ function TeacherClassPage() {
 
   // —— STUDENT DETAIL ——
   if (view === "student" && selectedName) {
+    const selectedTest = studentResults.find((r) => r.assessmentId === selectedTestId) || null;
     return (
       <AppShell
         title="Student Detail"
@@ -383,93 +402,137 @@ function TeacherClassPage() {
           </span>
         }
       >
-        <button type="button" className="mb-3 text-sm text-teal hover:underline" onClick={() => { setView("overview"); setSelectedName(null); }}>
-          ← {cls.name}
+        <button
+          type="button"
+          className="mb-3 text-sm text-teal hover:underline"
+          onClick={() => {
+            if (selectedTestId) setSelectedTestId(null);
+            else {
+              setView("overview");
+              setSelectedName(null);
+            }
+          }}
+        >
+          ← {selectedTestId ? selectedName : cls.name}
         </button>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-fg">{selectedName}</h2>
-            <p className="text-sm text-muted">
-              Grade {cls.gradeLevel || "—"} · Overall Average: {selectedRow?.average ?? "—"}%
+
+        {selectedTest ? (
+          <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5">
+            <h2 className="text-lg font-semibold text-fg">{selectedName}</h2>
+            <p className="mt-1 text-sm text-muted">
+              {selectedTest.assessment} · {selectedTest.score}% · {selectedTest.status}
             </p>
-          </div>
-          {selectedRow && (
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyle(selectedRow.status)}`}>
-              {selectedRow.status}
-            </span>
-          )}
-        </div>
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MiniStat label="Overall Avg" value={`${selectedRow?.average ?? "—"}%`} />
-          <MiniStat label="Last Quiz" value={selectedRow?.lastQuiz != null ? `${selectedRow.lastQuiz}%` : "—"} />
-          <MiniStat label="Assessments" value={String(studentResults.length)} />
-          <MiniStat label="Status" value={selectedRow?.status || "—"} />
-        </div>
-        <div className="mb-5 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4">
-            <h3 className="mb-2 text-sm font-semibold text-emerald-800">Achievements</h3>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-900/90">
-              {(achievements.length ? achievements : ["Grade assessments to build achievement history"]).map((x, i) => (
+            <h3 className="mt-5 text-sm font-semibold text-fg">What went well</h3>
+            <ul className="mt-1 list-disc pl-5 text-sm">
+              {(selectedTest.focus.length === 0 && selectedTest.score >= 80
+                ? ["Solid performance on this assessment"]
+                : selectedTest.score >= 75
+                  ? ["Several items correct — keep using the same process"]
+                  : ["Review the missed items below and retry similar problems"]
+              ).map((x, i) => (
                 <li key={i}>{x}</li>
               ))}
             </ul>
-          </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4">
-            <h3 className="mb-2 text-sm font-semibold text-amber-800">Focus Areas</h3>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90">
-              {(focusAll.length ? focusAll : ["No focus areas yet — grade a scan set"]).map((x, i) => (
-                <li key={i}>{x}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        {studentResults.length > 0 ? (
-          <div className="space-y-4">
-            {studentResults.map((r) => (
-              <div key={r.assessmentId} className="rounded-xl border border-border bg-card p-4">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-semibold text-fg">{r.assessment}</div>
-                  <div className="text-sm">
-                    <span className="font-bold">{r.score}%</span>
-                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${statusStyle(r.status)}`}>{r.status}</span>
+            <h3 className="mt-5 text-sm font-semibold text-fg">What you missed</h3>
+            <div className="mt-2 space-y-2">
+              {(selectedTest.missed.length ? selectedTest.missed : [{ question: "No missed items recorded.", correct: "—" }]).map(
+                (m, i) => (
+                  <div key={i} className="rounded-lg border-l-4 border-red-300 bg-red-50/80 px-3 py-2 text-sm">
+                    <p className="font-medium">{m.question}</p>
+                    {m.studentAnswer && <p className="text-xs text-muted">Answered: {m.studentAnswer}</p>}
+                    <p className="text-emerald-700">Correct: {m.correct}</p>
                   </div>
-                </div>
-                {r.missed.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs font-semibold text-muted uppercase">What was missed</div>
-                    {r.missed.map((m, i) => (
-                      <div key={i} className="rounded-lg border-l-4 border-red-300 bg-red-50/80 px-3 py-2 text-sm">
-                        <p className="font-medium">{m.question}</p>
-                        {m.studentAnswer && <p className="text-xs text-muted">Answered: {m.studentAnswer}</p>}
-                        <p className="text-emerald-700">Correct: {m.correct}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {r.tips.length > 0 && (
-                  <ul className="mt-2 list-disc pl-5 text-sm text-muted">
-                    {r.tips.map((tip, i) => (
-                      <li key={i}>{tip}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-            {tipsAll.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="mb-2 text-sm font-semibold">Study tips</h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm">
-                  {tipsAll.slice(0, 8).map((t, i) => (
-                    <li key={i}>{t}</li>
+                ),
+              )}
+            </div>
+            {selectedTest.focus.length > 0 && (
+              <>
+                <h3 className="mt-5 text-sm font-semibold text-fg">Focus for this test</h3>
+                <ul className="mt-1 list-disc pl-5 text-sm">
+                  {selectedTest.focus.map((f, i) => (
+                    <li key={i}>{f}</li>
                   ))}
                 </ul>
-              </div>
+              </>
+            )}
+            {selectedTest.tips.length > 0 && (
+              <>
+                <h3 className="mt-5 text-sm font-semibold text-fg">Study tips</h3>
+                <ul className="mt-1 list-disc pl-5 text-sm">
+                  {selectedTest.tips.map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         ) : (
-          <p className="rounded-xl border border-border bg-card px-4 py-8 text-center text-sm text-muted">
-            No graded results for this student yet. Use <strong>Scan / Upload Tests</strong> to grade a class set.
-          </p>
+          <>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-fg">{selectedName}</h2>
+                <p className="text-sm text-muted">
+                  Grade {cls.gradeLevel || "—"} · Combined average: {selectedRow?.average ?? "—"}%
+                </p>
+              </div>
+              {selectedRow && (
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyle(selectedRow.status)}`}>
+                  {selectedRow.status}
+                </span>
+              )}
+            </div>
+            <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <MiniStat label="Combined Avg" value={`${selectedRow?.average ?? "—"}%`} />
+              <MiniStat label="Last Test" value={selectedRow?.lastQuiz != null ? `${selectedRow.lastQuiz}%` : "—"} />
+              <MiniStat label="Tests Graded" value={String(studentResults.length)} />
+              <MiniStat label="Overall Status" value={selectedRow?.status || "—"} />
+            </div>
+            <div className="mb-5 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-emerald-800">Combined assessment — strengths</h3>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-900/90">
+                  {(achievements.length ? achievements : ["Grade more assessments to build a combined picture"]).map((x, i) => (
+                    <li key={i}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-amber-800">Combined assessment — focus</h3>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90">
+                  {(focusAll.length ? focusAll : ["No focus areas yet — grade a scan set"]).map((x, i) => (
+                    <li key={i}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="font-semibold text-fg">Assessments — click for this test</h3>
+              </div>
+              {studentResults.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted">
+                  No graded tests mapped to this student yet. Upload a batch and grade it to attach scores.
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {studentResults.map((r) => (
+                    <button
+                      key={r.assessmentId}
+                      type="button"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-bg"
+                      onClick={() => setSelectedTestId(r.assessmentId)}
+                    >
+                      <div>
+                        <div className="font-medium text-fg">{r.assessment}</div>
+                        <div className="text-xs text-muted">{r.status}</div>
+                      </div>
+                      <div className="text-lg font-bold text-fg">{r.score}%</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </AppShell>
     );
@@ -567,6 +630,7 @@ function TeacherClassPage() {
                     className="cursor-pointer border-b border-border/70 hover:bg-bg"
                     onClick={() => {
                       setSelectedName(s.name);
+                      setSelectedTestId(null);
                       setView("student");
                     }}
                   >

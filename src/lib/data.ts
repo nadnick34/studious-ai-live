@@ -1186,6 +1186,48 @@ function mapTeacherAssessment(row: TeacherAssessmentRow): TeacherAssessment {
 }
 
 
+
+function normName(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function nameTokens(s: string) {
+  return normName(s).split(" ").filter((t) => t.length > 1);
+}
+
+/** Fuzzy roster match: exact, last+first, last name + initial, token overlap. */
+function matchRosterName(candidate: string, roster: string[]): string | null {
+  const c = normName(candidate);
+  if (!c) return null;
+  const exact = roster.find((r) => normName(r) === c);
+  if (exact) return exact;
+  const cTok = nameTokens(candidate);
+  if (!cTok.length) return null;
+  let best: { name: string; score: number } | null = null;
+  for (const r of roster) {
+    const rTok = nameTokens(r);
+    if (!rTok.length) continue;
+    const lastC = cTok[cTok.length - 1];
+    const lastR = rTok[rTok.length - 1];
+    const firstC = cTok[0];
+    const firstR = rTok[0];
+    let score = 0;
+    if (lastC === lastR) score += 3;
+    if (firstC === firstR) score += 2;
+    else if (firstC[0] === firstR[0] && lastC === lastR) score += 2;
+    const overlap = cTok.filter((tok) => rTok.includes(tok)).length;
+    score += overlap;
+    if (c.includes(normName(r)) || normName(r).includes(c)) score += 2;
+    if (!best || score > best.score) best = { name: r, score };
+  }
+  if (best && best.score >= 3) return best.name;
+  return null;
+}
+
 async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
   const statements = [
     `create table if not exists teacher_classes (
@@ -1544,29 +1586,56 @@ export const applyAssessmentResultsToRoster = createServerFn({ method: "POST" })
       select id, name, average from teacher_students
       where user_id = ${context.userId} and class_id = ${data.classId}
     `;
-    const byLower = new Map(existing.map((r) => [r.name.toLowerCase(), r]));
+    const rosterNames = existing.map((r) => r.name);
+    const mapped: { rosterName: string; score: number }[] = [];
     for (const r of data.results) {
-      const name = (r.studentName || "").trim();
-      if (!name) continue;
+      const raw = (r.studentName || "").trim();
+      if (!raw) continue;
       const score = Math.max(0, Math.min(100, Number(r.score) || 0));
-      const hit = byLower.get(name.toLowerCase());
+      const matched = matchRosterName(raw, rosterNames) || raw;
+      mapped.push({ rosterName: matched, score });
+    }
+    const byName = new Map(existing.map((r) => [normName(r.name), r]));
+    for (const r of mapped) {
+      const key = normName(r.rosterName);
+      const hit = byName.get(key);
       if (hit) {
-        // blend: weight latest quiz more
-        const next = Math.round(hit.average * 0.4 + score * 0.6);
+        const next = Math.round(hit.average * 0.4 + r.score * 0.6);
         await sql`
-          update teacher_students set average = ${next}
+          update teacher_students set average = ${next}, name = ${hit.name}
           where id = ${hit.id} and user_id = ${context.userId}
         `;
+        hit.average = next;
       } else {
         const sid = uid("ts");
         await sql`
           insert into teacher_students (id, user_id, class_id, name, average)
-          values (${sid}, ${context.userId}, ${data.classId}, ${name}, ${score})
+          values (${sid}, ${context.userId}, ${data.classId}, ${r.rosterName}, ${r.score})
         `;
-        byLower.set(name.toLowerCase(), { id: sid, name, average: score });
+        byName.set(key, { id: sid, name: r.rosterName, average: r.score });
+        rosterNames.push(r.rosterName);
       }
     }
-    return { updated: data.results.length };
+    return { updated: mapped.length, names: mapped.map((m) => m.rosterName) };
+  });
+
+export const remapResultsToRoster = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: { classId: string; results: StudentResult[] }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const existing = await sql<{ name: string }>`
+      select name from teacher_students
+      where user_id = ${context.userId} and class_id = ${data.classId}
+    `;
+    const roster = existing.map((r) => r.name);
+    return data.results.map((r) => {
+      const matched = matchRosterName(r.studentName, roster);
+      return matched ? { ...r, studentName: matched } : r;
+    });
   });
 
 export const listAllTeacherAssessments = createServerFn({ method: "GET" })
