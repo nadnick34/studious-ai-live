@@ -1535,6 +1535,7 @@ export const generateScriptoriumPacket = createServerFn({ method: "POST" })
       generateType: "Study Guide" | "Quiz" | "Test" | "Practice";
       title: string;
       subject: string;
+      schoolName?: string;
       date?: string;
       itemFormat: "Multiple Choice" | "Essay" | "Fill in the Blank" | "Problem Set" | "Mixed";
       questionCount: number;
@@ -1546,60 +1547,69 @@ export const generateScriptoriumPacket = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = apiKey();
     const n = Math.max(5, Math.min(25, Number(data.questionCount) || 10));
+    const isGuide = data.generateType === "Study Guide";
     const system = `You are Scriptorium, the materials workshop of Studious AI Teacher Edition.
 
-Tone: conservative, traditional, classical. Clear language. No slang, no ideology, no contemporary culture-war framing. Prefer primary sources, chronology, definitions, worked examples, and mastery.
+Tone: conservative, traditional, classical. Clear language. No slang, no ideology.
 
-The teacher uploaded source pages (textbook photos, scans, notes) and optional comments/focus. Those sources are AUTHORITY. Outside material is allowed only when it clarifies something already in the sources, and must be labeled.
+Uploaded pages and teacher comments are AUTHORITY. Outside material only clarifies something already present, and must be labeled.
 
-Adapt item types to the SUBJECT:
-- Mathematics / science problem-heavy subjects: prefer Problem Set and Multiple Choice. Do not produce a stack of essays.
-- History / literature / theology: Multiple Choice, Fill in the Blank, and a few short essays are appropriate.
-- Mixed format: choose a sensible blend for the subject (never 10 essays for math).
+Adapt item types to SUBJECT:
+- Math / hard science: Problem Set and Multiple Choice. Almost no essays.
+- History / literature / theology: MC, fill-in-the-blank, a few short essays.
+- Mixed: include a Vocabulary Fill-in-the-Blank section (terms from the sources) PLUS other item types suited to the subject.
 
-If generateType is Study Guide:
-- Heavy outline from the uploaded material and teacher comments.
-- Key Terms / Vocabulary table (term | concise classical definition).
-- Worked examples or memory lists as appropriate.
-- Short "Check your understanding" set (not a full test).
-- Additional Resources: only tightly aligned sources + YouTube search titles/links that teach THIS content. Label them outside the uploaded pages.
+STUDY GUIDE rules:
+- Do NOT include practice questions, quizzes, or an answer key.
+- Order: Title/school/subject → Narrative → Key Terms/Vocabulary table → outline sections → Key Dates table → Additional Resources (aligned sources + YouTube).
+- Narrative is a readable 2–5 paragraph telling of the material (not bullets).
+- Key Dates only if the sources support dates; otherwise a short "Chronology / Sequence" list.
+- No student-name line and no date-blank line on a study guide.
 
-If generateType is Quiz, Test, or Practice:
-- Produce TWO versions of the SAME items:
-  1) Student form: header with Title, Subject, Date line, Student Name line. Numbered items. Leave answer space.
-  2) Answer key: same numbers with correct answers and a one-line rationale.
-- Problem Set items must say "Show your work."
-- Fill in the Blank uses a clear blank in the sentence.
-- Multiple Choice uses A–D.
+QUIZ / TEST / PRACTICE rules:
+- No vocabulary definition table.
+- No Additional Resources section.
+- Student form + answer key for the SAME items.
+- Header text only: school, title, subject. Date on the left, Student Name on the right (the UI will place them).
+- If format is Mixed: first section is Vocabulary Fill-in-the-Blank (from source terms), then other items.
+- Problem Set items say "Show your work."
+- Multiple Choice is A–D.
 
 Return ONLY JSON:
 {
   "generateType": "${data.generateType}",
   "title": "string",
   "subject": "string",
+  "schoolName": "string",
   "date": "string",
   "itemFormat": "string",
-  "overview": "1-3 sentences",
+  "overview": "short blurb",
+  "narrative": ${""2-5 paragraph narrative"" if False else '"string"'},
   "keyTerms": [{ "term": "string", "definition": "string" }],
   "guideSections": [{ "heading": "string", "bullets": ["string"] }],
+  "keyDates": [{ "date": "string", "event": "string" }],
   "questions": [{
     "number": 1,
-    "type": "Multiple Choice|Essay|Fill in the Blank|Problem Set",
+    "type": "Multiple Choice|Essay|Fill in the Blank|Problem Set|Vocabulary Fill in the Blank",
     "prompt": "string",
-    "choices": ["A) ...","B) ..."],
-    "blankHint": "optional"
+    "choices": ["A) ..."],
+    "section": "Vocabulary|Main"
   }],
   "answerKey": [{ "number": 1, "answer": "string", "rationale": "string" }],
   "resources": [{ "title": "string", "url": "string", "note": "string" }]
-}`;
+}
+
+If this is a Study Guide, questions and answerKey MUST be empty arrays.
+If this is Quiz/Test/Practice, keyTerms, guideSections, keyDates, and resources MUST be empty arrays.`;
 
     const user = `Generate a ${data.generateType}.
 Title: ${data.title}
 Subject: ${data.subject}
-Date: ${data.date || "leave a Date: ________ line"}
-Requested format: ${data.itemFormat}
-Question count: ${n}
-School type context: ${data.schoolType || "Classical / traditional"}
+School: ${data.schoolName || "from teacher profile"}
+Date: ${data.date || ""}
+Test/Quiz format: ${isGuide ? "n/a" : data.itemFormat}
+Question count: ${isGuide ? 0 : n}
+School type: ${data.schoolType || "Classical / traditional"}
 
 Teacher comments / focus:
 ${data.comments || "(none)"}
@@ -1612,11 +1622,14 @@ ${(data.extractedText || "").slice(0, 50000)}`;
         generateType: data.generateType,
         title: data.title,
         subject: data.subject,
+        schoolName: data.schoolName || "",
         date: data.date || "",
         itemFormat: data.itemFormat,
         overview: "Add XAI_API_KEY to generate live Scriptorium packets.",
+        narrative: "",
         keyTerms: [],
         guideSections: [],
+        keyDates: [],
         questions: [],
         answerKey: [],
         resources: [],
@@ -1639,7 +1652,20 @@ ${(data.extractedText || "").slice(0, 50000)}`;
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
     try {
-      return JSON.parse(extractJsonObject(content));
+      const parsed = JSON.parse(extractJsonObject(content));
+      if (isGuide) {
+        parsed.questions = [];
+        parsed.answerKey = [];
+      } else {
+        parsed.keyTerms = [];
+        parsed.guideSections = [];
+        parsed.keyDates = [];
+        parsed.resources = [];
+        parsed.narrative = "";
+      }
+      parsed.schoolName = parsed.schoolName || data.schoolName || "";
+      parsed.date = parsed.date || data.date || "";
+      return parsed;
     } catch {
       throw new Error("Could not parse the generated packet. Try fewer pages or a clearer prompt.");
     }
