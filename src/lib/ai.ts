@@ -1562,7 +1562,7 @@ Adapt item types to SUBJECT:
 STUDY GUIDE rules:
 - Do NOT include practice questions, quizzes, or an answer key.
 - Order: Title/school/subject → Narrative → Key Terms/Vocabulary table → outline sections → Key Dates table → Additional Resources (aligned sources + YouTube).
-- Narrative is a readable 2–5 paragraph telling of the material (not bullets).
+- First section after the title block MUST be "Narrative": one tight summary paragraph (two at most) that retells the story/argument of the uploaded material. Not bullets. Not questions.
 - Key Dates only if the sources support dates; otherwise a short "Chronology / Sequence" list.
 - No student-name line and no date-blank line on a study guide.
 
