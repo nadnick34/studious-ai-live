@@ -1387,6 +1387,85 @@ export const updateTeacherClass = createServerFn({ method: "POST" })
     return { ...cur, ...next };
   });
 
+
+export const getTeacherClassStats = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((classId: string) => classId)
+  .handler(async ({ context, data: classId }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const students = await sql<{ id: string; name: string; average: number }>`
+      select id, name, average from teacher_students
+      where user_id = ${context.userId} and class_id = ${classId}
+      order by name asc
+    `;
+    const assessments = await sql<TeacherAssessmentRow>`
+      select * from teacher_assessments
+      where user_id = ${context.userId} and class_id = ${classId}
+      order by created_at desc
+    `;
+    const mapped = assessments.map(mapTeacherAssessment);
+    // Per-student averages from latest results across assessments
+    const byStudent = new Map<string, number[]>();
+    for (const a of mapped) {
+      for (const r of a.results || []) {
+        const key = r.studentName;
+        if (!byStudent.has(key)) byStudent.set(key, []);
+        byStudent.get(key)!.push(Number(r.score) || 0);
+      }
+    }
+    const roster = students.map((s) => {
+      const scores = byStudent.get(s.name) || [];
+      const avg = scores.length
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        : Math.round(Number(s.average) || 0);
+      const lastQuiz = scores.length ? Math.round(scores[0]) : null;
+      let status: string = "On Track";
+      if (avg >= 90) status = "Strong";
+      else if (avg >= 75) status = "On Track";
+      else if (avg >= 60) status = "Needs Support";
+      else status = "At Risk";
+      return {
+        id: s.id,
+        name: s.name,
+        average: avg,
+        lastQuiz,
+        status,
+      };
+    });
+    // If no roster rows but assessment results exist, build roster from results
+    if (roster.length === 0 && byStudent.size) {
+      for (const [name, scores] of byStudent) {
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        const lastQuiz = Math.round(scores[0]);
+        let status = "On Track";
+        if (avg >= 90) status = "Strong";
+        else if (avg >= 75) status = "On Track";
+        else if (avg >= 60) status = "Needs Support";
+        else status = "At Risk";
+        roster.push({ id: name, name, average: avg, lastQuiz, status });
+      }
+      roster.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const classAverage =
+      roster.length > 0
+        ? Math.round(roster.reduce((s, r) => s + r.average, 0) / roster.length)
+        : mapped.length
+          ? Math.round(mapped.reduce((s, a) => s + a.classAverage, 0) / mapped.length)
+          : 0;
+    const onTrack = roster.filter((r) => r.status === "Strong" || r.status === "On Track").length;
+    const needSupport = roster.filter((r) => r.status === "Needs Support" || r.status === "At Risk").length;
+    return {
+      classAverage,
+      studentCount: roster.length,
+      onTrack,
+      needSupport,
+      assessmentCount: mapped.length,
+      students: roster,
+      assessments: mapped,
+    };
+  });
+
 export const listTeacherAssessments = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator((classId: string) => classId)

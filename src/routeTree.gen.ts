@@ -25,6 +25,7 @@ import { Route as TeacherAnalyticsRouteImport } from './routes/teacher.analytics
 import { Route as TeacherClassIdRouteImport } from './routes/teacher.class.$id'
 import { Route as TeacherClassIdGradeRouteImport } from './routes/teacher.class.$id.grade'
 import { Route as TeacherClassIdAssessmentAssessmentIdRouteImport } from './routes/teacher.class.$id.assessment.$assessmentId'
+import { Route as TeacherClassIdStudentStudentIdRouteImport } from './routes/teacher.class.$id.student.$studentId'
 import { Route as ClassIdRouteImport } from './routes/class.$id'
 import { Route as ClassIdIndexRouteImport } from './routes/class.$id.index'
 import { Route as ClassIdUploadRouteImport } from './routes/class.$id.upload'
@@ -60,6 +61,7 @@ const TeacherAnalyticsRoute = TeacherAnalyticsRouteImport.update({ id: '/teacher
 const TeacherClassIdRoute = TeacherClassIdRouteImport.update({ id: '/teacher/class/$id', path: '/class/$id', getParentRoute: () => TeacherRoute } as any)
 const TeacherClassIdGradeRoute = TeacherClassIdGradeRouteImport.update({ id: '/teacher/class/$id/grade', path: '/class/$id/grade', getParentRoute: () => TeacherRoute } as any)
 const TeacherClassIdAssessmentAssessmentIdRoute = TeacherClassIdAssessmentAssessmentIdRouteImport.update({ id: '/teacher/class/$id/assessment/$assessmentId', path: '/class/$id/assessment/$assessmentId', getParentRoute: () => TeacherRoute } as any)
+const TeacherClassIdStudentStudentIdRoute = TeacherClassIdStudentStudentIdRouteImport.update({ id: '/teacher/class/$id/student/$studentId', path: '/class/$id/student/$studentId', getParentRoute: () => TeacherRoute } as any)
 const ClassIdRoute = ClassIdRouteImport.update({ id: '/class/$id', path: '/class/$id', getParentRoute: () => rootRouteImport } as any)
 const ClassIdIndexRoute = ClassIdIndexRouteImport.update({ id: '/class/$id/', path: '/', getParentRoute: () => ClassIdRoute } as any)
 const ClassIdUploadRoute = ClassIdUploadRouteImport.update({ id: '/class/$id/upload', path: '/upload', getParentRoute: () => ClassIdRoute } as any)

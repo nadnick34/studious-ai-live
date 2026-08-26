@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, parseTeacherClassDocument } from "@/lib/ai";
-import { createTeacherClass, getProfile, listTeacherClasses, updateTeacherClass } from "@/lib/data";
+import { createTeacherClass, getProfile, getTeacherClassStats, listTeacherClasses, updateTeacherClass } from "@/lib/data";
 import {
   COURSE_LEVELS,
   SCHOOL_TYPES,
@@ -19,6 +19,7 @@ export const Route = createFileRoute("/teacher/")({ component: TeacherDashboard 
 function TeacherDashboard() {
   const navigate = useNavigate();
   const [classes, setClasses] = useState<TeacherClass[]>([]);
+  const [classStats, setClassStats] = useState<Record<string, { studentCount: number; classAverage: number }>>({});
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [parseBusy, setParseBusy] = useState(false);
@@ -41,6 +42,17 @@ function TeacherDashboard() {
     try {
       const list = await listTeacherClasses();
       setClasses(list);
+      const entries = await Promise.all(
+        list.map(async (c) => {
+          try {
+            const s = await getTeacherClassStats({ data: c.id });
+            return [c.id, { studentCount: s.studentCount, classAverage: s.classAverage }] as const;
+          } catch {
+            return [c.id, { studentCount: 0, classAverage: 0 }] as const;
+          }
+        }),
+      );
+      setClassStats(Object.fromEntries(entries));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load classes");
     }
@@ -281,7 +293,13 @@ function TeacherDashboard() {
                 <div className="mt-1 text-sm text-muted">
                   {c.subject} · Grade {c.gradeLevel || "—"} · {c.courseLevel}
                 </div>
-                <div className="mt-2 text-xs text-muted">{c.schoolType}</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
+                  <span>{c.schoolType}</span>
+                  <span>·</span>
+                  <span>{classStats[c.id]?.studentCount ?? "—"} students</span>
+                  <span>·</span>
+                  <span>Avg {classStats[c.id]?.classAverage ?? "—"}%</span>
+                </div>
               </button>
             </div>
           ))}

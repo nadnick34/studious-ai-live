@@ -18,7 +18,7 @@ function GradePage() {
   const [name, setName] = useState("");
   const [type, setType] = useState<AssessmentType>("Quiz");
   const [topics, setTopics] = useState("");
-  const [points, setPoints] = useState("100");
+  const [points, setPoints] = useState("50");
   const [blank, setBlank] = useState<CapturedFile[]>([]);
   const [key, setKey] = useState<CapturedFile[]>([]);
   const [scans, setScans] = useState<CapturedFile[]>([]);
@@ -30,14 +30,25 @@ function GradePage() {
     void getTeacherClassById({ data: id }).then(setCls);
   }, [id]);
 
+  async function labelGroup(items: CapturedFile[]) {
+    if (!items.length) return "(none)";
+    try {
+      const payloads = await capturedToPayloads(items);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      return extracted.text || items.map((i) => i.file.name).join(", ");
+    } catch {
+      return items.map((i) => i.file.name).join(", ");
+    }
+  }
+
   async function run() {
     if (!cls) return;
     if (!name.trim()) {
-      setError("Name this assessment (e.g. Chapter 3 Quiz).");
+      setError("Assessment name is required.");
       return;
     }
     if (!scans.length && !key.length && !blank.length) {
-      setError("Upload at least the student scans (and ideally the blank test + answer key).");
+      setError("Upload at least the student tests (and ideally blank test + answer key).");
       return;
     }
     setBusy(true);
@@ -48,14 +59,7 @@ function GradePage() {
       const payloads = await capturedToPayloads(all);
       const extracted = await extractMaterials({ data: { files: payloads } });
       const labeled =
-        `BLANK / TEST FORM:\n` +
-        (await labelGroup(blank)) +
-        `\n\nANSWER KEY:\n` +
-        (await labelGroup(key)) +
-        `\n\nSTUDENT SCANS:\n` +
-        (await labelGroup(scans)) +
-        `\n\nCOMBINED EXTRACT:\n` +
-        (extracted.text || "");
+        `BLANK / TEST FORM:\n${await labelGroup(blank)}\n\nANSWER KEY:\n${await labelGroup(key)}\n\nSTUDENT SCANS:\n${await labelGroup(scans)}\n\nCOMBINED:\n${extracted.text || ""}`;
 
       setStatus("Grading and building class + student feedback…");
       const graded = await gradeTeacherAssessment({
@@ -99,65 +103,111 @@ function GradePage() {
     }
   }
 
-  async function labelGroup(items: CapturedFile[]) {
-    if (!items.length) return "(none)";
-    try {
-      const payloads = await capturedToPayloads(items);
-      const extracted = await extractMaterials({ data: { files: payloads } });
-      return extracted.text || items.map((i) => i.file.name).join(", ");
-    } catch {
-      return items.map((i) => i.file.name).join(", ");
-    }
-  }
-
   if (!cls) {
     return (
-      <AppShell title="Grade">
+      <AppShell title="Scan / Upload Tests">
         <p className="text-sm text-muted">Loading…</p>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Grade scanned tests">
-      <Link to="/teacher/class/$id" params={{ id }} className="mb-4 inline-block text-sm text-teal hover:underline">
+    <AppShell
+      title="Scan / Upload Tests"
+      right={
+        <span className="text-xs text-muted">
+          {cls.name}
+          {cls.courseLevel ? ` – ${cls.courseLevel}` : ""}
+        </span>
+      }
+    >
+      <Link to="/teacher/class/$id" params={{ id }} className="mb-3 inline-block text-sm text-teal hover:underline">
         ← {cls.name}
       </Link>
-      <div className="mx-auto max-w-xl space-y-4">
-        <p className="text-sm text-muted">
-          Upload the blank test, answer key, and student packet (photos, scans, or PDFs). Results follow school-type
-          best practice — not a one-size-fits-all model.
-        </p>
-        <input className="w-full rounded-lg border border-border px-3 py-2 text-sm" placeholder="Assessment name *" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
-        <div className="grid grid-cols-2 gap-2">
-          <select className="rounded-lg border border-border px-3 py-2 text-sm" value={type} onChange={(e) => setType(e.target.value as AssessmentType)} disabled={busy}>
-            {ASSESSMENT_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <input className="rounded-lg border border-border px-3 py-2 text-sm" placeholder="Points possible" value={points} onChange={(e) => setPoints(e.target.value)} disabled={busy} />
+
+      <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-3 text-[11px] font-semibold tracking-wide text-muted uppercase">Upload assessment batch</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs text-muted">
+            Assessment Name
+            <input
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Quiz 4 – Genetics"
+              disabled={busy}
+            />
+          </label>
+          <label className="block text-xs text-muted">
+            Assessment Type
+            <select
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+              value={type}
+              onChange={(e) => setType(e.target.value as AssessmentType)}
+              disabled={busy}
+            >
+              {ASSESSMENT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs text-muted">
+            Topics Covered
+            <input
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+              value={topics}
+              onChange={(e) => setTopics(e.target.value)}
+              placeholder="Mendelian genetics, Punnett squares"
+              disabled={busy}
+            />
+          </label>
+          <label className="block text-xs text-muted">
+            Total Points
+            <input
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+              value={points}
+              onChange={(e) => setPoints(e.target.value)}
+              disabled={busy}
+            />
+          </label>
         </div>
-        <input className="w-full rounded-lg border border-border px-3 py-2 text-sm" placeholder="Topics covered (comma-separated)" value={topics} onChange={(e) => setTopics(e.target.value)} disabled={busy} />
 
-        <section className="rounded-xl border border-border bg-card p-3">
-          <h3 className="mb-2 text-sm font-semibold">1. Blank test / instructions</h3>
-          <CaptureBar items={blank} onChange={setBlank} disabled={busy} />
-        </section>
-        <section className="rounded-xl border border-border bg-card p-3">
-          <h3 className="mb-2 text-sm font-semibold">2. Answer key</h3>
-          <CaptureBar items={key} onChange={setKey} disabled={busy} />
-        </section>
-        <section className="rounded-xl border border-border bg-card p-3">
-          <h3 className="mb-2 text-sm font-semibold">3. Student tests (batch scan)</h3>
-          <CaptureBar items={scans} onChange={setScans} disabled={busy} />
-        </section>
+        <div className="mt-4 space-y-3">
+          <UploadBlock title="1. Blank Test (optional)" hint="PDF of the original assessment">
+            <CaptureBar items={blank} onChange={setBlank} disabled={busy} />
+          </UploadBlock>
+          <UploadBlock title="2. Answer Key" hint="PDF or document with correct answers / rubric">
+            <CaptureBar items={key} onChange={setKey} disabled={busy} />
+          </UploadBlock>
+          <UploadBlock title="3. Student Tests (batch scan)" hint="Single PDF of the full class set, or multiple files">
+            <CaptureBar items={scans} onChange={setScans} disabled={busy} />
+          </UploadBlock>
+        </div>
 
-        {status && <p className="text-xs text-teal">{status}</p>}
-        {error && <p className="text-sm text-red">{error}</p>}
-        <Button disabled={busy} onClick={() => void run()}>
-          {busy ? "Grading…" : "Grade & analyze"}
-        </Button>
+        {status && <p className="mt-3 text-xs text-teal">{status}</p>}
+        {error && <p className="mt-3 text-sm text-red">{error}</p>}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" disabled={busy} onClick={() => void navigate({ to: "/teacher/class/$id", params: { id } })}>
+            Cancel
+          </Button>
+          <Button disabled={busy} onClick={() => void run()}>
+            {busy ? "Grading…" : "Grade & Analyze"}
+          </Button>
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+function UploadBlock({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-bg/50 p-3">
+      <div className="mb-1 text-sm font-medium text-fg">{title}</div>
+      <div className="mb-2 text-xs text-muted">{hint}</div>
+      {children}
+    </div>
   );
 }
