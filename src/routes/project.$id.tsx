@@ -239,7 +239,20 @@ function ProjectDetailPage() {
         </div>
       )}
 
-      {tab === "gantt" && <GanttChart tasks={project.ganttTasks || []} start={project.startDate} end={project.endDate} />}
+      {tab === "gantt" && (
+        <GanttChart
+          tasks={project.ganttTasks || []}
+          start={project.startDate}
+          end={project.endDate}
+          projectName={project.name}
+          onChange={async (next) => {
+            const updated = await updateMeetingProject({
+              data: { id: project.id, patch: { ganttTasks: next } },
+            });
+            if (updated) setProject(updated);
+          }}
+        />
+      )}
 
       {tab === "materials" && (
         <div className="mx-auto max-w-xl space-y-2">
@@ -286,52 +299,193 @@ function ProjectDetailPage() {
   );
 }
 
+function formatMDY(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[2]}/${m[3]}/${m[1].slice(2)}`;
+    return iso;
+  }
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yy = String(d.getFullYear()).slice(2);
+  return `${mm}/${dd}/${yy}`;
+}
+
+function barColor(t: GanttTask) {
+  if (t.completed) return "bg-emerald-600";
+  if (t.risk === "high") return "bg-red-600";
+  if (t.risk === "medium") return "bg-orange-500";
+  return "bg-amber-400"; // incomplete default
+}
+
 function GanttChart({
   tasks,
   start,
   end,
+  projectName,
+  onChange,
 }: {
   tasks: GanttTask[];
   start?: string | null;
   end?: string | null;
+  projectName: string;
+  onChange: (tasks: GanttTask[]) => void | Promise<void>;
 }) {
-  if (!tasks.length) {
-    return <p className="text-sm text-muted">No Gantt tasks yet. Use Refresh AI plan after adding meetings or materials.</p>;
+  const [local, setLocal] = useState(tasks);
+  useEffect(() => setLocal(tasks), [tasks]);
+
+  if (!local.length) {
+    return (
+      <p className="text-sm text-muted">
+        No Gantt tasks yet. Use Refresh AI plan after adding meetings or materials.
+      </p>
+    );
   }
-  const starts = tasks.map((t) => new Date(t.start).getTime()).filter((n) => !Number.isNaN(n));
-  const ends = tasks.map((t) => new Date(t.end).getTime()).filter((n) => !Number.isNaN(n));
+
+  const starts = local.map((t) => new Date(t.start).getTime()).filter((n) => !Number.isNaN(n));
+  const ends = local.map((t) => new Date(t.end).getTime()).filter((n) => !Number.isNaN(n));
   const min = start ? new Date(start).getTime() : Math.min(...starts);
   const max = end ? new Date(end).getTime() : Math.max(...ends);
   const span = Math.max(max - min, 1);
 
+  function patch(id: string, partial: Partial<GanttTask>) {
+    const next = local.map((t) => (t.id === id ? { ...t, ...partial } : t));
+    setLocal(next);
+    void onChange(next);
+  }
+
+  function downloadCsv() {
+    const header = "Task,Owner,Lane,Start,End,Completed,Risk,Progress";
+    const rows = local.map((t) =>
+      [
+        t.name,
+        t.owner || "",
+        t.lane || "",
+        formatMDY(t.start),
+        formatMDY(t.end),
+        t.completed ? "yes" : "no",
+        t.completed ? "" : t.risk || "none",
+        t.progress ?? "",
+      ]
+        .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+        .join(","),
+    );
+    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.replace(/[^a-z0-9]+/gi, "-")}-gantt.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printGantt() {
+    const w = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+    if (!w) return;
+    const rows = local
+      .map((t) => {
+        const s = new Date(t.start).getTime();
+        const e = new Date(t.end).getTime();
+        const left = Number.isNaN(s) ? 0 : ((s - min) / span) * 100;
+        const width = Number.isNaN(s) || Number.isNaN(e) ? 8 : Math.max(((e - s) / span) * 100, 2);
+        const color = t.completed ? "#059669" : t.risk === "high" ? "#dc2626" : t.risk === "medium" ? "#f97316" : "#fbbf24";
+        return `<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center;margin:6px 0;font-size:12px">
+          <div>${t.name}${t.owner ? " · " + t.owner : ""}</div>
+          <div style="position:relative;height:22px;background:#f1f5f9;border-radius:4px">
+            <div title="${formatMDY(t.start)} – ${formatMDY(t.end)}" style="position:absolute;left:${left}%;width:${width}%;top:3px;height:16px;border-radius:4px;background:${color}"></div>
+          </div>
+        </div>`;
+      })
+      .join("");
+    w.document.write(`<!doctype html><html><head><title>${projectName} Gantt</title>
+      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} h1{font-size:18px} .legend span{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:middle}</style>
+      </head><body>
+      <h1>${projectName} — Gantt</h1>
+      <p class="legend">
+        <span style="background:#059669"></span> Completed
+        <span style="background:#fbbf24;margin-left:12px"></span> Incomplete
+        <span style="background:#f97316;margin-left:12px"></span> Medium risk
+        <span style="background:#dc2626;margin-left:12px"></span> High risk
+      </p>
+      ${rows}
+      <script>window.onload=()=>{window.print()}<\/script>
+      </body></html>`);
+    w.document.close();
+  }
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
-      <h3 className="mb-3 font-semibold text-fg">Gantt</h3>
-      <div className="min-w-[640px] space-y-2">
-        {tasks.map((t) => {
-          const s = new Date(t.start).getTime();
-          const e = new Date(t.end).getTime();
-          const left = Number.isNaN(s) ? 0 : ((s - min) / span) * 100;
-          const width = Number.isNaN(s) || Number.isNaN(e) ? 8 : Math.max(((e - s) / span) * 100, 2);
-          return (
-            <div key={t.id} className="grid grid-cols-[140px_1fr] items-center gap-2 text-xs">
-              <div className="truncate text-fg" title={t.name}>
-                {t.name}
-                {t.owner ? <span className="text-muted"> · {t.owner}</span> : null}
-              </div>
-              <div className="relative h-7 rounded bg-bg">
-                <div
-                  className="absolute top-1 h-5 rounded bg-slate/80 text-[10px] leading-5 text-white"
-                  style={{ left: `${left}%`, width: `${width}%` }}
-                  title={`${t.start} → ${t.end}`}
-                >
-                  <span className="px-1">{t.lane || ""}</span>
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold text-fg">Gantt</h3>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" className="text-xs" onClick={downloadCsv}>
+            Download CSV
+          </Button>
+          <Button type="button" variant="secondary" className="text-xs" onClick={printGantt}>
+            Print / PDF
+          </Button>
+        </div>
+      </div>
+      <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-muted">
+        <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-emerald-600" /> Completed</span>
+        <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-amber-400" /> Incomplete</span>
+        <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-orange-500" /> Medium risk</span>
+        <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-red-600" /> High risk</span>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px] space-y-2">
+          {local.map((t) => {
+            const s = new Date(t.start).getTime();
+            const e = new Date(t.end).getTime();
+            const left = Number.isNaN(s) ? 0 : ((s - min) / span) * 100;
+            const width = Number.isNaN(s) || Number.isNaN(e) ? 8 : Math.max(((e - s) / span) * 100, 2);
+            const tip = `${t.name}: ${formatMDY(t.start)} – ${formatMDY(t.end)}${t.owner ? ` · ${t.owner}` : ""}`;
+            return (
+              <div key={t.id} className="grid grid-cols-[minmax(120px,160px)_1fr_auto] items-center gap-2 text-xs">
+                <div className="truncate text-fg" title={t.name}>
+                  {t.name}
+                  {t.owner ? <span className="text-muted"> · {t.owner}</span> : null}
+                </div>
+                <div className="relative h-8 rounded bg-bg">
+                  <div
+                    className={`absolute top-1.5 h-5 rounded ${barColor(t)} text-[10px] leading-5 text-white shadow-sm`}
+                    style={{ left: `${left}%`, width: `${width}%` }}
+                    title={tip}
+                  >
+                    <span className="px-1 opacity-90">{t.lane || ""}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-[10px] text-muted">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(t.completed)}
+                      onChange={(e) => patch(t.id, { completed: e.target.checked, risk: e.target.checked ? "none" : t.risk })}
+                    />
+                    Done
+                  </label>
+                  <select
+                    className="rounded border border-border bg-bg px-1 py-0.5 text-[10px]"
+                    value={t.completed ? "none" : t.risk || "none"}
+                    disabled={Boolean(t.completed)}
+                    onChange={(e) =>
+                      patch(t.id, { risk: e.target.value as GanttTask["risk"], completed: false })
+                    }
+                    title="Deadline risk"
+                  >
+                    <option value="none">On track</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+      <p className="mt-2 text-[11px] text-muted">Hover a bar for dates (MM/DD/YY). Mark Done or set Medium/High risk for deadline slip.</p>
     </div>
   );
 }

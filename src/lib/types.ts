@@ -380,6 +380,10 @@ export interface GanttTask {
   end: string;
   progress?: number; // 0-100
   lane?: string; // e.g. Discovery, Compliance, IT
+  /** completed = green; incomplete default = yellow */
+  completed?: boolean;
+  /** Risk of slipping past deadline: medium = orange, high = red */
+  risk?: "none" | "medium" | "high";
 }
 
 export interface ProjectMaterial {
