@@ -1187,8 +1187,8 @@ function mapTeacherAssessment(row: TeacherAssessmentRow): TeacherAssessment {
 
 
 async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
-  await sql.unsafe(`
-    create table if not exists teacher_classes (
+  const statements = [
+    `create table if not exists teacher_classes (
       id text primary key,
       user_id text not null,
       name text not null,
@@ -1200,17 +1200,17 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       syllabus_text text not null default '',
       created_at timestamptz not null default now(),
       archived boolean not null default false
-    );
-    create index if not exists teacher_classes_user_idx on teacher_classes (user_id);
-    create table if not exists teacher_students (
+    )`,
+    `create index if not exists teacher_classes_user_idx on teacher_classes (user_id)`,
+    `create table if not exists teacher_students (
       id text primary key,
       user_id text not null,
       class_id text not null,
       name text not null,
       average double precision not null default 0
-    );
-    create index if not exists teacher_students_class_idx on teacher_students (user_id, class_id);
-    create table if not exists teacher_assessments (
+    )`,
+    `create index if not exists teacher_students_class_idx on teacher_students (user_id, class_id)`,
+    `create table if not exists teacher_assessments (
       id text primary key,
       user_id text not null,
       class_id text not null,
@@ -1225,13 +1225,21 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       strengths jsonb not null default '[]'::jsonb,
       needs jsonb not null default '[]'::jsonb,
       results jsonb not null default '[]'::jsonb
-    );
-    create index if not exists teacher_assessments_class_idx on teacher_assessments (user_id, class_id);
-  `);
+    )`,
+    `create index if not exists teacher_assessments_class_idx on teacher_assessments (user_id, class_id)`,
+  ];
+  for (const stmt of statements) {
+    try {
+      await sql.query(stmt);
+    } catch (err) {
+      console.error("[teacher] ensure table statement failed:", err);
+      throw err;
+    }
+  }
   try {
-    await sql.unsafe(`alter table teacher_classes add column if not exists syllabus_text text not null default ''`);
+    await sql.query(`alter table teacher_classes add column if not exists syllabus_text text not null default ''`);
   } catch {
-    /* ignore */
+    /* column may already exist or alter unsupported in edge case */
   }
 }
 
