@@ -256,7 +256,7 @@ export const extractMaterials = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const parts: string[] = [];
     const attachments: Attachment[] = [];
-    for (const file of data.files.slice(0, 12)) {
+    for (const file of data.files.slice(0, 20)) {
       const processed = await processFile(file);
       parts.push(processed.heading);
       attachments.push(processed.attachment);
@@ -1416,11 +1416,55 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
     }
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
+    let parsed: Record<string, unknown>;
     try {
-      return JSON.parse(extractJsonObject(content));
+      parsed = JSON.parse(extractJsonObject(content));
     } catch {
       throw new Error("Could not parse grading response. Try a smaller batch or clearer PDFs.");
     }
+    // Normalize alternate shapes the model sometimes returns
+    const rawResults =
+      (Array.isArray(parsed.results) && parsed.results) ||
+      (Array.isArray(parsed.students) && parsed.students) ||
+      (Array.isArray(parsed.studentResults) && parsed.studentResults) ||
+      [];
+    const results = rawResults.map((r: any) => {
+      const pointsPossible = Number(r.pointsPossible ?? r.points_possible ?? data.pointsPossible) || 100;
+      const pointsEarned = Number(r.pointsEarned ?? r.points_earned ?? r.correctCount ?? 0);
+      let score = Number(r.score);
+      if (!Number.isFinite(score) && pointsPossible > 0) {
+        score = Math.round((pointsEarned / pointsPossible) * 100);
+      }
+      if (!Number.isFinite(score)) score = 0;
+      const status =
+        r.status ||
+        (score >= 90 ? "Strong" : score >= 75 ? "On Track" : score >= 60 ? "Needs Support" : "At Risk");
+      return {
+        studentName: String(r.studentName || r.name || r.student || "Unknown student").trim(),
+        score,
+        pointsEarned,
+        pointsPossible,
+        status,
+        missed: Array.isArray(r.missed) ? r.missed : Array.isArray(r.missedItems) ? r.missedItems : [],
+        focusAreas: Array.isArray(r.focusAreas) ? r.focusAreas : Array.isArray(r.focus) ? r.focus : [],
+        studyTips: Array.isArray(r.studyTips) ? r.studyTips : Array.isArray(r.tips) ? r.tips : [],
+      };
+    }).filter((r: { studentName: string }) => r.studentName && r.studentName !== "Unknown student");
+
+    const classAverage =
+      Number(parsed.classAverage) ||
+      (results.length
+        ? Math.round(results.reduce((s: number, r: { score: number }) => s + r.score, 0) / results.length)
+        : 0);
+
+    return {
+      classAverage,
+      topicScores: Array.isArray(parsed.topicScores) ? parsed.topicScores : [],
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      needs: Array.isArray(parsed.needs) ? parsed.needs : [],
+      results,
+      _rawPreview: results.length ? undefined : content.slice(0, 500),
+    };
   });
 
 

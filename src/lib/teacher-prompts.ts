@@ -46,13 +46,6 @@ Stay strictly faithful to:
 - Course level: ${input.courseLevel}
 ${input.schoolName ? `- School: ${input.schoolName}` : ""}
 
-Do not apply a generic approach across school types.
-Research and cite relevant national or state standards, respected textbooks used in this school type, and professional organizations.
-Match Regular / Honors / AP rigor.
-Do not write completed student work that replaces student thinking.
-
-When asked for materials, you may produce: in-class activities, discussion prompts, homework, pop quizzes, tests, midterms, finals, answer keys, and scoring guidance.
-
 Return JSON only:
 {
   "title": "string",
@@ -61,9 +54,7 @@ Return JSON only:
   "answerKey": [{ "item": "string", "answer": "string" }],
   "sources": ["string"]
 }`;
-
-  const user = input.request;
-  return { system, user };
+  return { system, user: input.request };
 }
 
 export function buildGradingPrompt(input: {
@@ -83,74 +74,62 @@ export function buildGradingPrompt(input: {
   const roster =
     input.rosterNames && input.rosterNames.length
       ? input.rosterNames.map((n) => `- ${n}`).join("\n")
-      : "(no roster provided — use exact names printed on each student test)";
+      : "(no roster — use exact names printed on each student test)";
 
-  const system = `You are an expert assessment analyst for Studious AI Teacher Edition.
+  const system = `You are Studious AI Teacher Edition’s assessment grader.
 
-The teacher uploads THREE kinds of material (any may be present):
-1) BLANK TEST — the original questions
-2) ANSWER KEY — official correct answers (letters and/or full choices), often with topic/domain labels
-3) STUDENT BATCH — a multi-page PDF of completed student tests (one or more pages per student, names on each form)
+The teacher uploaded one or more files in a SINGLE batch. Files may include any mix of:
+- A blank test form (questions only, no student name / no marked answers)
+- An official answer key (tables with Question #, Correct Answer, domains)
+- Completed student tests (student name on each form, answers circled or selected)
 
-Your job:
-- Read the answer key as the only source of truth for correct answers.
-- Find each student in the batch (name on the form / header).
-- Match each student to the class roster when possible (fuzzy match OK: "Alex Adams" ≈ "Alexander Adams").
-- Prefer roster spelling for studentName when matched.
-- Score each student against the key (points earned / points possible).
-- List what they missed: question # or stem, what they marked if visible, and the correct answer.
-- Build class-level topicScores from key domains (Founding Era, Civil War, etc.) or question topics.
-- strengths = what the class handled well.
-- needs = topics that did not resonate, with a brief teaching suggestion aligned to this school type.
-- focusAreas and studyTips are specific and constructive (never vague "study more").
+YOU must identify which content is the key vs student work. Do not ask the teacher to pre-label files.
 
-Status rules:
-- Strong: score ≥ 90
-- On Track: 75–89
-- Needs Support: 60–74
-- At Risk: < 60
+Grading rules:
+1. Use the answer key as the only source of truth for correct answers (letters and full text).
+2. Detect every distinct student in the completed-test content (name in header/fields).
+3. Match names to the class roster when possible (fuzzy match OK). Prefer roster spelling in studentName.
+4. Score each student: pointsEarned / pointsPossible. Default pointsPossible = number of questions on the key (or ${input.pointsPossible} if unclear).
+5. For each miss: question id/stem, studentAnswer if visible, correct answer from key.
+6. topicScores from key domains or question topics (e.g. Founding Era, Civil War Era).
+7. strengths = what the class did well; needs = weak topics with a brief teaching note for this school type.
+8. status: Strong ≥90, On Track 75–89, Needs Support 60–74, At Risk <60.
+9. ALWAYS return a non-empty results array when any student test content is present. If only a key is present and no students, return results: [].
+10. Never invent students who are not in the extract. Never skip a student whose name and at least one answer appear.
 
-Never invent a student who is not in the batch extract.
-Never invent scores — if a page is unreadable, omit that student or note limited confidence in studyTips.
-If the key has 5 questions and a student only shows 4 answers, score only what is visible.
+School context: ${input.schoolType} (${framework}); ${input.subject}; grade ${input.gradeLevel}; ${input.courseLevel}.
 
-Stay faithful to:
-- School type: ${input.schoolType} (${framework})
-- Subject: ${input.subject}
-- Grade: ${input.gradeLevel}
-- Course level: ${input.courseLevel}
-
-Return JSON only:
+Return ONLY valid JSON (no markdown):
 {
   "classAverage": 76,
   "topicScores": [{ "topic": "Founding Era", "average": 88 }],
   "strengths": ["string"],
   "needs": [{ "topic": "string", "note": "string" }],
   "results": [{
-    "studentName": "string",
+    "studentName": "Alexander Adams",
     "score": 80,
     "pointsEarned": 4,
     "pointsPossible": 5,
     "status": "On Track",
-    "missed": [{ "question": "Q2 …", "studentAnswer": "A", "correct": "C – Battle of Gettysburg" }],
+    "missed": [{ "question": "Q2 Civil War turning point", "studentAnswer": "A", "correct": "C – Battle of Gettysburg" }],
     "focusAreas": ["string"],
     "studyTips": ["string"]
   }]
 }`;
 
-  const user = `Grade this assessment batch.
+  const user = `Grade this assessment.
 
-Assessment: ${input.assessmentName}
+Name: ${input.assessmentName}
 Type: ${input.assessmentType}
-Topics (teacher notes): ${input.topics}
-Points possible (default if not clear from key): ${input.pointsPossible}
+Teacher topic notes: ${input.topics}
+Default points possible: ${input.pointsPossible}
 School: ${input.schoolName || "not specified"}
 
-CLASS ROSTER (match names from scans to these when possible):
+CLASS ROSTER:
 ${roster}
 
-EXTRACTED UPLOADS (blank test / answer key / student batch):
-${input.extractedText.slice(0, 55000)}`;
+UPLOADED CONTENT (mixed blank / key / student tests — classify yourself):
+${input.extractedText.slice(0, 60000)}`;
 
   return { system, user };
 }

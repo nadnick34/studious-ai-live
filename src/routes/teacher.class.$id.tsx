@@ -62,9 +62,7 @@ function TeacherClassPage() {
   const [gType, setGType] = useState<AssessmentType>("Quiz");
   const [gTopics, setGTopics] = useState("");
   const [gPoints, setGPoints] = useState("50");
-  const [blank, setBlank] = useState<CapturedFile[]>([]);
-  const [keyFiles, setKeyFiles] = useState<CapturedFile[]>([]);
-  const [scans, setScans] = useState<CapturedFile[]>([]);
+  const [allFiles, setAllFiles] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -142,43 +140,33 @@ function TeacherClassPage() {
       setError("Assessment name is required.");
       return;
     }
-    if (!scans.length && !keyFiles.length && !blank.length) {
-      setError("Upload the answer key and the student test batch (blank test optional).");
-      return;
-    }
-    if (!keyFiles.length) {
-      setError("Upload the official answer key so scores can be checked against correct answers.");
-      return;
-    }
-    if (!scans.length) {
-      setError("Upload the student tests batch PDF (all completed tests).");
+    if (!allFiles.length) {
+      setError("Upload the answer key and completed student tests (blank test optional) in the box below.");
       return;
     }
     setBusy(true);
     setError(null);
-    setStatus("Reading blank test, answer key, and student batch…");
+    setStatus("Reading all uploaded files…");
     try {
-      async function extractLabeled(label: string, items: CapturedFile[]) {
-        if (!items.length) return `${label}:\n(none)\n`;
-        const payloads = await capturedToPayloads(items);
-        const extracted = await extractMaterials({ data: { files: payloads } });
-        const names = items.map((i) => i.file.name).join(", ");
-        return `${label} (files: ${names}):\n${extracted.text || "(no text extracted)"}\n`;
+      const payloads = await capturedToPayloads(allFiles);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      const text = (extracted.text || "").trim();
+      if (text.length < 40) {
+        throw new Error(
+          "Could not read enough text from the uploads. Use text-based PDFs when possible, or photo/scan each page clearly.",
+        );
       }
 
-      const labeled = [
-        await extractLabeled("=== BLANK TEST ===", blank),
-        await extractLabeled("=== ANSWER KEY (source of truth) ===", keyFiles),
-        await extractLabeled("=== STUDENT BATCH (completed tests) ===", scans),
-      ].join("\n");
-
-      if (labeled.length < 80) {
-        throw new Error("Could not read enough text from the PDFs. Try text-based PDFs or clearer scans.");
-      }
+      const fileList = allFiles.map((f) => f.file.name).join(", ");
+      const labeled =
+        `FILES UPLOADED: ${fileList}\n\n` +
+        `The following may include a blank test, an official answer key, and/or a multi-student completed-test batch. ` +
+        `Identify each type yourself.\n\n` +
+        text;
 
       const rosterNames = (stats?.students || []).map((s) => s.name).filter(Boolean);
 
-      setStatus("Matching students to the roster and scoring against the answer key…");
+      setStatus("Identifying key vs student tests, matching roster, and scoring…");
       const graded = await gradeTeacherAssessment({
         data: {
           schoolType: cls.schoolType,
@@ -197,12 +185,14 @@ function TeacherClassPage() {
 
       const results = Array.isArray(graded.results) ? graded.results : [];
       if (!results.length) {
+        const hint = (graded as { _rawPreview?: string })._rawPreview;
         throw new Error(
-          "No student results were returned. Check that the batch PDF shows student names and marked answers, and that the answer key is readable.",
+          "No student results came back. Make sure the student batch shows names and answers, and the answer key is included. " +
+            (hint ? `Model note: ${hint.slice(0, 180)}` : "Try fewer pages or clearer PDFs."),
         );
       }
 
-      setStatus(`Saving results for ${results.length} student(s) and updating roster scores…`);
+      setStatus(`Saving ${results.length} student result(s) and updating roster…`);
       const assessment = await createTeacherAssessment({
         data: {
           classId: id,
@@ -210,7 +200,7 @@ function TeacherClassPage() {
           type: gType,
           topics: gTopics.trim(),
           pointsPossible: Number(gPoints) || 100,
-          sourceFiles: [...blank, ...keyFiles, ...scans].map((f) => f.file.name),
+          sourceFiles: allFiles.map((f) => f.file.name),
           classAverage: Number(graded.classAverage) || 0,
           topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
           strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
@@ -231,9 +221,7 @@ function TeacherClassPage() {
 
       setStatus("Done — opening analytics…");
       setView("overview");
-      setBlank([]);
-      setKeyFiles([]);
-      setScans([]);
+      setAllFiles([]);
       setGName("");
       setGTopics("");
       await reload();
@@ -298,9 +286,8 @@ function TeacherClassPage() {
             Upload assessment batch
           </div>
           <p className="mb-3 text-xs text-muted">
-            Upload the blank test (optional), the official answer key, and one PDF of all completed student tests.
-            Studious matches names to your roster, scores against the key, updates averages, and builds class and
-            individual strengths / focus areas.
+            One upload area for everything: blank test, answer key, and the full student batch. AI separates them,
+            matches roster names, scores, and fills strengths / focus areas.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-xs text-muted">
@@ -349,16 +336,15 @@ function TeacherClassPage() {
             </label>
           </div>
 
-          <div className="mt-4 space-y-3">
-            <UploadBlock title="1. Blank Test (optional)" hint="PDF of the original assessment">
-              <CaptureBar items={blank} onChange={setBlank} disabled={busy} />
-            </UploadBlock>
-            <UploadBlock title="2. Answer Key" hint="PDF or document with correct answers / rubric">
-              <CaptureBar items={keyFiles} onChange={setKeyFiles} disabled={busy} />
-            </UploadBlock>
-            <UploadBlock title="3. Student Tests (batch scan)" hint="Single PDF of the full class set, or multiple files">
-              <CaptureBar items={scans} onChange={setScans} disabled={busy} />
-            </UploadBlock>
+          <div className="mt-4">
+            <div className="mb-2 text-sm font-medium text-fg">Upload files</div>
+            <p className="mb-2 text-xs text-muted">
+              Add the blank test, answer key, and completed student tests together (PDFs, photos, or scans). Studious
+              figures out which is which, matches names to your roster, scores against the key, and updates averages.
+            </p>
+            <div className="rounded-xl border border-dashed border-border bg-bg/50 p-3">
+              <CaptureBar items={allFiles} onChange={setAllFiles} disabled={busy} />
+            </div>
           </div>
 
           {status && <p className="mt-3 text-xs text-teal">{status}</p>}
@@ -661,12 +647,3 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UploadBlock({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-bg/50 p-3">
-      <div className="mb-1 text-sm font-medium text-fg">{title}</div>
-      <div className="mb-2 text-xs text-muted">{hint}</div>
-      {children}
-    </div>
-  );
-}
