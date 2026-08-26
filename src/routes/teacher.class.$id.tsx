@@ -1,9 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
-import { getTeacherClassById, getTeacherClassStats, listTeacherAssessments } from "@/lib/data";
-import type { TeacherAssessment, TeacherClass } from "@/lib/types";
+import { extractMaterials, gradeTeacherAssessment } from "@/lib/ai";
+import {
+  createTeacherAssessment,
+  getTeacherClassById,
+  getTeacherClassStats,
+  listTeacherAssessments,
+} from "@/lib/data";
+import {
+  ASSESSMENT_TYPES,
+  type AssessmentType,
+  type TeacherAssessment,
+  type TeacherClass,
+} from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/class/$id")({
   component: TeacherClassPage,
@@ -17,6 +29,8 @@ type RosterRow = {
   status: string;
 };
 
+type View = "overview" | "student" | "grade";
+
 function statusStyle(status: string) {
   if (status === "Strong") return "bg-emerald-50 text-emerald-700";
   if (status === "On Track") return "bg-teal-50 text-teal-700";
@@ -27,6 +41,7 @@ function statusStyle(status: string) {
 function TeacherClassPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const [view, setView] = useState<View>("overview");
   const [cls, setCls] = useState<TeacherClass | null>(null);
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -41,18 +56,31 @@ function TeacherClassPage() {
   } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void Promise.all([
+  // Grade form state
+  const [gName, setGName] = useState("");
+  const [gType, setGType] = useState<AssessmentType>("Quiz");
+  const [gTopics, setGTopics] = useState("");
+  const [gPoints, setGPoints] = useState("50");
+  const [blank, setBlank] = useState<CapturedFile[]>([]);
+  const [keyFiles, setKeyFiles] = useState<CapturedFile[]>([]);
+  const [scans, setScans] = useState<CapturedFile[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function reload() {
+    const [c, s, a] = await Promise.all([
       getTeacherClassById({ data: id }),
       getTeacherClassStats({ data: id }),
       listTeacherAssessments({ data: id }),
-    ])
-      .then(([c, s, a]) => {
-        setCls(c);
-        setStats(s);
-        setAssessments(a);
-      })
-      .catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load class"));
+    ]);
+    setCls(c);
+    setStats(s);
+    setAssessments(a);
+  }
+
+  useEffect(() => {
+    void reload().catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load class"));
   }, [id]);
 
   const studentResults = useMemo(() => {
@@ -96,6 +124,90 @@ function TeacherClassPage() {
     achievements.push("On track with class expectations");
   }
 
+  async function labelGroup(items: CapturedFile[]) {
+    if (!items.length) return "(none)";
+    try {
+      const payloads = await capturedToPayloads(items);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      return extracted.text || items.map((i) => i.file.name).join(", ");
+    } catch {
+      return items.map((i) => i.file.name).join(", ");
+    }
+  }
+
+  async function runGrade() {
+    if (!cls) return;
+    if (!gName.trim()) {
+      setError("Assessment name is required.");
+      return;
+    }
+    if (!scans.length && !keyFiles.length && !blank.length) {
+      setError("Upload at least the student tests (and ideally blank test + answer key).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setStatus("Reading uploads…");
+    try {
+      const all = [...blank, ...keyFiles, ...scans];
+      const payloads = await capturedToPayloads(all);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      const labeled =
+        `BLANK / TEST FORM:\n${await labelGroup(blank)}\n\nANSWER KEY:\n${await labelGroup(keyFiles)}\n\nSTUDENT SCANS:\n${await labelGroup(scans)}\n\nCOMBINED:\n${extracted.text || ""}`;
+
+      setStatus("Grading and building class + student feedback…");
+      const graded = await gradeTeacherAssessment({
+        data: {
+          schoolType: cls.schoolType,
+          subject: cls.subject,
+          gradeLevel: cls.gradeLevel,
+          courseLevel: cls.courseLevel,
+          schoolName: cls.schoolName,
+          assessmentName: gName.trim(),
+          assessmentType: gType,
+          topics: gTopics.trim() || "General",
+          pointsPossible: Number(gPoints) || 100,
+          extractedText: labeled,
+        },
+      });
+
+      const results = Array.isArray(graded.results) ? graded.results : [];
+      const assessment = await createTeacherAssessment({
+        data: {
+          classId: id,
+          name: gName.trim(),
+          type: gType,
+          topics: gTopics.trim(),
+          pointsPossible: Number(gPoints) || 100,
+          sourceFiles: (extracted.attachments || []).map((a: { name: string }) => a.name),
+          classAverage: Number(graded.classAverage) || 0,
+          topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
+          strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
+          needs: Array.isArray(graded.needs) ? graded.needs : [],
+          results,
+        },
+      });
+      setStatus("Done — opening analytics…");
+      setView("overview");
+      setBlank([]);
+      setKeyFiles([]);
+      setScans([]);
+      setGName("");
+      setGTopics("");
+      await reload();
+      await navigate({
+        to: "/teacher/class/$id/assessment/$assessmentId",
+        params: { id, assessmentId: assessment.id },
+      });
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Grading failed");
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loadError) {
     return (
       <AppShell title="Class">
@@ -115,8 +227,119 @@ function TeacherClassPage() {
     );
   }
 
-  // —— Student detail panel (inline; always works) ——
-  if (selectedName) {
+  // —— GRADE VIEW ——
+  if (view === "grade") {
+    return (
+      <AppShell
+        title="Scan / Upload Tests"
+        right={
+          <span className="text-xs text-muted">
+            {cls.name}
+            {cls.courseLevel ? ` – ${cls.courseLevel}` : ""}
+          </span>
+        }
+      >
+        <button
+          type="button"
+          className="mb-3 text-sm text-teal hover:underline"
+          onClick={() => {
+            setView("overview");
+            setError(null);
+            setStatus("");
+          }}
+        >
+          ← {cls.name}
+        </button>
+
+        <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="mb-3 text-[11px] font-semibold tracking-wide text-muted uppercase">
+            Upload assessment batch
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs text-muted">
+              Assessment Name
+              <input
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                value={gName}
+                onChange={(e) => setGName(e.target.value)}
+                placeholder="Quiz 4 – Genetics"
+                disabled={busy}
+              />
+            </label>
+            <label className="block text-xs text-muted">
+              Assessment Type
+              <select
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                value={gType}
+                onChange={(e) => setGType(e.target.value as AssessmentType)}
+                disabled={busy}
+              >
+                {ASSESSMENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs text-muted">
+              Topics Covered
+              <input
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                value={gTopics}
+                onChange={(e) => setGTopics(e.target.value)}
+                placeholder="Mendelian genetics, Punnett squares"
+                disabled={busy}
+              />
+            </label>
+            <label className="block text-xs text-muted">
+              Total Points
+              <input
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                value={gPoints}
+                onChange={(e) => setGPoints(e.target.value)}
+                disabled={busy}
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <UploadBlock title="1. Blank Test (optional)" hint="PDF of the original assessment">
+              <CaptureBar items={blank} onChange={setBlank} disabled={busy} />
+            </UploadBlock>
+            <UploadBlock title="2. Answer Key" hint="PDF or document with correct answers / rubric">
+              <CaptureBar items={keyFiles} onChange={setKeyFiles} disabled={busy} />
+            </UploadBlock>
+            <UploadBlock title="3. Student Tests (batch scan)" hint="Single PDF of the full class set, or multiple files">
+              <CaptureBar items={scans} onChange={setScans} disabled={busy} />
+            </UploadBlock>
+          </div>
+
+          {status && <p className="mt-3 text-xs text-teal">{status}</p>}
+          {error && <p className="mt-3 text-sm text-red">{error}</p>}
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => {
+                setView("overview");
+                setError(null);
+                setStatus("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={busy} onClick={() => void runGrade()}>
+              {busy ? "Grading…" : "Grade & Analyze"}
+            </Button>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // —— STUDENT DETAIL ——
+  if (view === "student" && selectedName) {
     return (
       <AppShell
         title="Student Detail"
@@ -127,7 +350,7 @@ function TeacherClassPage() {
           </span>
         }
       >
-        <button type="button" className="mb-3 text-sm text-teal hover:underline" onClick={() => setSelectedName(null)}>
+        <button type="button" className="mb-3 text-sm text-teal hover:underline" onClick={() => { setView("overview"); setSelectedName(null); }}>
           ← {cls.name}
         </button>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -219,6 +442,7 @@ function TeacherClassPage() {
     );
   }
 
+  // —— OVERVIEW ——
   return (
     <AppShell
       title={`${cls.name}${cls.courseLevel ? ` – ${cls.courseLevel}` : ""}`}
@@ -243,12 +467,18 @@ function TeacherClassPage() {
           <Button
             variant="secondary"
             className="text-xs"
-            onClick={() => void navigate({ to: "/teacher/class/$id/grade", params: { id } })}
+            type="button"
+            onClick={() => {
+              setError(null);
+              setStatus("");
+              setView("grade");
+            }}
           >
             Scan / Upload Tests
           </Button>
           <Button
             className="text-xs"
+            type="button"
             onClick={() => {
               const latest = stats.assessments[0];
               if (latest) {
@@ -257,7 +487,7 @@ function TeacherClassPage() {
                   params: { id, assessmentId: latest.id },
                 });
               } else {
-                void navigate({ to: "/teacher/analytics" });
+                setView("grade");
               }
             }}
           >
@@ -302,7 +532,10 @@ function TeacherClassPage() {
                   <tr
                     key={s.id}
                     className="cursor-pointer border-b border-border/70 hover:bg-bg"
-                    onClick={() => setSelectedName(s.name)}
+                    onClick={() => {
+                      setSelectedName(s.name);
+                      setView("student");
+                    }}
                   >
                     <td className="px-4 py-3 font-medium text-teal">{s.name}</td>
                     <td className="px-4 py-3">{s.average}%</td>
@@ -377,6 +610,16 @@ function MiniStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="text-[11px] text-muted">{label}</div>
       <div className="mt-1 text-lg font-bold text-fg">{value}</div>
+    </div>
+  );
+}
+
+function UploadBlock({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-bg/50 p-3">
+      <div className="mb-1 text-sm font-medium text-fg">{title}</div>
+      <div className="mb-2 text-xs text-muted">{hint}</div>
+      {children}
     </div>
   );
 }
