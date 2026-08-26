@@ -226,12 +226,13 @@ function ProfilePage() {
               )}
             </div>
           )}
-          <div>
+          <div className={role === "professional" ? "opacity-50" : ""}>
             <label className="mb-1 block text-xs text-muted">School</label>
             <select
-              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:bg-bg"
               value={schoolSelect}
               onChange={(e) => setSchoolSelect(e.target.value)}
+              disabled={role === "professional"}
             >
               <option value="studious">Studious default</option>
               <optgroup label="Colleges">
@@ -254,14 +255,18 @@ function ProfilePage() {
               </optgroup>
               <option value="custom">Custom</option>
             </select>
+            {role === "professional" && (
+              <p className="mt-1 text-[11px] text-muted">School branding is not used for Professional accounts.</p>
+            )}
           </div>
           {schoolSelect === "custom" && (
-            <div>
+            <div className={role === "professional" ? "opacity-50" : ""}>
               <label className="mb-1 block text-xs text-muted">Custom school name</label>
               <input
-                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:bg-bg"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
+                disabled={role === "professional"}
               />
             </div>
           )}
