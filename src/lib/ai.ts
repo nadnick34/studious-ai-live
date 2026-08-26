@@ -1526,3 +1526,121 @@ Use empty string or [] when unknown. Prefer exact student names from a roster.`;
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
   });
+
+
+export const generateScriptoriumPacket = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      generateType: "Study Guide" | "Quiz" | "Test" | "Practice";
+      title: string;
+      subject: string;
+      date?: string;
+      itemFormat: "Multiple Choice" | "Essay" | "Fill in the Blank" | "Problem Set" | "Mixed";
+      questionCount: number;
+      comments: string;
+      extractedText: string;
+      schoolType?: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const n = Math.max(5, Math.min(25, Number(data.questionCount) || 10));
+    const system = `You are Scriptorium, the materials workshop of Studious AI Teacher Edition.
+
+Tone: conservative, traditional, classical. Clear language. No slang, no ideology, no contemporary culture-war framing. Prefer primary sources, chronology, definitions, worked examples, and mastery.
+
+The teacher uploaded source pages (textbook photos, scans, notes) and optional comments/focus. Those sources are AUTHORITY. Outside material is allowed only when it clarifies something already in the sources, and must be labeled.
+
+Adapt item types to the SUBJECT:
+- Mathematics / science problem-heavy subjects: prefer Problem Set and Multiple Choice. Do not produce a stack of essays.
+- History / literature / theology: Multiple Choice, Fill in the Blank, and a few short essays are appropriate.
+- Mixed format: choose a sensible blend for the subject (never 10 essays for math).
+
+If generateType is Study Guide:
+- Heavy outline from the uploaded material and teacher comments.
+- Key Terms / Vocabulary table (term | concise classical definition).
+- Worked examples or memory lists as appropriate.
+- Short "Check your understanding" set (not a full test).
+- Additional Resources: only tightly aligned sources + YouTube search titles/links that teach THIS content. Label them outside the uploaded pages.
+
+If generateType is Quiz, Test, or Practice:
+- Produce TWO versions of the SAME items:
+  1) Student form: header with Title, Subject, Date line, Student Name line. Numbered items. Leave answer space.
+  2) Answer key: same numbers with correct answers and a one-line rationale.
+- Problem Set items must say "Show your work."
+- Fill in the Blank uses a clear blank in the sentence.
+- Multiple Choice uses A–D.
+
+Return ONLY JSON:
+{
+  "generateType": "${data.generateType}",
+  "title": "string",
+  "subject": "string",
+  "date": "string",
+  "itemFormat": "string",
+  "overview": "1-3 sentences",
+  "keyTerms": [{ "term": "string", "definition": "string" }],
+  "guideSections": [{ "heading": "string", "bullets": ["string"] }],
+  "questions": [{
+    "number": 1,
+    "type": "Multiple Choice|Essay|Fill in the Blank|Problem Set",
+    "prompt": "string",
+    "choices": ["A) ...","B) ..."],
+    "blankHint": "optional"
+  }],
+  "answerKey": [{ "number": 1, "answer": "string", "rationale": "string" }],
+  "resources": [{ "title": "string", "url": "string", "note": "string" }]
+}`;
+
+    const user = `Generate a ${data.generateType}.
+Title: ${data.title}
+Subject: ${data.subject}
+Date: ${data.date || "leave a Date: ________ line"}
+Requested format: ${data.itemFormat}
+Question count: ${n}
+School type context: ${data.schoolType || "Classical / traditional"}
+
+Teacher comments / focus:
+${data.comments || "(none)"}
+
+UPLOADED SOURCE TEXT:
+${(data.extractedText || "").slice(0, 50000)}`;
+
+    if (!key) {
+      return {
+        generateType: data.generateType,
+        title: data.title,
+        subject: data.subject,
+        date: data.date || "",
+        itemFormat: data.itemFormat,
+        overview: "Add XAI_API_KEY to generate live Scriptorium packets.",
+        keyTerms: [],
+        guideSections: [],
+        questions: [],
+        answerKey: [],
+        resources: [],
+      };
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 12000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Scriptorium failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    try {
+      return JSON.parse(extractJsonObject(content));
+    } catch {
+      throw new Error("Could not parse the generated packet. Try fewer pages or a clearer prompt.");
+    }
+  });

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, LayoutDashboard, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
+import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, LayoutDashboard, LogOut, Moon, NotebookPen, ScrollText, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
@@ -18,6 +18,7 @@ function getNav(role?: string | null) {
     return [
       { to: "/teacher", label: "Classes", icon: GraduationCap, match: (p: string) => p === "/teacher" || p.startsWith("/teacher/class") },
       { to: "/teacher/analytics", label: "Analytics", icon: LayoutDashboard, match: (p: string) => p.startsWith("/teacher/analytics") },
+      { to: "/teacher/scriptorium", label: "Scriptorium", icon: ScrollText, match: (p: string) => p.startsWith("/teacher/scriptorium") },
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
   }
