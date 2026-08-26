@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, gradeTeacherAssessment } from "@/lib/ai";
-import { createTeacherAssessment, getTeacherClassById } from "@/lib/data";
+import { applyAssessmentResultsToRoster, createTeacherAssessment, getTeacherClassById, listTeacherStudents } from "@/lib/data";
 import { ASSESSMENT_TYPES, type AssessmentType, type TeacherClass } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/class/$id/grade")({
@@ -62,6 +62,7 @@ function GradePage() {
         `BLANK / TEST FORM:\n${await labelGroup(blank)}\n\nANSWER KEY:\n${await labelGroup(key)}\n\nSTUDENT SCANS:\n${await labelGroup(scans)}\n\nCOMBINED:\n${extracted.text || ""}`;
 
       setStatus("Grading and building class + student feedback…");
+      const roster = await listTeacherStudents({ data: id }).catch(() => []);
       const graded = await gradeTeacherAssessment({
         data: {
           schoolType: cls.schoolType,
@@ -73,6 +74,7 @@ function GradePage() {
           assessmentType: type,
           topics: topics.trim() || "General",
           pointsPossible: Number(points) || 100,
+          rosterNames: roster.map((s) => s.name),
           extractedText: labeled,
         },
       });
@@ -94,6 +96,15 @@ function GradePage() {
           strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
           needs: Array.isArray(graded.needs) ? graded.needs : [],
           results,
+        },
+      });
+      await applyAssessmentResultsToRoster({
+        data: {
+          classId: id,
+          results: (graded.results || []).map((r: { studentName: string; score: number }) => ({
+            studentName: r.studentName,
+            score: r.score,
+          })),
         },
       });
       setStatus("Opening analytics…");

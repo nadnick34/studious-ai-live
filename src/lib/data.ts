@@ -1528,6 +1528,47 @@ export const createTeacherAssessment = createServerFn({ method: "POST" })
     return mapTeacherAssessment(rows[0]);
   });
 
+
+export const applyAssessmentResultsToRoster = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      classId: string;
+      results: { studentName: string; score: number }[];
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const existing = await sql<{ id: string; name: string; average: number }>`
+      select id, name, average from teacher_students
+      where user_id = ${context.userId} and class_id = ${data.classId}
+    `;
+    const byLower = new Map(existing.map((r) => [r.name.toLowerCase(), r]));
+    for (const r of data.results) {
+      const name = (r.studentName || "").trim();
+      if (!name) continue;
+      const score = Math.max(0, Math.min(100, Number(r.score) || 0));
+      const hit = byLower.get(name.toLowerCase());
+      if (hit) {
+        // blend: weight latest quiz more
+        const next = Math.round(hit.average * 0.4 + score * 0.6);
+        await sql`
+          update teacher_students set average = ${next}
+          where id = ${hit.id} and user_id = ${context.userId}
+        `;
+      } else {
+        const sid = uid("ts");
+        await sql`
+          insert into teacher_students (id, user_id, class_id, name, average)
+          values (${sid}, ${context.userId}, ${data.classId}, ${name}, ${score})
+        `;
+        byLower.set(name.toLowerCase(), { id: sid, name, average: score });
+      }
+    }
+    return { updated: data.results.length };
+  });
+
 export const listAllTeacherAssessments = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {

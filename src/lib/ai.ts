@@ -1381,6 +1381,7 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
       assessmentType: string;
       topics: string;
       pointsPossible: number;
+      rosterNames?: string[];
       extractedText: string;
     }) => input,
   )
@@ -1401,8 +1402,8 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "grok-4.5",
-        temperature: 0.2,
-        max_tokens: 8000,
+        temperature: 0.15,
+        max_tokens: 16000,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -1418,7 +1419,7 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
     try {
       return JSON.parse(extractJsonObject(content));
     } catch {
-      throw new Error("Could not parse grading response. Try fewer pages or a clearer scan.");
+      throw new Error("Could not parse grading response. Try a smaller batch or clearer PDFs.");
     }
   });
 

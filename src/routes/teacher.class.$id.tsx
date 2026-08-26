@@ -5,6 +5,7 @@ import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/
 import { Button } from "@/components/ui/button";
 import { extractMaterials, gradeTeacherAssessment } from "@/lib/ai";
 import {
+  applyAssessmentResultsToRoster,
   createTeacherAssessment,
   getTeacherClassById,
   getTeacherClassStats,
@@ -142,20 +143,42 @@ function TeacherClassPage() {
       return;
     }
     if (!scans.length && !keyFiles.length && !blank.length) {
-      setError("Upload at least the student tests (and ideally blank test + answer key).");
+      setError("Upload the answer key and the student test batch (blank test optional).");
+      return;
+    }
+    if (!keyFiles.length) {
+      setError("Upload the official answer key so scores can be checked against correct answers.");
+      return;
+    }
+    if (!scans.length) {
+      setError("Upload the student tests batch PDF (all completed tests).");
       return;
     }
     setBusy(true);
     setError(null);
-    setStatus("Reading uploads…");
+    setStatus("Reading blank test, answer key, and student batch…");
     try {
-      const all = [...blank, ...keyFiles, ...scans];
-      const payloads = await capturedToPayloads(all);
-      const extracted = await extractMaterials({ data: { files: payloads } });
-      const labeled =
-        `BLANK / TEST FORM:\n${await labelGroup(blank)}\n\nANSWER KEY:\n${await labelGroup(keyFiles)}\n\nSTUDENT SCANS:\n${await labelGroup(scans)}\n\nCOMBINED:\n${extracted.text || ""}`;
+      async function extractLabeled(label: string, items: CapturedFile[]) {
+        if (!items.length) return `${label}:\n(none)\n`;
+        const payloads = await capturedToPayloads(items);
+        const extracted = await extractMaterials({ data: { files: payloads } });
+        const names = items.map((i) => i.file.name).join(", ");
+        return `${label} (files: ${names}):\n${extracted.text || "(no text extracted)"}\n`;
+      }
 
-      setStatus("Grading and building class + student feedback…");
+      const labeled = [
+        await extractLabeled("=== BLANK TEST ===", blank),
+        await extractLabeled("=== ANSWER KEY (source of truth) ===", keyFiles),
+        await extractLabeled("=== STUDENT BATCH (completed tests) ===", scans),
+      ].join("\n");
+
+      if (labeled.length < 80) {
+        throw new Error("Could not read enough text from the PDFs. Try text-based PDFs or clearer scans.");
+      }
+
+      const rosterNames = (stats?.students || []).map((s) => s.name).filter(Boolean);
+
+      setStatus("Matching students to the roster and scoring against the answer key…");
       const graded = await gradeTeacherAssessment({
         data: {
           schoolType: cls.schoolType,
@@ -167,11 +190,19 @@ function TeacherClassPage() {
           assessmentType: gType,
           topics: gTopics.trim() || "General",
           pointsPossible: Number(gPoints) || 100,
+          rosterNames,
           extractedText: labeled,
         },
       });
 
       const results = Array.isArray(graded.results) ? graded.results : [];
+      if (!results.length) {
+        throw new Error(
+          "No student results were returned. Check that the batch PDF shows student names and marked answers, and that the answer key is readable.",
+        );
+      }
+
+      setStatus(`Saving results for ${results.length} student(s) and updating roster scores…`);
       const assessment = await createTeacherAssessment({
         data: {
           classId: id,
@@ -179,7 +210,7 @@ function TeacherClassPage() {
           type: gType,
           topics: gTopics.trim(),
           pointsPossible: Number(gPoints) || 100,
-          sourceFiles: (extracted.attachments || []).map((a: { name: string }) => a.name),
+          sourceFiles: [...blank, ...keyFiles, ...scans].map((f) => f.file.name),
           classAverage: Number(graded.classAverage) || 0,
           topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
           strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
@@ -187,6 +218,17 @@ function TeacherClassPage() {
           results,
         },
       });
+
+      await applyAssessmentResultsToRoster({
+        data: {
+          classId: id,
+          results: results.map((r: { studentName: string; score: number }) => ({
+            studentName: r.studentName,
+            score: r.score,
+          })),
+        },
+      });
+
       setStatus("Done — opening analytics…");
       setView("overview");
       setBlank([]);
@@ -252,9 +294,14 @@ function TeacherClassPage() {
         </button>
 
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-3 text-[11px] font-semibold tracking-wide text-muted uppercase">
+          <div className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
             Upload assessment batch
           </div>
+          <p className="mb-3 text-xs text-muted">
+            Upload the blank test (optional), the official answer key, and one PDF of all completed student tests.
+            Studious matches names to your roster, scores against the key, updates averages, and builds class and
+            individual strengths / focus areas.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-xs text-muted">
               Assessment Name

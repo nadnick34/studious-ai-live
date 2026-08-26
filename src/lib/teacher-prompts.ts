@@ -76,12 +76,43 @@ export function buildGradingPrompt(input: {
   assessmentType: string;
   topics: string;
   pointsPossible: number;
+  rosterNames?: string[];
   extractedText: string;
 }) {
   const framework = schoolFramework(input.schoolType);
+  const roster =
+    input.rosterNames && input.rosterNames.length
+      ? input.rosterNames.map((n) => `- ${n}`).join("\n")
+      : "(no roster provided — use exact names printed on each student test)";
+
   const system = `You are an expert assessment analyst for Studious AI Teacher Edition.
 
-When a teacher uploads a scanned class set (and optionally an answer key), produce clear, actionable results for the class and for each student.
+The teacher uploads THREE kinds of material (any may be present):
+1) BLANK TEST — the original questions
+2) ANSWER KEY — official correct answers (letters and/or full choices), often with topic/domain labels
+3) STUDENT BATCH — a multi-page PDF of completed student tests (one or more pages per student, names on each form)
+
+Your job:
+- Read the answer key as the only source of truth for correct answers.
+- Find each student in the batch (name on the form / header).
+- Match each student to the class roster when possible (fuzzy match OK: "Alex Adams" ≈ "Alexander Adams").
+- Prefer roster spelling for studentName when matched.
+- Score each student against the key (points earned / points possible).
+- List what they missed: question # or stem, what they marked if visible, and the correct answer.
+- Build class-level topicScores from key domains (Founding Era, Civil War, etc.) or question topics.
+- strengths = what the class handled well.
+- needs = topics that did not resonate, with a brief teaching suggestion aligned to this school type.
+- focusAreas and studyTips are specific and constructive (never vague "study more").
+
+Status rules:
+- Strong: score ≥ 90
+- On Track: 75–89
+- Needs Support: 60–74
+- At Risk: < 60
+
+Never invent a student who is not in the batch extract.
+Never invent scores — if a page is unreadable, omit that student or note limited confidence in studyTips.
+If the key has 5 questions and a student only shows 4 answers, score only what is visible.
 
 Stay faithful to:
 - School type: ${input.schoolType} (${framework})
@@ -89,39 +120,37 @@ Stay faithful to:
 - Grade: ${input.gradeLevel}
 - Course level: ${input.courseLevel}
 
-Rules:
-- Never invent scores. If handwriting is unreadable, note the limitation.
-- Tone: constructive, specific, no "study more."
-- Class report: average, distribution, topics that did not resonate, what to try next (aligned to this school type), topics that landed well.
-- Student report: what they missed, what it should have been, what to focus on, 2–4 study tips.
-
 Return JSON only:
 {
   "classAverage": 76,
-  "topicScores": [{ "topic": "string", "average": 58 }],
+  "topicScores": [{ "topic": "Founding Era", "average": 88 }],
   "strengths": ["string"],
   "needs": [{ "topic": "string", "note": "string" }],
   "results": [{
     "studentName": "string",
-    "score": 64,
-    "pointsEarned": 32,
-    "pointsPossible": 50,
-    "status": "Needs Support",
-    "missed": [{ "question": "string", "correct": "string" }],
+    "score": 80,
+    "pointsEarned": 4,
+    "pointsPossible": 5,
+    "status": "On Track",
+    "missed": [{ "question": "Q2 …", "studentAnswer": "A", "correct": "C – Battle of Gettysburg" }],
     "focusAreas": ["string"],
     "studyTips": ["string"]
   }]
 }`;
 
-  const user = `Grade this assessment.
-Name: ${input.assessmentName}
+  const user = `Grade this assessment batch.
+
+Assessment: ${input.assessmentName}
 Type: ${input.assessmentType}
-Topics: ${input.topics}
-Points: ${input.pointsPossible}
+Topics (teacher notes): ${input.topics}
+Points possible (default if not clear from key): ${input.pointsPossible}
 School: ${input.schoolName || "not specified"}
 
-EXTRACTED FILES:
-${input.extractedText.slice(0, 20000)}`;
+CLASS ROSTER (match names from scans to these when possible):
+${roster}
+
+EXTRACTED UPLOADS (blank test / answer key / student batch):
+${input.extractedText.slice(0, 55000)}`;
 
   return { system, user };
 }
