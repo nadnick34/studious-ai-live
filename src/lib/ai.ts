@@ -1584,7 +1584,7 @@ Return ONLY JSON:
   "date": "string",
   "itemFormat": "string",
   "overview": "short blurb",
-  "narrative": ${""2-5 paragraph narrative"" if False else '"string"'},
+  "narrative": "string",
   "keyTerms": [{ "term": "string", "definition": "string" }],
   "guideSections": [{ "heading": "string", "bullets": ["string"] }],
   "keyDates": [{ "date": "string", "event": "string" }],
