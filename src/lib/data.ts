@@ -1151,6 +1151,7 @@ type TeacherAssessmentRow = {
   strengths: unknown;
   needs: unknown;
   results: unknown;
+  questions?: unknown;
 };
 
 function mapTeacherClass(row: TeacherClassRow): TeacherClass {
@@ -1182,6 +1183,7 @@ function mapTeacherAssessment(row: TeacherAssessmentRow): TeacherAssessment {
     strengths: parseJson(row.strengths, []),
     needs: parseJson(row.needs, []),
     results: parseJson(row.results, []),
+    questions: parseJson(row.questions, []),
   };
 }
 
@@ -1281,7 +1283,12 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
   try {
     await sql.query(`alter table teacher_classes add column if not exists syllabus_text text not null default ''`);
   } catch {
-    /* column may already exist or alter unsupported in edge case */
+    /* ignore */
+  }
+  try {
+    await sql.query(`alter table teacher_assessments add column if not exists questions jsonb not null default '[]'::jsonb`);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -1547,12 +1554,27 @@ export const createTeacherAssessment = createServerFn({ method: "POST" })
       strengths: string[];
       needs: { topic: string; note: string }[];
       results: StudentResult[];
+      questions?: { number: string; prompt: string; correct: string; topic?: string }[];
     }) => input,
   )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     await ensureTeacherTables(sql);
     const id = uid("ta");
+    try {
+      await sql`
+        insert into teacher_assessments (
+          id, user_id, class_id, name, type, topics, points_possible, source_files,
+          class_average, topic_scores, strengths, needs, results, questions
+        ) values (
+          ${id}, ${context.userId}, ${data.classId}, ${data.name}, ${data.type},
+          ${data.topics}, ${data.pointsPossible}, ${JSON.stringify(data.sourceFiles || [])}::jsonb,
+          ${data.classAverage}, ${JSON.stringify(data.topicScores)}::jsonb,
+          ${JSON.stringify(data.strengths)}::jsonb, ${JSON.stringify(data.needs)}::jsonb,
+          ${JSON.stringify(data.results)}::jsonb, ${JSON.stringify(data.questions || [])}::jsonb
+        )
+      `;
+    } catch {
     await sql`
       insert into teacher_assessments (
         id, user_id, class_id, name, type, topics, points_possible, source_files,
@@ -1565,6 +1587,7 @@ export const createTeacherAssessment = createServerFn({ method: "POST" })
         ${JSON.stringify(data.results)}::jsonb
       )
     `;
+    }
     const rows = await sql<TeacherAssessmentRow>`select * from teacher_assessments where id = ${id} limit 1`;
     if (!rows[0]) throw new Error("Assessment save failed.");
     return mapTeacherAssessment(rows[0]);

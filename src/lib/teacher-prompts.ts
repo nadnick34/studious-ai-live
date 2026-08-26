@@ -102,6 +102,7 @@ School context: ${input.schoolType} (${framework}); ${input.subject}; grade ${in
 Return ONLY valid JSON (no markdown):
 {
   "classAverage": 76,
+  "questions": [{ "number": "1", "prompt": "Year Declaration adopted?", "correct": "B – 1776", "topic": "Founding Era" }],
   "topicScores": [{ "topic": "Founding Era", "average": 88 }],
   "strengths": ["string"],
   "needs": [{ "topic": "string", "note": "string" }],
@@ -111,8 +112,8 @@ Return ONLY valid JSON (no markdown):
     "pointsEarned": 4,
     "pointsPossible": 5,
     "status": "On Track",
-    "missed": [{ "question": "Q2 Civil War turning point", "studentAnswer": "A", "correct": "C – Battle of Gettysburg" }],
-    "focusAreas": ["string"],
+    "missed": [{ "questionNumber": "2", "question": "Civil War turning point", "studentAnswer": "A", "correct": "C – Gettysburg" }],
+    "focusAreas": ["Punnett-style setup of Civil War causation"],
     "studyTips": ["string"]
   }]
 }`;

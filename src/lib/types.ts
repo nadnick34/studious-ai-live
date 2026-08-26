@@ -514,8 +514,16 @@ export interface TopicScore {
 
 export interface MissedItem {
   question: string;
+  questionNumber?: string;
   studentAnswer?: string;
   correct: string;
+}
+
+export interface AssessmentQuestion {
+  number: string;
+  prompt: string;
+  correct: string;
+  topic?: string;
 }
 
 export interface StudentResult {
@@ -544,4 +552,5 @@ export interface TeacherAssessment {
   strengths: string[];
   needs: { topic: string; note: string }[];
   results: StudentResult[];
+  questions?: AssessmentQuestion[];
 }

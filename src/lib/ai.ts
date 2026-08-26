@@ -1457,8 +1457,19 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
         ? Math.round(results.reduce((s: number, r: { score: number }) => s + r.score, 0) / results.length)
         : 0);
 
+    const questions = Array.isArray(parsed.questions)
+      ? parsed.questions
+      : Array.isArray(parsed.answerKey)
+        ? parsed.answerKey.map((q: any, i: number) => ({
+            number: String(q.number ?? q.item ?? i + 1),
+            prompt: String(q.prompt ?? q.item ?? q.question ?? ""),
+            correct: String(q.correct ?? q.answer ?? ""),
+            topic: q.topic,
+          }))
+        : [];
     return {
       classAverage,
+      questions,
       topicScores: Array.isArray(parsed.topicScores) ? parsed.topicScores : [],
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
       needs: Array.isArray(parsed.needs) ? parsed.needs : [],

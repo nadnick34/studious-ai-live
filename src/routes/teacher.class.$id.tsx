@@ -31,7 +31,7 @@ type RosterRow = {
   status: string;
 };
 
-type View = "overview" | "student" | "grade";
+type View = "overview" | "student" | "grade" | "test";
 
 function statusStyle(status: string) {
   if (status === "Strong") return "bg-emerald-50 text-emerald-700";
@@ -48,6 +48,7 @@ function TeacherClassPage() {
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedTestId, setSelectedTestId] = useState<string | null>(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string | null>(null);
   const [stats, setStats] = useState<{
     classAverage: number;
     studentCount: number;
@@ -224,6 +225,9 @@ function TeacherClassPage() {
           strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
           needs: Array.isArray(graded.needs) ? graded.needs : [],
           results,
+          questions: Array.isArray((graded as { questions?: unknown }).questions)
+            ? (graded as { questions: { number: string; prompt: string; correct: string; topic?: string }[] }).questions
+            : [],
         },
       });
 
@@ -538,6 +542,151 @@ function TeacherClassPage() {
     );
   }
 
+  // —— CLASS TEST DETAIL ——
+  if (view === "test" && selectedAssessmentId) {
+    const test = (stats.assessments || assessments).find((a) => a.id === selectedAssessmentId);
+    if (!test) {
+      setView("overview");
+    } else {
+      const questions = test.questions || [];
+      return (
+        <AppShell
+          title={test.name}
+          right={
+            <span className="text-xs text-muted">
+              {cls.name} · {test.results.length} student{test.results.length === 1 ? "" : "s"}
+            </span>
+          }
+        >
+          <button
+            type="button"
+            className="mb-3 text-sm text-teal hover:underline"
+            onClick={() => {
+              setView("overview");
+              setSelectedAssessmentId(null);
+            }}
+          >
+            ← {cls.name}
+          </button>
+
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-fg">{test.name}</h2>
+              <p className="text-sm text-muted">
+                {test.type} · {test.pointsPossible} pts · Class avg {Math.round(test.classAverage)}%
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MiniStat label="Class Average" value={`${Math.round(test.classAverage)}%`} />
+            <MiniStat label="Students" value={String(test.results.length)} />
+            <MiniStat label="Questions" value={String(questions.length || "—")} />
+            <MiniStat label="Type" value={test.type} />
+          </div>
+
+          <div className="mb-5 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4">
+              <h3 className="mb-2 text-sm font-semibold text-emerald-800">What the class did well</h3>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-900/90">
+                {(test.strengths.length ? test.strengths : ["—"]).map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4">
+              <h3 className="mb-2 text-sm font-semibold text-amber-800">What did not resonate</h3>
+              <ul className="space-y-1 text-sm text-amber-900/90">
+                {(test.needs.length ? test.needs : [{ topic: "—", note: "" }]).map((n, i) => (
+                  <li key={i}>
+                    <span className="font-semibold">{n.topic}</span>
+                    {n.note ? ` — ${n.note}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {questions.length > 0 && (
+            <div className="mb-5 overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-4 py-3">
+                <h3 className="font-semibold text-fg">Questions and answer key</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+                      <th className="px-4 py-2.5">#</th>
+                      <th className="px-4 py-2.5">Question</th>
+                      <th className="px-4 py-2.5">Correct</th>
+                      <th className="px-4 py-2.5">Topic</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questions.map((q) => (
+                      <tr key={q.number} className="border-b border-border/70">
+                        <td className="px-4 py-2 font-medium">{q.number}</td>
+                        <td className="px-4 py-2">{q.prompt}</td>
+                        <td className="px-4 py-2 text-emerald-700">{q.correct}</td>
+                        <td className="px-4 py-2 text-muted">{q.topic || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="font-semibold text-fg">Students on this test</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+                    <th className="px-4 py-2.5">Student Name</th>
+                    <th className="px-4 py-2.5">Score</th>
+                    <th className="px-4 py-2.5">Missed</th>
+                    <th className="px-4 py-2.5">Focus Area</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {test.results.map((r) => {
+                    const missedNums = (r.missed || [])
+                      .map((m) => m.questionNumber || (m.question || "").match(/^Q?\s*(\d+)/i)?.[1] || "")
+                      .filter(Boolean);
+                    const missedLabel = missedNums.length
+                      ? missedNums.map((n) => (String(n).startsWith("Q") ? n : `#${n}`)).join(", ")
+                      : r.missed?.length
+                        ? `${r.missed.length} item(s)`
+                        : "—";
+                    return (
+                      <tr
+                        key={r.studentName}
+                        className="cursor-pointer border-b border-border/70 hover:bg-bg"
+                        onClick={() => {
+                          setSelectedName(r.studentName);
+                          setSelectedTestId(test.id);
+                          setView("student");
+                        }}
+                      >
+                        <td className="px-4 py-3 font-medium text-teal">{r.studentName}</td>
+                        <td className="px-4 py-3">{r.score}%</td>
+                        <td className="px-4 py-3">{missedLabel}</td>
+                        <td className="px-4 py-3 text-muted">{(r.focusAreas || []).slice(0, 2).join("; ") || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </AppShell>
+      );
+    }
+  }
+
   // —— OVERVIEW ——
   return (
     <AppShell
@@ -659,12 +808,10 @@ function TeacherClassPage() {
                 key={a.id}
                 type="button"
                 className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left hover:border-teal/40"
-                onClick={() =>
-                  void navigate({
-                    to: "/teacher/class/$id/assessment/$assessmentId",
-                    params: { id, assessmentId: a.id },
-                  })
-                }
+                onClick={() => {
+                  setSelectedAssessmentId(a.id);
+                  setView("test");
+                }}
               >
                 <div>
                   <div className="font-medium text-fg">{a.name}</div>
