@@ -5,6 +5,7 @@ import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/data";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
+import { RoleHomeRedirect } from "@/components/role-home-redirect";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -16,7 +17,13 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (user) return <Navigate to="/dashboard" />;
+  if (user) return <RoleHomeRedirect />;
+
+  async function homeForRole(role?: string | null) {
+    if (role === "teacher") return "/teacher";
+    if (role === "professional") return "/meetings";
+    return "/dashboard";
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,15 +35,17 @@ function Login() {
       setError(err.message || "Invalid email or password.");
       return;
     }
+    let dest = "/dashboard";
     try {
       const p = await getProfile();
       const brand = brandFromProfile(p);
       if (brand) persistBrand(brand);
       else hydrateBrand();
+      dest = await homeForRole(p.role);
     } catch {
       hydrateBrand();
     }
-    await navigate({ to: "/dashboard" });
+    await navigate({ to: dest as any });
   }
 
   return (
@@ -56,7 +65,7 @@ function Login() {
               <button
                 key={p.providerId}
                 type="button"
-                onClick={() => void signIn(p.providerId, { callbackURL: "/dashboard" })}
+                onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
                 className="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-bg"
               >
                 Continue with {p.label}

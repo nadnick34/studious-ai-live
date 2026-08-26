@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Archive, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -6,7 +6,6 @@ import { InfoButton, InfoModal } from "@/components/info-modal";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { createClass, getProfile, listClasses, seedSampleClass, updateClass } from "@/lib/data";
-import { useNavigate } from "@tanstack/react-router";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
 import { extractPdfText, formatShortDate, timeAgo } from "@/lib/utils";
 import type { ClassRecord } from "@/lib/types";
@@ -35,6 +34,7 @@ function DashboardPage() {
   useEffect(() => {
     void getProfile().then((p) => {
       if (p.role === "professional") void navigate({ to: "/meetings" });
+      if (p.role === "teacher") void navigate({ to: "/teacher" });
     });
   }, [navigate]);
   const [classes, setClasses] = useState<ClassRecord[]>([]);

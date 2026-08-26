@@ -1337,6 +1337,56 @@ export const listTeacherStudents = createServerFn({ method: "GET" })
     }));
   });
 
+
+export const updateTeacherClass = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      id: string;
+      patch: Partial<{
+        name: string;
+        subject: string;
+        gradeLevel: string;
+        courseLevel: CourseLevel;
+        schoolType: SchoolType;
+        schoolName: string;
+        syllabusText: string;
+        archived: boolean;
+      }>;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const rows = await sql<TeacherClassRow>`
+      select * from teacher_classes where id = ${data.id} and user_id = ${context.userId} limit 1
+    `;
+    if (!rows[0]) return null;
+    const cur = mapTeacherClass(rows[0]);
+    const p = data.patch;
+    const next = {
+      name: p.name ?? cur.name,
+      subject: p.subject ?? cur.subject,
+      gradeLevel: p.gradeLevel ?? cur.gradeLevel,
+      courseLevel: p.courseLevel ?? cur.courseLevel,
+      schoolType: p.schoolType ?? cur.schoolType,
+      schoolName: p.schoolName ?? cur.schoolName,
+      archived: p.archived ?? cur.archived,
+    };
+    await sql`
+      update teacher_classes set
+        name = ${next.name},
+        subject = ${next.subject},
+        grade_level = ${next.gradeLevel},
+        course_level = ${next.courseLevel},
+        school_type = ${next.schoolType},
+        school_name = ${next.schoolName},
+        archived = ${next.archived}
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ...cur, ...next };
+  });
+
 export const listTeacherAssessments = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator((classId: string) => classId)

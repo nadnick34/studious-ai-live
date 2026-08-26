@@ -2,6 +2,7 @@ import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { InfoModal } from "@/components/info-modal";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { RoleHomeRedirect } from "@/components/role-home-redirect";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -10,7 +11,7 @@ function Landing() {
   const [showOverview, setShowOverview] = useState(false);
   const [showAppInfo, setShowAppInfo] = useState(false);
 
-  if (user) return <Navigate to="/dashboard" />;
+  if (user) return <RoleHomeRedirect />;
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-slate-dark text-cream">

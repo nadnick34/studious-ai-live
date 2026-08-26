@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { GraduationCap, Plus } from "lucide-react";
+import { Archive, GraduationCap, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, parseTeacherClassDocument } from "@/lib/ai";
-import { createTeacherClass, getProfile, listTeacherClasses } from "@/lib/data";
+import { createTeacherClass, getProfile, listTeacherClasses, updateTeacherClass } from "@/lib/data";
 import {
   COURSE_LEVELS,
   SCHOOL_TYPES,
@@ -27,6 +27,7 @@ function TeacherDashboard() {
   const [docFiles, setDocFiles] = useState<CapturedFile[]>([]);
   const [studentsText, setStudentsText] = useState("");
   const [syllabusText, setSyllabusText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     subject: "",
@@ -51,6 +52,34 @@ function TeacherDashboard() {
     });
     void refresh();
   }, [navigate]);
+
+  function openEdit(c: TeacherClass) {
+    setEditingId(c.id);
+    setForm({
+      name: c.name,
+      subject: c.subject,
+      gradeLevel: c.gradeLevel,
+      courseLevel: c.courseLevel,
+      schoolType: c.schoolType,
+      schoolName: c.schoolName,
+    });
+    setSyllabusText("");
+    setStudentsText("");
+    setDocFiles([]);
+    setError(null);
+    setStatus(null);
+    setShowForm(true);
+  }
+
+  async function archiveClass(c: TeacherClass) {
+    if (!confirm(`Archive “${c.name}”?`)) return;
+    try {
+      await updateTeacherClass({ data: { id: c.id, patch: { archived: true } } });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not archive class");
+    }
+  }
 
   async function fillFromDocument() {
     if (!docFiles.length && !syllabusText.trim()) {
@@ -107,6 +136,26 @@ function TeacherDashboard() {
         .split(/[\n,;]+/)
         .map((s) => s.trim())
         .filter(Boolean);
+      if (editingId) {
+        await updateTeacherClass({
+          data: {
+            id: editingId,
+            patch: {
+              name: form.name.trim(),
+              subject: form.subject.trim(),
+              gradeLevel: form.gradeLevel,
+              courseLevel: form.courseLevel,
+              schoolType: form.schoolType,
+              schoolName: form.schoolName,
+            },
+          },
+        });
+        setShowForm(false);
+        setEditingId(null);
+        setStatus(null);
+        await refresh();
+        return;
+      }
       const c = await createTeacherClass({
         data: {
           ...form,
@@ -116,6 +165,7 @@ function TeacherDashboard() {
       });
       if (!c?.id) throw new Error("Save returned no class id.");
       setShowForm(false);
+      setEditingId(null);
       setStatus(null);
       setDocFiles([]);
       setStudentsText("");
@@ -148,7 +198,7 @@ function TeacherDashboard() {
     <AppShell
       title="Teacher Classes"
       right={
-        <Button className="min-h-10 text-xs" onClick={() => { setShowForm(true); setError(null); setStatus(null); }}>
+        <Button className="min-h-10 text-xs" onClick={() => { setEditingId(null); setShowForm(true); setError(null); setStatus(null); }}>
           <Plus className="size-4" />
           New class
         </Button>
@@ -174,18 +224,44 @@ function TeacherDashboard() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {classes.map((c) => (
-            <Link
+            <div
               key={c.id}
-              to="/teacher/class/$id"
-              params={{ id: c.id }}
-              className="rounded-xl border border-border bg-card p-4 hover:border-teal/40"
+              className="relative rounded-xl border border-border bg-card p-4 transition-colors hover:border-teal/40"
             >
-              <div className="font-semibold text-fg">{c.name}</div>
-              <div className="mt-1 text-sm text-muted">
-                {c.subject} · Grade {c.gradeLevel || "—"} · {c.courseLevel}
+              <div className="absolute top-3 right-3 flex gap-1">
+                <button
+                  type="button"
+                  className="grid size-8 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg"
+                  aria-label="Edit class"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openEdit(c);
+                  }}
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className="grid size-8 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg"
+                  aria-label="Archive class"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void archiveClass(c);
+                  }}
+                >
+                  <Archive className="size-4" />
+                </button>
               </div>
-              <div className="mt-2 text-xs text-muted">{c.schoolType}</div>
-            </Link>
+              <Link to="/teacher/class/$id" params={{ id: c.id }} className="block pr-16">
+                <div className="font-semibold text-fg">{c.name}</div>
+                <div className="mt-1 text-sm text-muted">
+                  {c.subject} · Grade {c.gradeLevel || "—"} · {c.courseLevel}
+                </div>
+                <div className="mt-2 text-xs text-muted">{c.schoolType}</div>
+              </Link>
+            </div>
           ))}
         </div>
       )}
@@ -193,7 +269,7 @@ function TeacherDashboard() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
           <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-5">
-            <h3 className="text-lg font-semibold text-fg">New class</h3>
+            <h3 className="text-lg font-semibold text-fg">{editingId ? "Edit class" : "New class"}</h3>
             <p className="mt-1 text-sm text-muted">
               Optional: upload a syllabus, class info sheet, or roster and auto-fill the fields below.
             </p>
@@ -249,7 +325,7 @@ function TeacherDashboard() {
                 Cancel
               </Button>
               <Button disabled={busy || parseBusy} onClick={() => void create()}>
-                {busy ? "Saving…" : "Create class"}
+                {busy ? "Saving…" : editingId ? "Save changes" : "Create class"}
               </Button>
             </div>
           </div>
