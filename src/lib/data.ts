@@ -1110,3 +1110,197 @@ export const updateMeetingProject = createServerFn({ method: "POST" })
     `;
     return { ...cur, ...next };
   });
+
+/* ——— Teacher Edition ——— */
+import type {
+  AssessmentType,
+  CourseLevel,
+  SchoolType,
+  StudentResult,
+  TeacherAssessment,
+  TeacherClass,
+  TeacherStudent,
+  TopicScore,
+} from "@/lib/types";
+
+type TeacherClassRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  subject: string;
+  grade_level: string;
+  course_level: string;
+  school_type: string;
+  school_name: string;
+  created_at: string;
+  archived: boolean;
+};
+
+type TeacherAssessmentRow = {
+  id: string;
+  user_id: string;
+  class_id: string;
+  name: string;
+  type: string;
+  topics: string;
+  points_possible: number;
+  created_at: string;
+  source_files: unknown;
+  class_average: number;
+  topic_scores: unknown;
+  strengths: unknown;
+  needs: unknown;
+  results: unknown;
+};
+
+function mapTeacherClass(row: TeacherClassRow): TeacherClass {
+  return {
+    id: row.id,
+    name: row.name,
+    subject: row.subject || "",
+    gradeLevel: row.grade_level || "",
+    courseLevel: (row.course_level as CourseLevel) || "Regular",
+    schoolType: (row.school_type as SchoolType) || "Private Independent",
+    schoolName: row.school_name || "",
+    createdAt: row.created_at,
+    archived: Boolean(row.archived),
+  };
+}
+
+function mapTeacherAssessment(row: TeacherAssessmentRow): TeacherAssessment {
+  return {
+    id: row.id,
+    classId: row.class_id,
+    name: row.name,
+    type: (row.type as AssessmentType) || "Quiz",
+    topics: row.topics || "",
+    pointsPossible: row.points_possible || 100,
+    createdAt: row.created_at,
+    sourceFiles: parseJson(row.source_files, []),
+    classAverage: Number(row.class_average) || 0,
+    topicScores: parseJson(row.topic_scores, []),
+    strengths: parseJson(row.strengths, []),
+    needs: parseJson(row.needs, []),
+    results: parseJson(row.results, []),
+  };
+}
+
+export const listTeacherClasses = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<TeacherClassRow>`
+      select * from teacher_classes where user_id = ${context.userId} and archived = false
+      order by created_at desc
+    `;
+    return rows.map(mapTeacherClass);
+  });
+
+export const getTeacherClassById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<TeacherClassRow>`
+      select * from teacher_classes where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapTeacherClass(rows[0]) : null;
+  });
+
+export const createTeacherClass = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      name: string;
+      subject: string;
+      gradeLevel: string;
+      courseLevel: CourseLevel;
+      schoolType: SchoolType;
+      schoolName?: string;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("tc");
+    await sql`
+      insert into teacher_classes (
+        id, user_id, name, subject, grade_level, course_level, school_type, school_name
+      ) values (
+        ${id}, ${context.userId}, ${data.name.trim()}, ${data.subject.trim()},
+        ${data.gradeLevel}, ${data.courseLevel}, ${data.schoolType}, ${data.schoolName || ""}
+      )
+    `;
+    const rows = await sql<TeacherClassRow>`select * from teacher_classes where id = ${id} limit 1`;
+    return mapTeacherClass(rows[0]);
+  });
+
+export const listTeacherAssessments = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((classId: string) => classId)
+  .handler(async ({ context, data: classId }) => {
+    const sql = await getSql();
+    const rows = await sql<TeacherAssessmentRow>`
+      select * from teacher_assessments
+      where user_id = ${context.userId} and class_id = ${classId}
+      order by created_at desc
+    `;
+    return rows.map(mapTeacherAssessment);
+  });
+
+export const getTeacherAssessmentById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<TeacherAssessmentRow>`
+      select * from teacher_assessments where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapTeacherAssessment(rows[0]) : null;
+  });
+
+export const createTeacherAssessment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      classId: string;
+      name: string;
+      type: AssessmentType;
+      topics: string;
+      pointsPossible: number;
+      sourceFiles?: string[];
+      classAverage: number;
+      topicScores: TopicScore[];
+      strengths: string[];
+      needs: { topic: string; note: string }[];
+      results: StudentResult[];
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("ta");
+    await sql`
+      insert into teacher_assessments (
+        id, user_id, class_id, name, type, topics, points_possible, source_files,
+        class_average, topic_scores, strengths, needs, results
+      ) values (
+        ${id}, ${context.userId}, ${data.classId}, ${data.name}, ${data.type},
+        ${data.topics}, ${data.pointsPossible}, ${JSON.stringify(data.sourceFiles || [])}::jsonb,
+        ${data.classAverage}, ${JSON.stringify(data.topicScores)}::jsonb,
+        ${JSON.stringify(data.strengths)}::jsonb, ${JSON.stringify(data.needs)}::jsonb,
+        ${JSON.stringify(data.results)}::jsonb
+      )
+    `;
+    const rows = await sql<TeacherAssessmentRow>`select * from teacher_assessments where id = ${id} limit 1`;
+    return mapTeacherAssessment(rows[0]);
+  });
+
+export const listAllTeacherAssessments = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<TeacherAssessmentRow>`
+      select * from teacher_assessments where user_id = ${context.userId}
+      order by created_at desc limit 50
+    `;
+    return rows.map(mapTeacherAssessment);
+  });

@@ -58,6 +58,7 @@ function AppShellInner({
         document.documentElement.classList.toggle("kids-boy", kids && p.childGender === "boy");
         document.documentElement.classList.toggle("kids-girl", kids && p.childGender === "girl");
         document.documentElement.classList.toggle("professional-mode", p.role === "professional");
+        document.documentElement.classList.toggle("teacher-mode", p.role === "teacher");
       })
       .catch(() => hydrateBrand());
   }, []);

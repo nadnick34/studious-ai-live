@@ -82,7 +82,7 @@ function ProfilePage() {
     document.documentElement.classList.toggle("kids-boy", Boolean(kidsMode && next.childGender === "boy"));
     document.documentElement.classList.toggle("kids-girl", Boolean(kidsMode && next.childGender === "girl"));
     setSaving(false);
-    if (next.edition === "teacher") await navigate({ to: "/coming-soon" });
+    if (next.edition === "teacher" || next.role === "teacher") await navigate({ to: "/teacher" });
     else if (next.role === "professional" || next.edition === "professional") await navigate({ to: "/meetings" });
     else await navigate({ to: "/dashboard" });
   }
@@ -170,8 +170,7 @@ function ProfilePage() {
               <option value="theologian">Theologian</option>
             </select>
             <p className="mt-1 text-[11px] text-muted">
-              Teacher, Professional, and Theologian modes will be customized later. Core study tools work for all types
-              now.
+              Teacher Edition includes school-type setup, classes, scanned-test grading, and analytics. Professional has Meetings & Projects.
             </p>
           </div>
           {role === "student" && (

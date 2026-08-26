@@ -1,17 +1,23 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, Briefcase, FolderKanban, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
+import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, LayoutDashboard, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
 function getNav(role?: string | null) {
-  const isPro = role === "professional";
-  if (isPro) {
+  if (role === "professional") {
     return [
-      { to: "/projects", label: "Projects", icon: FolderKanban, match: (p: string) => p.startsWith("/projects") },
+      { to: "/projects", label: "Projects", icon: FolderKanban, match: (p: string) => p.startsWith("/projects") || p.startsWith("/project") },
       { to: "/meetings", label: "Meetings", icon: Briefcase, match: (p: string) => p.startsWith("/meetings") || p.startsWith("/meeting") },
       { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
       { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
+      { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
+    ];
+  }
+  if (role === "teacher") {
+    return [
+      { to: "/teacher", label: "Classes", icon: GraduationCap, match: (p: string) => p === "/teacher" || p.startsWith("/teacher/class") },
+      { to: "/teacher/analytics", label: "Analytics", icon: LayoutDashboard, match: (p: string) => p.startsWith("/teacher/analytics") },
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
   }
@@ -41,7 +47,7 @@ export function Sidebar({
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col bg-slate text-white sm:flex">
       <div className="px-4 pt-5 pb-4">
-        <Link to={profile?.role === "professional" ? "/meetings" : "/dashboard"} className="flex items-center gap-2">
+        <Link to={profile?.role === "professional" ? "/meetings" : profile?.role === "teacher" ? "/teacher" : "/dashboard"} className="flex items-center gap-2">
           <span className="rounded-lg bg-white px-2 py-1.5">
             <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
           </span>

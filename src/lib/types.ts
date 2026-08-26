@@ -439,3 +439,109 @@ export const MEETING_TYPES: MeetingType[] = [
   "Google Meet",
   "Other Remote",
 ];
+
+export type SchoolType =
+  | "Classical"
+  | "Religious / Faith-Based"
+  | "Public – Common Core"
+  | "Public – Non-Common Core / State Standards"
+  | "Charter"
+  | "Private Independent"
+  | "Montessori"
+  | "Homeschool"
+  | "Vocational / CTE"
+  | "Special Education";
+
+export type CourseLevel = "Regular" | "Honors" | "AP / Advanced";
+
+export type AssessmentType =
+  | "Pop Quiz"
+  | "Quiz"
+  | "Test"
+  | "Midterm"
+  | "Final"
+  | "Lab / Practical";
+
+export type StudentStatus = "Strong" | "On Track" | "Needs Support" | "At Risk";
+
+export const SCHOOL_TYPES: SchoolType[] = [
+  "Classical",
+  "Religious / Faith-Based",
+  "Public – Common Core",
+  "Public – Non-Common Core / State Standards",
+  "Charter",
+  "Private Independent",
+  "Montessori",
+  "Homeschool",
+  "Vocational / CTE",
+  "Special Education",
+];
+
+export const COURSE_LEVELS: CourseLevel[] = ["Regular", "Honors", "AP / Advanced"];
+
+export const ASSESSMENT_TYPES: AssessmentType[] = [
+  "Pop Quiz",
+  "Quiz",
+  "Test",
+  "Midterm",
+  "Final",
+  "Lab / Practical",
+];
+
+export interface TeacherClass {
+  id: string;
+  name: string;
+  subject: string;
+  gradeLevel: string;
+  courseLevel: CourseLevel;
+  schoolType: SchoolType;
+  schoolName: string;
+  createdAt: string;
+  archived: boolean;
+}
+
+export interface TeacherStudent {
+  id: string;
+  classId: string;
+  name: string;
+  average: number;
+}
+
+export interface TopicScore {
+  topic: string;
+  average: number;
+}
+
+export interface MissedItem {
+  question: string;
+  studentAnswer?: string;
+  correct: string;
+}
+
+export interface StudentResult {
+  studentId?: string;
+  studentName: string;
+  score: number;
+  pointsEarned: number;
+  pointsPossible: number;
+  status: StudentStatus;
+  missed: MissedItem[];
+  focusAreas: string[];
+  studyTips: string[];
+}
+
+export interface TeacherAssessment {
+  id: string;
+  classId: string;
+  name: string;
+  type: AssessmentType;
+  topics: string;
+  pointsPossible: number;
+  createdAt: string;
+  sourceFiles: string[];
+  classAverage: number;
+  topicScores: TopicScore[];
+  strengths: string[];
+  needs: { topic: string; note: string }[];
+  results: StudentResult[];
+}

@@ -4,6 +4,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 import { buildClassicalPrompt } from "@/lib/classical-prompts";
 import { buildAssignmentUnifiedPrompt } from "@/lib/assignment-prompts";
 import { buildInviteParsePrompt, buildMeetingPackagePrompt } from "@/lib/meeting-prompts";
+import { buildGradingPrompt } from "@/lib/teacher-prompts";
 import { buildGenerationPrompt, buildProfessorInsightPrompt } from "@/lib/prompts";
 import { parseSyllabusLocally } from "@/lib/calendar";
 import { normalizeSlides } from "@/lib/slides";
@@ -1361,6 +1362,54 @@ ${data.materialText.slice(0, 25000)}
       }),
     });
     if (!res.ok) throw new Error(`Project analysis failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    return JSON.parse(extractJsonObject(content));
+  });
+
+
+export const gradeTeacherAssessment = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      schoolType: SchoolType;
+      subject: string;
+      gradeLevel: string;
+      courseLevel: CourseLevel;
+      schoolName?: string;
+      assessmentName: string;
+      assessmentType: string;
+      topics: string;
+      pointsPossible: number;
+      extractedText: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const { system, user } = buildGradingPrompt(data);
+    if (!key) {
+      return {
+        classAverage: 0,
+        topicScores: [],
+        strengths: [],
+        needs: [{ topic: "API key", note: "Set XAI_API_KEY to grade live scans." }],
+        results: [],
+      };
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 8000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Grading failed (${res.status})`);
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
     return JSON.parse(extractJsonObject(content));
