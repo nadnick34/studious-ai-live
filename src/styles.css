@@ -158,3 +158,40 @@ html.kids-mode.dark.kids-girl {
   --teal: #f472b6;
   --teal-hover: #ec4899;
 }
+
+/* Professional edition — charcoal / cool grey / silver */
+html.professional-mode {
+  --slate: #1a1d21;
+  --slate-dark: #0d0f12;
+  --teal: #8b939e;
+  --teal-hover: #a8b0ba;
+  --bg: #e8eaed;
+  --card: #f7f8f9;
+  --text: #121417;
+  --muted: #5c6570;
+  --border: #c5CAD1;
+  --green: #3d7a5c;
+  --amber: #9a7b2f;
+  --red: #a33b3b;
+  --cream: #eceff2;
+  --shadow-card: 0 0 0 1px rgba(18, 20, 23, 0.08), 0 8px 28px -14px rgba(18, 20, 23, 0.25);
+}
+html.professional-mode.dark {
+  --slate: #0a0b0d;
+  --slate-dark: #050506;
+  --teal: #9aa3ad;
+  --teal-hover: #c0c7d0;
+  --bg: #0f1114;
+  --card: #1a1d22;
+  --text: #eef0f3;
+  --muted: #9aa3ad;
+  --border: #2c3138;
+  --green: #6bb892;
+  --amber: #d4b45a;
+  --red: #e07070;
+  --cream: #1e2228;
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+html.professional-mode aside {
+  background: linear-gradient(180deg, #121417 0%, #1a1d22 100%);
+}

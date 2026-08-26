@@ -63,7 +63,7 @@ function ProfilePage() {
       customSchoolName: customName,
       avatarDataUrl: avatar,
       role,
-      edition: role === "teacher" ? "teacher" : "student",
+      edition: role === "teacher" ? "teacher" : role === "professional" ? "professional" : "student",
       setupComplete: true,
       forChild: role === "student" ? forChild : false,
       childAge: role === "student" ? ageNum : null,
@@ -83,6 +83,7 @@ function ProfilePage() {
     document.documentElement.classList.toggle("kids-girl", Boolean(kidsMode && next.childGender === "girl"));
     setSaving(false);
     if (next.edition === "teacher") await navigate({ to: "/coming-soon" });
+    else if (next.role === "professional" || next.edition === "professional") await navigate({ to: "/meetings" });
     else await navigate({ to: "/dashboard" });
   }
 

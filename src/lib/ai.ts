@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { buildClassicalPrompt } from "@/lib/classical-prompts";
 import { buildAssignmentUnifiedPrompt } from "@/lib/assignment-prompts";
+import { buildInviteParsePrompt, buildMeetingPackagePrompt } from "@/lib/meeting-prompts";
 import { buildGenerationPrompt, buildProfessorInsightPrompt } from "@/lib/prompts";
 import { parseSyllabusLocally } from "@/lib/calendar";
 import { normalizeSlides } from "@/lib/slides";
@@ -1201,4 +1202,104 @@ export const checkAssignmentWork = createServerFn({ method: "POST" })
     const content = body.choices?.[0]?.message?.content || "";
     const parsed = JSON.parse(extractJsonObject(content)) as Partial<AssignmentFeedback>;
     return normalizeAssignmentReport(parsed);
+  });
+
+
+export const generateMeetingPackage = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      meetingName: string;
+      category: MeetingCategory;
+      organizer: string;
+      meetingType: string;
+      subject: string;
+      companyName: string;
+      location: string;
+      meetingAt: string | null;
+      attendees: string;
+      agendaText: string;
+      miscNotes: string;
+      extractedText: string;
+      sourceFiles: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const { system, user } = buildMeetingPackagePrompt(data);
+    if (!key) {
+      return {
+        notes: {
+          title: data.meetingName,
+          subtitle: "Add API key to generate full notes",
+          sections: [{ heading: "Material captured", bullets: ["Upload was saved. Configure XAI_API_KEY to analyze."], layout: "stack" }],
+        },
+        focusItems: [],
+        actionItems: [],
+        audioScript: "Meeting materials were saved. Connect an API key to generate a spoken summary.",
+      } satisfies MeetingPackage;
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.3,
+        max_tokens: 8000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Meeting analysis failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(extractJsonObject(content)) as MeetingPackage;
+    return {
+      notes: parsed.notes || { title: data.meetingName, sections: [] },
+      focusItems: parsed.focusItems || [],
+      actionItems: parsed.actionItems || [],
+      audioScript: parsed.audioScript || "",
+    };
+  });
+
+export const parseMeetingInvite = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { text: string }) => input)
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    if (!key || !data.text.trim()) {
+      return {
+        name: "",
+        category: "Regular Work",
+        organizer: "",
+        meetingType: "Other Remote",
+        subject: "",
+        companyName: "",
+        location: "",
+        meetingAt: "",
+        attendees: "",
+        agendaText: data.text.slice(0, 4000),
+        miscNotes: "",
+      };
+    }
+    const { system, user } = buildInviteParsePrompt(data.text);
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.1,
+        max_tokens: 2000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Invite parse failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    return JSON.parse(extractJsonObject(content));
   });

@@ -1,5 +1,5 @@
 export type UserRole = "student" | "teacher" | "professional" | "theologian" | "admin" | "both";
-export type EditionView = "student" | "teacher";
+export type EditionView = "student" | "teacher" | "professional";
 export type ChildGender = "boy" | "girl";
 
 /** Display label for the account type chip under the logo */
@@ -298,3 +298,103 @@ export interface AssignmentRecord {
   /** Latest unified report (assistant + checker) */
   latestReport?: AssignmentFeedback | null;
 }
+
+export type MeetingCategory =
+  | "Regular Work"
+  | "Conference"
+  | "Education"
+  | "Legal/Compliance"
+  | "Vendor"
+  | "Interview"
+  | "Human Resources"
+  | "IT";
+
+export type MeetingType = "In-Person" | "Teams" | "Zoom" | "Google Meet" | "Other Remote";
+
+export interface MeetingActionItem {
+  id: string;
+  action: string;
+  owner?: string;
+  dueHint?: string;
+  audience?: string;
+}
+
+export interface MeetingFocusItem {
+  id: string;
+  phrase: string;
+  why?: string;
+}
+
+export interface MeetingNotes {
+  title: string;
+  subtitle?: string;
+  sections: NotesSection[];
+  speakers?: { name: string; points: string[] }[];
+}
+
+export interface MeetingPackage {
+  notes: MeetingNotes;
+  focusItems: MeetingFocusItem[];
+  actionItems: MeetingActionItem[];
+  audioScript: string;
+}
+
+export interface MeetingSession {
+  id: string;
+  meetingId: string;
+  name: string;
+  createdAt: string;
+  notes: MeetingNotes;
+  focusItems: MeetingFocusItem[];
+  actionItems: MeetingActionItem[];
+  audioScript: string;
+  sourceFiles: string[];
+  attachments: Attachment[];
+}
+
+export interface MeetingRecord {
+  id: string;
+  name: string;
+  category: MeetingCategory;
+  organizer: string;
+  meetingType: MeetingType;
+  subject: string;
+  companyName: string;
+  location: string;
+  meetingAt: string | null;
+  attendees: string;
+  miscNotes: string;
+  agendaText: string;
+  inviteText: string;
+  createdAt: string;
+  lastAccessed: string;
+  archived: boolean;
+  projectId?: string | null;
+}
+
+export interface MeetingProject {
+  id: string;
+  name: string;
+  meetingIds: string[];
+  createdAt: string;
+  archived: boolean;
+}
+
+export const MEETING_CATEGORIES: MeetingCategory[] = [
+  "Regular Work",
+  "Conference",
+  "Education",
+  "Legal/Compliance",
+  "Vendor",
+  "Interview",
+  "Human Resources",
+  "IT",
+];
+
+export const MEETING_TYPES: MeetingType[] = [
+  "In-Person",
+  "Teams",
+  "Zoom",
+  "Google Meet",
+  "Other Remote",
+];

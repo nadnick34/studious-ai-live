@@ -1,15 +1,20 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
+import { Archive, BookOpen, Briefcase, LogOut, Moon, NotebookPen, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
-const NAV = [
-  { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
-  { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
-  { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
-  { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
-];
+function getNav(role?: string | null) {
+  const isPro = role === "professional";
+  return [
+    isPro
+      ? { to: "/meetings", label: "Meetings", icon: Briefcase, match: (p: string) => p.startsWith("/meetings") || p.startsWith("/meeting") }
+      : { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
+    { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
+    { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
+    { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
+  ];
+}
 
 export function Sidebar({
   userName,
@@ -40,7 +45,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 px-2.5">
-        {NAV.map((item) => {
+        {getNav(undefined).map((item) => {
           const Icon = item.icon;
           const active = item.match(pathname);
           return (
@@ -87,11 +92,11 @@ export function Sidebar({
   );
 }
 
-export function BottomNav() {
+export function BottomNav({ role }: { role?: string | null } = {}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden">
-      {NAV.map((item) => {
+      {getNav(role).map((item) => {
         const Icon = item.icon;
         const active = item.match(pathname);
         return (

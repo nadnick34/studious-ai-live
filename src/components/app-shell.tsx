@@ -57,6 +57,7 @@ function AppShellInner({
         document.documentElement.classList.toggle("kids-mode", kids);
         document.documentElement.classList.toggle("kids-boy", kids && p.childGender === "boy");
         document.documentElement.classList.toggle("kids-girl", kids && p.childGender === "girl");
+        document.documentElement.classList.toggle("professional-mode", p.role === "professional");
       })
       .catch(() => hydrateBrand());
   }, []);
@@ -112,7 +113,7 @@ function AppShellInner({
         )}
         <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-8">{children}</main>
       </div>
-      <BottomNav />
+      <BottomNav role={profile?.role} />
     </div>
   );
 }

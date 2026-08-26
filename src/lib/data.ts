@@ -13,6 +13,15 @@ import type {
   ClassUpcoming,
   FlashCard,
   GeneratedPackage,
+  MeetingActionItem,
+  MeetingCategory,
+  MeetingFocusItem,
+  MeetingNotes,
+  MeetingPackage,
+  MeetingProject,
+  MeetingRecord,
+  MeetingSession,
+  MeetingType,
   QuizQuestion,
   StudyNotes,
   StudySet,
@@ -155,7 +164,7 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
     schoolLogoUrl: row.school_logo_url,
     avatarDataUrl: row.avatar_data_url,
     role: (row.role as UserProfile["role"]) || "student",
-    edition: row.edition === "teacher" ? "teacher" : "student",
+    edition: row.edition === "teacher" ? "teacher" : row.edition === "professional" ? "professional" : "student",
     setupComplete: Boolean(row.setup_complete),
     forChild,
     childAge,
@@ -642,4 +651,351 @@ export const deleteAssignment = createServerFn({ method: "POST" })
     const sql = await getSql();
     await sql`delete from assignments where id = ${id} and user_id = ${context.userId}`;
     return { ok: true as const };
+  });
+
+/* ——— Professional meetings ——— */
+
+type MeetingRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  category: string;
+  organizer: string;
+  meeting_type: string;
+  subject: string;
+  company_name: string;
+  location: string;
+  meeting_at: string | null;
+  attendees: string;
+  misc_notes: string;
+  agenda_text: string;
+  invite_text: string;
+  created_at: string;
+  last_accessed: string;
+  archived: boolean;
+  project_id: string | null;
+};
+
+type MeetingSessionRow = {
+  id: string;
+  user_id: string;
+  meeting_id: string;
+  name: string;
+  created_at: string;
+  notes: unknown;
+  focus_items: unknown;
+  action_items: unknown;
+  audio_script: string;
+  source_files: unknown;
+  attachments: unknown;
+};
+
+type MeetingProjectRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  meeting_ids: unknown;
+  created_at: string;
+  archived: boolean;
+};
+
+function mapMeeting(row: MeetingRow): MeetingRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    category: (row.category as MeetingCategory) || "Regular Work",
+    organizer: row.organizer || "",
+    meetingType: (row.meeting_type as MeetingType) || "In-Person",
+    subject: row.subject || "",
+    companyName: row.company_name || "",
+    location: row.location || "",
+    meetingAt: row.meeting_at,
+    attendees: row.attendees || "",
+    miscNotes: row.misc_notes || "",
+    agendaText: row.agenda_text || "",
+    inviteText: row.invite_text || "",
+    createdAt: row.created_at,
+    lastAccessed: row.last_accessed,
+    archived: Boolean(row.archived),
+    projectId: row.project_id,
+  };
+}
+
+function mapMeetingSession(row: MeetingSessionRow): MeetingSession {
+  return {
+    id: row.id,
+    meetingId: row.meeting_id,
+    name: row.name,
+    createdAt: row.created_at,
+    notes: parseJson<MeetingNotes>(row.notes, { title: row.name, sections: [] }),
+    focusItems: parseJson<MeetingFocusItem[]>(row.focus_items, []),
+    actionItems: parseJson<MeetingActionItem[]>(row.action_items, []),
+    audioScript: row.audio_script || "",
+    sourceFiles: parseJson<string[]>(row.source_files, []),
+    attachments: parseJson(row.attachments, []),
+  };
+}
+
+function mapMeetingProject(row: MeetingProjectRow): MeetingProject {
+  return {
+    id: row.id,
+    name: row.name,
+    meetingIds: parseJson<string[]>(row.meeting_ids, []),
+    createdAt: row.created_at,
+    archived: Boolean(row.archived),
+  };
+}
+
+export const listMeetings = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingRow>`
+      select * from meetings where user_id = ${context.userId} and archived = false
+      order by coalesce(meeting_at, created_at) desc
+    `;
+    return rows.map(mapMeeting);
+  });
+
+export const listArchivedMeetings = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingRow>`
+      select * from meetings where user_id = ${context.userId} and archived = true
+      order by last_accessed desc
+    `;
+    return rows.map(mapMeeting);
+  });
+
+export const getMeetingById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingRow>`
+      select * from meetings where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapMeeting(rows[0]) : null;
+  });
+
+export type MeetingInput = {
+  name: string;
+  category?: MeetingCategory;
+  organizer?: string;
+  meetingType?: MeetingType;
+  subject?: string;
+  companyName?: string;
+  location?: string;
+  meetingAt?: string | null;
+  attendees?: string;
+  miscNotes?: string;
+  agendaText?: string;
+  inviteText?: string;
+};
+
+export const createMeeting = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: MeetingInput) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("mtg");
+    await sql`
+      insert into meetings (
+        id, user_id, name, category, organizer, meeting_type, subject, company_name,
+        location, meeting_at, attendees, misc_notes, agenda_text, invite_text
+      ) values (
+        ${id}, ${context.userId}, ${data.name.trim()},
+        ${data.category || "Regular Work"}, ${data.organizer || ""},
+        ${data.meetingType || "In-Person"}, ${data.subject || ""},
+        ${data.companyName || ""}, ${data.location || ""},
+        ${data.meetingAt || null}, ${data.attendees || ""},
+        ${data.miscNotes || ""}, ${data.agendaText || ""}, ${data.inviteText || ""}
+      )
+    `;
+    const rows = await sql<MeetingRow>`select * from meetings where id = ${id} limit 1`;
+    return mapMeeting(rows[0]);
+  });
+
+export const updateMeeting = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: string; patch: Partial<MeetingInput> & { archived?: boolean; projectId?: string | null } }) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingRow>`
+      select * from meetings where id = ${data.id} and user_id = ${context.userId} limit 1
+    `;
+    if (!rows[0]) return null;
+    const cur = mapMeeting(rows[0]);
+    const p = data.patch;
+    const next = {
+      name: p.name ?? cur.name,
+      category: p.category ?? cur.category,
+      organizer: p.organizer ?? cur.organizer,
+      meetingType: p.meetingType ?? cur.meetingType,
+      subject: p.subject ?? cur.subject,
+      companyName: p.companyName ?? cur.companyName,
+      location: p.location ?? cur.location,
+      meetingAt: p.meetingAt !== undefined ? p.meetingAt : cur.meetingAt,
+      attendees: p.attendees ?? cur.attendees,
+      miscNotes: p.miscNotes ?? cur.miscNotes,
+      agendaText: p.agendaText ?? cur.agendaText,
+      inviteText: p.inviteText ?? cur.inviteText,
+      archived: p.archived ?? cur.archived,
+      projectId: p.projectId !== undefined ? p.projectId : cur.projectId,
+    };
+    await sql`
+      update meetings set
+        name = ${next.name},
+        category = ${next.category},
+        organizer = ${next.organizer},
+        meeting_type = ${next.meetingType},
+        subject = ${next.subject},
+        company_name = ${next.companyName},
+        location = ${next.location},
+        meeting_at = ${next.meetingAt},
+        attendees = ${next.attendees},
+        misc_notes = ${next.miscNotes},
+        agenda_text = ${next.agendaText},
+        invite_text = ${next.inviteText},
+        archived = ${next.archived},
+        project_id = ${next.projectId ?? null},
+        last_accessed = now()
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ...cur, ...next };
+  });
+
+export const listMeetingSessions = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((meetingId: string) => meetingId)
+  .handler(async ({ context, data: meetingId }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingSessionRow>`
+      select * from meeting_sessions
+      where user_id = ${context.userId} and meeting_id = ${meetingId}
+      order by created_at desc
+    `;
+    return rows.map(mapMeetingSession);
+  });
+
+export const getMeetingSessionById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingSessionRow>`
+      select * from meeting_sessions where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapMeetingSession(rows[0]) : null;
+  });
+
+export const createMeetingSession = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      meetingId: string;
+      name: string;
+      generated: MeetingPackage;
+      sourceFiles?: string[];
+      attachments?: Attachment[];
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("ms");
+    await sql`
+      insert into meeting_sessions (
+        id, user_id, meeting_id, name, notes, focus_items, action_items, audio_script, source_files, attachments
+      ) values (
+        ${id}, ${context.userId}, ${data.meetingId}, ${data.name},
+        ${JSON.stringify(data.generated.notes)}::jsonb,
+        ${JSON.stringify(data.generated.focusItems)}::jsonb,
+        ${JSON.stringify(data.generated.actionItems)}::jsonb,
+        ${data.generated.audioScript || ""},
+        ${JSON.stringify(data.sourceFiles || [])}::jsonb,
+        ${JSON.stringify(data.attachments || [])}::jsonb
+      )
+    `;
+    await sql`update meetings set last_accessed = now() where id = ${data.meetingId} and user_id = ${context.userId}`;
+    const rows = await sql<MeetingSessionRow>`select * from meeting_sessions where id = ${id} limit 1`;
+    return mapMeetingSession(rows[0]);
+  });
+
+export const updateMeetingSession = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      id: string;
+      patch: Partial<{
+        name: string;
+        notes: MeetingNotes;
+        focusItems: MeetingFocusItem[];
+        actionItems: MeetingActionItem[];
+        audioScript: string;
+        sourceFiles: string[];
+        attachments: Attachment[];
+      }>;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingSessionRow>`
+      select * from meeting_sessions where id = ${data.id} and user_id = ${context.userId} limit 1
+    `;
+    if (!rows[0]) return { ok: false as const };
+    const cur = mapMeetingSession(rows[0]);
+    const p = data.patch;
+    const next = {
+      name: p.name ?? cur.name,
+      notes: p.notes ?? cur.notes,
+      focusItems: p.focusItems ?? cur.focusItems,
+      actionItems: p.actionItems ?? cur.actionItems,
+      audioScript: p.audioScript ?? cur.audioScript,
+      sourceFiles: p.sourceFiles ?? cur.sourceFiles,
+      attachments: p.attachments ?? cur.attachments,
+    };
+    await sql`
+      update meeting_sessions set
+        name = ${next.name},
+        notes = ${JSON.stringify(next.notes)}::jsonb,
+        focus_items = ${JSON.stringify(next.focusItems)}::jsonb,
+        action_items = ${JSON.stringify(next.actionItems)}::jsonb,
+        audio_script = ${next.audioScript},
+        source_files = ${JSON.stringify(next.sourceFiles)}::jsonb,
+        attachments = ${JSON.stringify(next.attachments)}::jsonb
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ok: true as const };
+  });
+
+export const listMeetingProjects = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingProjectRow>`
+      select * from meeting_projects where user_id = ${context.userId} and archived = false
+      order by created_at desc
+    `;
+    return rows.map(mapMeetingProject);
+  });
+
+export const createMeetingProject = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { name: string; meetingIds: string[] }) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("mpj");
+    const ids = data.meetingIds || [];
+    await sql`
+      insert into meeting_projects (id, user_id, name, meeting_ids)
+      values (${id}, ${context.userId}, ${data.name.trim()}, ${JSON.stringify(ids)}::jsonb)
+    `;
+    for (const mid of ids) {
+      await sql`
+        update meetings set project_id = ${id}
+        where id = ${mid} and user_id = ${context.userId}
+      `;
+    }
+    return { id, name: data.name.trim(), meetingIds: ids, createdAt: new Date().toISOString(), archived: false } satisfies MeetingProject;
   });

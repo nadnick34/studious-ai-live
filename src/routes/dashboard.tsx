@@ -5,7 +5,8 @@ import { AppShell } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { createClass, listClasses, seedSampleClass, updateClass } from "@/lib/data";
+import { createClass, getProfile, listClasses, seedSampleClass, updateClass } from "@/lib/data";
+import { useNavigate } from "@tanstack/react-router";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
 import { extractPdfText, formatShortDate, timeAgo } from "@/lib/utils";
 import type { ClassRecord } from "@/lib/types";
@@ -30,6 +31,12 @@ const emptyForm = {
 };
 
 function DashboardPage() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    void getProfile().then((p) => {
+      if (p.role === "professional") void navigate({ to: "/meetings" });
+    });
+  }, [navigate]);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ClassRecord | null>(null);
