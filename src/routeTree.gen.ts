@@ -20,6 +20,7 @@ import { Route as MeetingsRouteImport } from './routes/meetings'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
 import { Route as TeacherRouteImport } from './routes/teacher'
+import { Route as TeacherIndexRouteImport } from './routes/teacher.index'
 import { Route as TeacherAnalyticsRouteImport } from './routes/teacher.analytics'
 import { Route as TeacherClassIdRouteImport } from './routes/teacher.class.$id'
 import { Route as TeacherClassIdGradeRouteImport } from './routes/teacher.class.$id.grade'
@@ -54,10 +55,11 @@ const MeetingsRoute = MeetingsRouteImport.update({ id: '/meetings', path: '/meet
 const ProjectsRoute = ProjectsRouteImport.update({ id: '/projects', path: '/projects', getParentRoute: () => rootRouteImport } as any)
 const ProjectIdRoute = ProjectIdRouteImport.update({ id: '/project/$id', path: '/project/$id', getParentRoute: () => rootRouteImport } as any)
 const TeacherRoute = TeacherRouteImport.update({ id: '/teacher', path: '/teacher', getParentRoute: () => rootRouteImport } as any)
-const TeacherAnalyticsRoute = TeacherAnalyticsRouteImport.update({ id: '/teacher/analytics', path: '/teacher/analytics', getParentRoute: () => rootRouteImport } as any)
-const TeacherClassIdRoute = TeacherClassIdRouteImport.update({ id: '/teacher/class/$id', path: '/teacher/class/$id', getParentRoute: () => rootRouteImport } as any)
-const TeacherClassIdGradeRoute = TeacherClassIdGradeRouteImport.update({ id: '/teacher/class/$id/grade', path: '/teacher/class/$id/grade', getParentRoute: () => rootRouteImport } as any)
-const TeacherClassIdAssessmentAssessmentIdRoute = TeacherClassIdAssessmentAssessmentIdRouteImport.update({ id: '/teacher/class/$id/assessment/$assessmentId', path: '/teacher/class/$id/assessment/$assessmentId', getParentRoute: () => rootRouteImport } as any)
+const TeacherIndexRoute = TeacherIndexRouteImport.update({ id: '/teacher/', path: '/', getParentRoute: () => TeacherRoute } as any)
+const TeacherAnalyticsRoute = TeacherAnalyticsRouteImport.update({ id: '/teacher/analytics', path: '/analytics', getParentRoute: () => TeacherRoute } as any)
+const TeacherClassIdRoute = TeacherClassIdRouteImport.update({ id: '/teacher/class/$id', path: '/class/$id', getParentRoute: () => TeacherRoute } as any)
+const TeacherClassIdGradeRoute = TeacherClassIdGradeRouteImport.update({ id: '/teacher/class/$id/grade', path: '/class/$id/grade', getParentRoute: () => TeacherRoute } as any)
+const TeacherClassIdAssessmentAssessmentIdRoute = TeacherClassIdAssessmentAssessmentIdRouteImport.update({ id: '/teacher/class/$id/assessment/$assessmentId', path: '/class/$id/assessment/$assessmentId', getParentRoute: () => TeacherRoute } as any)
 const ClassIdRoute = ClassIdRouteImport.update({ id: '/class/$id', path: '/class/$id', getParentRoute: () => rootRouteImport } as any)
 const ClassIdIndexRoute = ClassIdIndexRouteImport.update({ id: '/class/$id/', path: '/', getParentRoute: () => ClassIdRoute } as any)
 const ClassIdUploadRoute = ClassIdUploadRouteImport.update({ id: '/class/$id/upload', path: '/upload', getParentRoute: () => ClassIdRoute } as any)
@@ -88,7 +90,8 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof MeetingsRoute
   '/projects': typeof ProjectsRoute
   '/project/$id': typeof ProjectIdRoute
-  '/teacher': typeof TeacherRoute
+  '/teacher': typeof TeacherRouteWithChildren
+  '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
@@ -123,7 +126,8 @@ export interface FileRoutesByTo {
   '/meetings': typeof MeetingsRoute
   '/projects': typeof ProjectsRoute
   '/project/$id': typeof ProjectIdRoute
-  '/teacher': typeof TeacherRoute
+  '/teacher': typeof TeacherRouteWithChildren
+  '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
@@ -156,7 +160,8 @@ export interface FileRoutesById {
   '/meetings': typeof MeetingsRoute
   '/projects': typeof ProjectsRoute
   '/project/$id': typeof ProjectIdRoute
-  '/teacher': typeof TeacherRoute
+  '/teacher': typeof TeacherRouteWithChildren
+  '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
@@ -296,11 +301,7 @@ export interface RootRouteChildren {
   MeetingsRoute: typeof MeetingsRoute
   ProjectsRoute: typeof ProjectsRoute
   ProjectIdRoute: typeof ProjectIdRoute
-  TeacherRoute: typeof TeacherRoute
-  TeacherAnalyticsRoute: typeof TeacherAnalyticsRoute
-  TeacherClassIdRoute: typeof TeacherClassIdRoute
-  TeacherClassIdGradeRoute: typeof TeacherClassIdGradeRoute
-  TeacherClassIdAssessmentAssessmentIdRoute: typeof TeacherClassIdAssessmentAssessmentIdRoute
+  TeacherRoute: typeof TeacherRouteWithChildren
   ClassIdRoute: typeof ClassIdRouteWithChildren
   MeetingIdRoute: typeof MeetingIdRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -379,11 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   MeetingsRoute,
   ProjectsRoute,
   ProjectIdRoute,
-  TeacherRoute,
-  TeacherAnalyticsRoute,
-  TeacherClassIdRoute,
-  TeacherClassIdGradeRoute,
-  TeacherClassIdAssessmentAssessmentIdRoute,
+  TeacherRoute: TeacherRouteWithChildren,
   ClassIdRoute: ClassIdRouteWithChildren,
   MeetingIdRoute: MeetingIdRouteWithChildren,
   ApiAuthSplatRoute,
