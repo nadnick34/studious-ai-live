@@ -7,6 +7,7 @@ create table if not exists teacher_classes (
   course_level text not null default 'Regular',
   school_type text not null default 'Private Independent',
   school_name text not null default '',
+  syllabus_text text not null default '',
   created_at timestamptz not null default now(),
   archived boolean not null default false
 );

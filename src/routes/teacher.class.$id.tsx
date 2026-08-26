@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { getTeacherClassById, listTeacherAssessments } from "@/lib/data";
-import type { TeacherAssessment, TeacherClass } from "@/lib/types";
+import { getTeacherClassById, listTeacherAssessments, listTeacherStudents } from "@/lib/data";
+import type { TeacherAssessment, TeacherClass, TeacherStudent } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/class/$id")({
   component: TeacherClassPage,
@@ -13,14 +13,18 @@ function TeacherClassPage() {
   const { id } = Route.useParams();
   const [cls, setCls] = useState<TeacherClass | null>(null);
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
+  const [students, setStudents] = useState<TeacherStudent[]>([]);
 
   useEffect(() => {
-    void Promise.all([getTeacherClassById({ data: id }), listTeacherAssessments({ data: id })]).then(
-      ([c, a]) => {
-        setCls(c);
-        setAssessments(a);
-      },
-    );
+    void Promise.all([
+      getTeacherClassById({ data: id }),
+      listTeacherAssessments({ data: id }),
+      listTeacherStudents({ data: id }),
+    ]).then(([c, a, s]) => {
+      setCls(c);
+      setAssessments(a);
+      setStudents(s);
+    });
   }, [id]);
 
   if (!cls) {
@@ -53,6 +57,13 @@ function TeacherClassPage() {
           {cls.schoolName ? ` · ${cls.schoolName}` : ""}
         </div>
       </div>
+
+      {students.length > 0 && (
+        <div className="mb-5 rounded-xl border border-border bg-card p-4">
+          <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Roster ({students.length})</h3>
+          <p className="text-sm text-fg/90">{students.map((s) => s.name).join(" · ")}</p>
+        </div>
+      )}
 
       <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Assessments</h3>
       {assessments.length === 0 ? (

@@ -1414,3 +1414,52 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
     const content = body.choices?.[0]?.message?.content || "";
     return JSON.parse(extractJsonObject(content));
   });
+
+
+export const parseTeacherClassDocument = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { text: string }) => input)
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const system = `Extract class setup from a syllabus, roster, or class-info document.
+Return ONLY JSON:
+{
+  "name": "class name",
+  "subject": "subject",
+  "gradeLevel": "e.g. 10 or 6th",
+  "courseLevel": "Regular" | "Honors" | "AP / Advanced",
+  "schoolType": one of Classical | Religious / Faith-Based | Public – Common Core | Public – Non-Common Core / State Standards | Charter | Private Independent | Montessori | Homeschool | Vocational / CTE | Special Education,
+  "schoolName": "string",
+  "syllabusText": "concise syllabus summary including schedule, policies, major dates",
+  "students": ["Student Name 1", "Student Name 2"]
+}
+Use empty string or [] when unknown. Prefer exact student names from a roster.`;
+    if (!key) {
+      return {
+        name: "",
+        subject: "",
+        gradeLevel: "",
+        courseLevel: "Regular",
+        schoolType: "Private Independent",
+        schoolName: "",
+        syllabusText: data.text.slice(0, 8000),
+        students: [],
+      };
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.1,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: data.text.slice(0, 25000) },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Could not read class document (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+  });
