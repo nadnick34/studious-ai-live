@@ -372,10 +372,47 @@ export interface MeetingRecord {
   projectId?: string | null;
 }
 
+export interface GanttTask {
+  id: string;
+  name: string;
+  owner?: string;
+  start: string; // YYYY-MM-DD
+  end: string;
+  progress?: number; // 0-100
+  lane?: string; // e.g. Discovery, Compliance, IT
+}
+
+export interface ProjectMaterial {
+  id: string;
+  name: string;
+  kind?: string;
+  notes?: string;
+  needsSignature?: boolean;
+  signed?: boolean;
+  owner?: string;
+  addedAt: string;
+}
+
+export interface ProjectStakeholder {
+  id: string;
+  name: string;
+  role?: string; // Compliance, IT, Administration, Vendor, etc.
+  email?: string;
+}
+
 export interface MeetingProject {
   id: string;
   name: string;
+  description: string;
+  status: string;
   meetingIds: string[];
+  stakeholders: ProjectStakeholder[];
+  plan: Record<string, unknown>;
+  ganttTasks: GanttTask[];
+  materials: ProjectMaterial[];
+  statusSummary: string;
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
   archived: boolean;
 }

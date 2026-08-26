@@ -1,14 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Briefcase, FolderKanban, Pencil, Plus } from "lucide-react";
+import { Briefcase, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, parseMeetingInvite } from "@/lib/ai";
 import {
   createMeeting,
-  createMeetingProject,
-  listMeetingProjects,
   listMeetings,
   updateMeeting,
 } from "@/lib/data";
@@ -16,7 +14,6 @@ import {
   MEETING_CATEGORIES,
   MEETING_TYPES,
   type MeetingCategory,
-  type MeetingProject,
   type MeetingRecord,
   type MeetingType,
 } from "@/lib/types";
@@ -41,21 +38,17 @@ const emptyForm = {
 function MeetingsPage() {
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
-  const [projects, setProjects] = useState<MeetingProject[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MeetingRecord | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [inviteFiles, setInviteFiles] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showProject, setShowProject] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
 
   async function refresh() {
-    const [m, p] = await Promise.all([listMeetings(), listMeetingProjects()]);
-    setMeetings(m);
-    setProjects(p);
+    setMeetings(await listMeetings());
   }
 
   useEffect(() => {
@@ -92,20 +85,37 @@ function MeetingsPage() {
   }
 
   async function parseInvite() {
-    setBusy(true);
+    setInviteBusy(true);
     setError(null);
+    setInviteStatus("Reading invite…");
     try {
-      let text = form.inviteText;
+      let text = form.inviteText.trim();
       if (inviteFiles.length) {
-        const payloads = await capturedToPayloads(inviteFiles);
-        const extracted = await extractMaterials({ data: { files: payloads } });
-        text = [text, extracted.text].filter(Boolean).join("\n\n");
+        setInviteStatus("Extracting text from upload…");
+        const payloads = await Promise.race([
+          capturedToPayloads(inviteFiles),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Upload timed out. Try pasting the invite text instead.")), 45000)),
+        ]);
+        const extracted = await Promise.race([
+          extractMaterials({ data: { files: payloads } }),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Reading the file timed out. Paste the invite text and try again.")), 60000)),
+        ]);
+        const extractedText = (extracted.text || "").trim();
+        if (!extractedText) {
+          setError("Could not read text from that file. Paste the invite or email body into the text box.");
+          return;
+        }
+        text = [text, extractedText].filter(Boolean).join("\n\n");
       }
       if (!text.trim()) {
         setError("Paste invite text or upload the invite/email first.");
         return;
       }
-      const parsed = await parseMeetingInvite({ data: { text } });
+      setInviteStatus("Filling fields…");
+      const parsed = await Promise.race([
+        parseMeetingInvite({ data: { text: text.slice(0, 20000) } }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Invite analysis timed out. Fields were not auto-filled — enter them manually.")), 90000)),
+      ]);
       setForm((f) => ({
         ...f,
         name: parsed.name || f.name,
@@ -121,10 +131,12 @@ function MeetingsPage() {
         miscNotes: parsed.miscNotes || f.miscNotes,
         inviteText: text,
       }));
+      setInviteStatus("Fields updated from invite.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not parse invite");
+      setInviteStatus(null);
     } finally {
-      setBusy(false);
+      setInviteBusy(false);
     }
   }
 
@@ -166,58 +178,22 @@ function MeetingsPage() {
     }
   }
 
-  async function saveProject() {
-    if (!projectName.trim() || selected.length < 2) {
-      setError("Name the project and select at least two meetings.");
-      return;
-    }
-    setBusy(true);
-    try {
-      await createMeetingProject({ data: { name: projectName.trim(), meetingIds: selected } });
-      setShowProject(false);
-      setSelected([]);
-      setProjectName("");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Project failed");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <AppShell
       title="Meetings"
       right={
-        <div className="flex gap-1.5">
-          <Button variant="secondary" className="min-h-10 text-xs" onClick={() => setShowProject(true)}>
-            <FolderKanban className="size-4" />
-            Project
-          </Button>
-          <Button className="min-h-10 text-xs" onClick={openNew}>
-            <Plus className="size-4" />
-            New meeting
-          </Button>
-        </div>
+        <Button className="min-h-10 text-xs" onClick={openNew}>
+          <Plus className="size-4" />
+          New meeting
+        </Button>
       }
     >
       <p className="mb-4 text-sm text-muted">
         Capture meetings, generate notes, focus items, and action items. Student class data stays separate.
       </p>
 
-      {projects.length > 0 && (
-        <div className="mb-5 space-y-2">
-          <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">Projects</h3>
-          {projects.map((p) => (
-            <div key={p.id} className="rounded-xl border border-border bg-card px-4 py-3">
-              <div className="font-semibold text-fg">{p.name}</div>
-              <div className="text-xs text-muted">{p.meetingIds.length} meetings grouped</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {meetings.length === 0 ? (
+            {meetings.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-4 py-14 text-center text-sm text-muted">
           <Briefcase className="mx-auto mb-3 size-8 opacity-50" />
           No meetings yet. Create one to start capturing notes and actions.
@@ -319,8 +295,9 @@ function MeetingsPage() {
                   value={form.inviteText}
                   onChange={(e) => setForm({ ...form, inviteText: e.target.value })}
                 />
-                <Button type="button" variant="secondary" className="mt-2" disabled={busy} onClick={() => void parseInvite()}>
-                  {busy ? "Reading…" : "Fill from invite"}
+                {inviteStatus && <p className="mt-2 text-xs text-teal">{inviteStatus}</p>}
+                <Button type="button" variant="secondary" className="mt-2" disabled={inviteBusy || busy} onClick={() => void parseInvite()}>
+                  {inviteBusy ? "Reading invite…" : "Fill from invite"}
                 </Button>
               </div>
             </div>
@@ -333,36 +310,7 @@ function MeetingsPage() {
         </div>
       )}
 
-      {showProject && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5">
-            <h3 className="text-lg font-semibold text-fg">Group into project</h3>
-            <p className="mt-1 text-sm text-muted">Select meetings to group under one project name (does not merge content).</p>
-            <input className="field mt-3" placeholder="Project name" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
-            <div className="mt-3 max-h-56 space-y-2 overflow-y-auto">
-              {meetings.map((m) => (
-                <label key={m.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(m.id)}
-                    onChange={(e) =>
-                      setSelected((prev) => (e.target.checked ? [...prev, m.id] : prev.filter((id) => id !== m.id)))
-                    }
-                  />
-                  <span className="truncate">{m.name}</span>
-                </label>
-              ))}
-            </div>
-            {error && <p className="mt-2 text-sm text-red">{error}</p>}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowProject(false)}>Cancel</Button>
-              <Button disabled={busy} onClick={() => void saveProject()}>Create project</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`.field{width:100%;border-radius:0.5rem;border:1px solid var(--border);background:var(--bg);padding:0.55rem 0.75rem;font-size:0.875rem;color:var(--text)}`}</style>
+            <style>{`.field{width:100%;border-radius:0.5rem;border:1px solid var(--border);background:var(--bg);padding:0.55rem 0.75rem;font-size:0.875rem;color:var(--text)}`}</style>
     </AppShell>
   );
 }

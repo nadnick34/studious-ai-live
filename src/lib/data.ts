@@ -13,6 +13,7 @@ import type {
   ClassUpcoming,
   FlashCard,
   GeneratedPackage,
+  GanttTask,
   MeetingActionItem,
   MeetingCategory,
   MeetingFocusItem,
@@ -22,6 +23,8 @@ import type {
   MeetingRecord,
   MeetingSession,
   MeetingType,
+  ProjectMaterial,
+  ProjectStakeholder,
   QuizQuestion,
   StudyNotes,
   StudySet,
@@ -694,7 +697,16 @@ type MeetingProjectRow = {
   id: string;
   user_id: string;
   name: string;
+  description?: string;
+  status?: string;
   meeting_ids: unknown;
+  stakeholders?: unknown;
+  plan?: unknown;
+  gantt_tasks?: unknown;
+  materials?: unknown;
+  status_summary?: string;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at: string;
   archived: boolean;
 };
@@ -740,7 +752,16 @@ function mapMeetingProject(row: MeetingProjectRow): MeetingProject {
   return {
     id: row.id,
     name: row.name,
+    description: row.description || "",
+    status: row.status || "active",
     meetingIds: parseJson<string[]>(row.meeting_ids, []),
+    stakeholders: parseJson(row.stakeholders, []),
+    plan: parseJson(row.plan, {}),
+    ganttTasks: parseJson(row.gantt_tasks, []),
+    materials: parseJson(row.materials, []),
+    statusSummary: row.status_summary || "",
+    startDate: row.start_date,
+    endDate: row.end_date,
     createdAt: row.created_at,
     archived: Boolean(row.archived),
   };
@@ -982,14 +1003,30 @@ export const listMeetingProjects = createServerFn({ method: "GET" })
 
 export const createMeetingProject = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .validator((input: { name: string; meetingIds: string[] }) => input)
+  .validator(
+    (input: {
+      name: string;
+      description?: string;
+      meetingIds?: string[];
+      stakeholders?: ProjectStakeholder[];
+      startDate?: string | null;
+      endDate?: string | null;
+      status?: string;
+    }) => input,
+  )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     const id = uid("mpj");
     const ids = data.meetingIds || [];
     await sql`
-      insert into meeting_projects (id, user_id, name, meeting_ids)
-      values (${id}, ${context.userId}, ${data.name.trim()}, ${JSON.stringify(ids)}::jsonb)
+      insert into meeting_projects (
+        id, user_id, name, description, status, meeting_ids, stakeholders, start_date, end_date
+      ) values (
+        ${id}, ${context.userId}, ${data.name.trim()}, ${data.description || ""},
+        ${data.status || "active"}, ${JSON.stringify(ids)}::jsonb,
+        ${JSON.stringify(data.stakeholders || [])}::jsonb,
+        ${data.startDate || null}, ${data.endDate || null}
+      )
     `;
     for (const mid of ids) {
       await sql`
@@ -997,5 +1034,79 @@ export const createMeetingProject = createServerFn({ method: "POST" })
         where id = ${mid} and user_id = ${context.userId}
       `;
     }
-    return { id, name: data.name.trim(), meetingIds: ids, createdAt: new Date().toISOString(), archived: false } satisfies MeetingProject;
+    const rows = await sql<MeetingProjectRow>`select * from meeting_projects where id = ${id} limit 1`;
+    return mapMeetingProject(rows[0]);
+  });
+
+export const getMeetingProjectById = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ context, data: id }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingProjectRow>`
+      select * from meeting_projects where id = ${id} and user_id = ${context.userId} limit 1
+    `;
+    return rows[0] ? mapMeetingProject(rows[0]) : null;
+  });
+
+export const updateMeetingProject = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      id: string;
+      patch: Partial<{
+        name: string;
+        description: string;
+        status: string;
+        meetingIds: string[];
+        stakeholders: ProjectStakeholder[];
+        plan: Record<string, unknown>;
+        ganttTasks: GanttTask[];
+        materials: ProjectMaterial[];
+        statusSummary: string;
+        startDate: string | null;
+        endDate: string | null;
+        archived: boolean;
+      }>;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const rows = await sql<MeetingProjectRow>`
+      select * from meeting_projects where id = ${data.id} and user_id = ${context.userId} limit 1
+    `;
+    if (!rows[0]) return null;
+    const cur = mapMeetingProject(rows[0]);
+    const p = data.patch;
+    const next = {
+      name: p.name ?? cur.name,
+      description: p.description ?? cur.description,
+      status: p.status ?? cur.status,
+      meetingIds: p.meetingIds ?? cur.meetingIds,
+      stakeholders: p.stakeholders ?? cur.stakeholders,
+      plan: p.plan ?? cur.plan,
+      ganttTasks: p.ganttTasks ?? cur.ganttTasks,
+      materials: p.materials ?? cur.materials,
+      statusSummary: p.statusSummary ?? cur.statusSummary,
+      startDate: p.startDate !== undefined ? p.startDate : cur.startDate,
+      endDate: p.endDate !== undefined ? p.endDate : cur.endDate,
+      archived: p.archived ?? cur.archived,
+    };
+    await sql`
+      update meeting_projects set
+        name = ${next.name},
+        description = ${next.description},
+        status = ${next.status},
+        meeting_ids = ${JSON.stringify(next.meetingIds)}::jsonb,
+        stakeholders = ${JSON.stringify(next.stakeholders)}::jsonb,
+        plan = ${JSON.stringify(next.plan)}::jsonb,
+        gantt_tasks = ${JSON.stringify(next.ganttTasks)}::jsonb,
+        materials = ${JSON.stringify(next.materials)}::jsonb,
+        status_summary = ${next.statusSummary},
+        start_date = ${next.startDate ?? null},
+        end_date = ${next.endDate ?? null},
+        archived = ${next.archived}
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ...cur, ...next };
   });

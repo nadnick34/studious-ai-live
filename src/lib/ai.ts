@@ -1303,3 +1303,65 @@ export const parseMeetingInvite = createServerFn({ method: "POST" })
     const content = body.choices?.[0]?.message?.content || "";
     return JSON.parse(extractJsonObject(content));
   });
+
+
+export const generateProjectIntelligence = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      projectName: string;
+      description: string;
+      startDate?: string | null;
+      endDate?: string | null;
+      meetingContext: string;
+      materialText: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const system = `You are a project management analyst for professional coordinators.
+Build a practical plan: discovery, kickoff, weekly cadence, compliance/IT/admin touchpoints, signatures, resources, and deadlines.
+Return ONLY JSON with:
+- statusSummary: 2-4 paragraph executive status (where we are, risks, next actions)
+- ganttTasks: array of {id,name,owner,start,end,progress,lane} with realistic YYYY-MM-DD dates
+- stakeholders: array of {id,name,role}
+- plan: { phases: string[], discovery: string[], kickoffAgenda: string[], weeklyCadence: string[], risks: string[] }
+- materials: array of {id,name,kind,notes,needsSignature,signed,owner} suggested document list
+Keep tasks concrete for a coordinator (not software engineering jargon unless the material is IT).`;
+    const user = `Project: ${data.projectName}
+Description: ${data.description}
+Window: ${data.startDate || "TBD"} → ${data.endDate || "TBD"}
+
+MEETING / NOTES CONTEXT:
+${data.meetingContext.slice(0, 25000)}
+
+MATERIALS / UPLOADS:
+${data.materialText.slice(0, 25000)}
+`;
+    if (!key) {
+      return {
+        statusSummary: "Add API key to generate project intelligence.",
+        ganttTasks: [],
+        stakeholders: [],
+        plan: {},
+        materials: [],
+      };
+    }
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.3,
+        max_tokens: 6000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Project analysis failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    return JSON.parse(extractJsonObject(content));
+  });
