@@ -1509,6 +1509,7 @@ export const createTeacherAssessment = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    await ensureTeacherTables(sql);
     const id = uid("ta");
     await sql`
       insert into teacher_assessments (
@@ -1523,6 +1524,7 @@ export const createTeacherAssessment = createServerFn({ method: "POST" })
       )
     `;
     const rows = await sql<TeacherAssessmentRow>`select * from teacher_assessments where id = ${id} limit 1`;
+    if (!rows[0]) throw new Error("Assessment save failed.");
     return mapTeacherAssessment(rows[0]);
   });
 

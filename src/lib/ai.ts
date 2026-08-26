@@ -1409,10 +1409,17 @@ export const gradeTeacherAssessment = createServerFn({ method: "POST" })
         ],
       }),
     });
-    if (!res.ok) throw new Error(`Grading failed (${res.status})`);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Grading failed (${res.status})${errText ? ": " + errText.slice(0, 200) : ""}`);
+    }
     const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const content = body.choices?.[0]?.message?.content || "";
-    return JSON.parse(extractJsonObject(content));
+    try {
+      return JSON.parse(extractJsonObject(content));
+    } catch {
+      throw new Error("Could not parse grading response. Try fewer pages or a clearer scan.");
+    }
   });
 
 

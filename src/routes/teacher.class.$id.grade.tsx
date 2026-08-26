@@ -77,6 +77,10 @@ function GradePage() {
         },
       });
 
+      const results = Array.isArray(graded.results) ? graded.results : [];
+      if (!results.length && !graded.classAverage) {
+        setStatus("Grading returned little structure — saving what we have…");
+      }
       const assessment = await createTeacherAssessment({
         data: {
           classId: id,
@@ -84,19 +88,21 @@ function GradePage() {
           type,
           topics: topics.trim(),
           pointsPossible: Number(points) || 100,
-          sourceFiles: extracted.attachments.map((a) => a.name),
+          sourceFiles: (extracted.attachments || []).map((a: { name: string }) => a.name),
           classAverage: Number(graded.classAverage) || 0,
-          topicScores: graded.topicScores || [],
-          strengths: graded.strengths || [],
-          needs: graded.needs || [],
-          results: graded.results || [],
+          topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
+          strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
+          needs: Array.isArray(graded.needs) ? graded.needs : [],
+          results,
         },
       });
+      setStatus("Opening analytics…");
       await navigate({
         to: "/teacher/class/$id/assessment/$assessmentId",
         params: { id, assessmentId: assessment.id },
       });
     } catch (err) {
+      console.error(err);
       setError(err instanceof Error ? err.message : "Grading failed");
       setBusy(false);
       setStatus("");
@@ -202,7 +208,7 @@ function GradePage() {
   );
 }
 
-function UploadBlock({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function UploadBlock({ title, hint, children }: { title: string; hint: string; children: import("react").ReactNode }) {
   return (
     <div className="rounded-xl border border-dashed border-border bg-bg/50 p-3">
       <div className="mb-1 text-sm font-medium text-fg">{title}</div>

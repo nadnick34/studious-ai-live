@@ -370,6 +370,15 @@ const MeetingIdRouteWithChildren = MeetingIdRoute._addFileChildren({
   MeetingIdSessionSessionIdRoute,
 })
 
+const TeacherRouteWithChildren = TeacherRoute._addFileChildren({
+  TeacherIndexRoute,
+  TeacherAnalyticsRoute,
+  TeacherClassIdRoute,
+  TeacherClassIdGradeRoute,
+  TeacherClassIdAssessmentAssessmentIdRoute,
+  TeacherClassIdStudentStudentIdRoute,
+})
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
   ArchivedRoute,

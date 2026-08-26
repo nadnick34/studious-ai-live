@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { getTeacherClassById, getTeacherClassStats } from "@/lib/data";
+import { getTeacherClassById, getTeacherClassStats, listTeacherAssessments } from "@/lib/data";
 import type { TeacherAssessment, TeacherClass } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/class/$id")({
@@ -28,6 +28,8 @@ function TeacherClassPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const [cls, setCls] = useState<TeacherClass | null>(null);
+  const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
   const [stats, setStats] = useState<{
     classAverage: number;
     studentCount: number;
@@ -37,20 +39,182 @@ function TeacherClassPage() {
     students: RosterRow[];
     assessments: TeacherAssessment[];
   } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([getTeacherClassById({ data: id }), getTeacherClassStats({ data: id })]).then(
-      ([c, s]) => {
+    void Promise.all([
+      getTeacherClassById({ data: id }),
+      getTeacherClassStats({ data: id }),
+      listTeacherAssessments({ data: id }),
+    ])
+      .then(([c, s, a]) => {
         setCls(c);
         setStats(s);
-      },
-    );
+        setAssessments(a);
+      })
+      .catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load class"));
   }, [id]);
+
+  const studentResults = useMemo(() => {
+    if (!selectedName) return [];
+    const rows: {
+      assessment: string;
+      assessmentId: string;
+      score: number;
+      status: string;
+      focus: string[];
+      tips: string[];
+      missed: { question: string; studentAnswer?: string; correct: string }[];
+    }[] = [];
+    for (const a of assessments) {
+      const r = (a.results || []).find((x) => x.studentName === selectedName);
+      if (r) {
+        rows.push({
+          assessment: a.name,
+          assessmentId: a.id,
+          score: r.score,
+          status: r.status,
+          focus: r.focusAreas || [],
+          tips: r.studyTips || [],
+          missed: r.missed || [],
+        });
+      }
+    }
+    return rows;
+  }, [assessments, selectedName]);
+
+  const selectedRow = stats?.students.find((s) => s.name === selectedName);
+  const focusAll = [...new Set(studentResults.flatMap((r) => r.focus))];
+  const tipsAll = [...new Set(studentResults.flatMap((r) => r.tips))];
+  const achievements: string[] = [];
+  if ((selectedRow?.average || 0) >= 85) achievements.push("Strong overall average");
+  if (studentResults.length >= 2) {
+    const scores = studentResults.map((r) => r.score);
+    if (scores[0] >= scores[scores.length - 1]) achievements.push("Improving or steady on recent assessments");
+  }
+  if (selectedRow && (selectedRow.status === "Strong" || selectedRow.status === "On Track") && !achievements.length) {
+    achievements.push("On track with class expectations");
+  }
+
+  if (loadError) {
+    return (
+      <AppShell title="Class">
+        <p className="text-sm text-red">{loadError}</p>
+        <Link to="/teacher" className="mt-3 inline-block text-sm text-teal">
+          ← Dashboard
+        </Link>
+      </AppShell>
+    );
+  }
 
   if (!cls || !stats) {
     return (
       <AppShell title="Class">
         <p className="text-sm text-muted">Loading…</p>
+      </AppShell>
+    );
+  }
+
+  // —— Student detail panel (inline; always works) ——
+  if (selectedName) {
+    return (
+      <AppShell
+        title="Student Detail"
+        right={
+          <span className="text-xs text-muted">
+            {cls.name}
+            {cls.courseLevel ? ` – ${cls.courseLevel}` : ""}
+          </span>
+        }
+      >
+        <button type="button" className="mb-3 text-sm text-teal hover:underline" onClick={() => setSelectedName(null)}>
+          ← {cls.name}
+        </button>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-fg">{selectedName}</h2>
+            <p className="text-sm text-muted">
+              Grade {cls.gradeLevel || "—"} · Overall Average: {selectedRow?.average ?? "—"}%
+            </p>
+          </div>
+          {selectedRow && (
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyle(selectedRow.status)}`}>
+              {selectedRow.status}
+            </span>
+          )}
+        </div>
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MiniStat label="Overall Avg" value={`${selectedRow?.average ?? "—"}%`} />
+          <MiniStat label="Last Quiz" value={selectedRow?.lastQuiz != null ? `${selectedRow.lastQuiz}%` : "—"} />
+          <MiniStat label="Assessments" value={String(studentResults.length)} />
+          <MiniStat label="Status" value={selectedRow?.status || "—"} />
+        </div>
+        <div className="mb-5 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-4">
+            <h3 className="mb-2 text-sm font-semibold text-emerald-800">Achievements</h3>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-emerald-900/90">
+              {(achievements.length ? achievements : ["Grade assessments to build achievement history"]).map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4">
+            <h3 className="mb-2 text-sm font-semibold text-amber-800">Focus Areas</h3>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900/90">
+              {(focusAll.length ? focusAll : ["No focus areas yet — grade a scan set"]).map((x, i) => (
+                <li key={i}>{x}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        {studentResults.length > 0 ? (
+          <div className="space-y-4">
+            {studentResults.map((r) => (
+              <div key={r.assessmentId} className="rounded-xl border border-border bg-card p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-semibold text-fg">{r.assessment}</div>
+                  <div className="text-sm">
+                    <span className="font-bold">{r.score}%</span>
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${statusStyle(r.status)}`}>{r.status}</span>
+                  </div>
+                </div>
+                {r.missed.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs font-semibold text-muted uppercase">What was missed</div>
+                    {r.missed.map((m, i) => (
+                      <div key={i} className="rounded-lg border-l-4 border-red-300 bg-red-50/80 px-3 py-2 text-sm">
+                        <p className="font-medium">{m.question}</p>
+                        {m.studentAnswer && <p className="text-xs text-muted">Answered: {m.studentAnswer}</p>}
+                        <p className="text-emerald-700">Correct: {m.correct}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {r.tips.length > 0 && (
+                  <ul className="mt-2 list-disc pl-5 text-sm text-muted">
+                    {r.tips.map((tip, i) => (
+                      <li key={i}>{tip}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+            {tipsAll.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h3 className="mb-2 text-sm font-semibold">Study tips</h3>
+                <ul className="list-disc space-y-1 pl-5 text-sm">
+                  {tipsAll.slice(0, 8).map((t, i) => (
+                    <li key={i}>{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="rounded-xl border border-border bg-card px-4 py-8 text-center text-sm text-muted">
+            No graded results for this student yet. Use <strong>Scan / Upload Tests</strong> to grade a class set.
+          </p>
+        )}
       </AppShell>
     );
   }
@@ -61,7 +225,7 @@ function TeacherClassPage() {
       right={
         <span className="text-xs text-muted">
           {stats.studentCount} student{stats.studentCount === 1 ? "" : "s"}
-          {cls.schoolType ? ` · ${cls.schoolType.split(" ")[0]}` : ""}
+          {cls.schoolType ? ` · ${cls.schoolType.split(/[–/]/)[0].trim()}` : ""}
         </span>
       }
     >
@@ -104,11 +268,7 @@ function TeacherClassPage() {
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Class Average" value={`${stats.classAverage}%`} sub="Last assessments" />
-        <StatCard
-          label="Students On Track"
-          value={String(stats.onTrack)}
-          sub={`of ${stats.studentCount || "—"}`}
-        />
+        <StatCard label="Students On Track" value={String(stats.onTrack)} sub={`of ${stats.studentCount || "—"}`} />
         <StatCard
           label="Need Support"
           value={String(stats.needSupport)}
@@ -124,7 +284,7 @@ function TeacherClassPage() {
         </div>
         {stats.students.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted">
-            No students yet. Upload a roster when creating the class, or grade a scanned set to populate results.
+            No students yet. Add a roster when creating the class, or grade a scanned set to populate results.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -142,14 +302,9 @@ function TeacherClassPage() {
                   <tr
                     key={s.id}
                     className="cursor-pointer border-b border-border/70 hover:bg-bg"
-                    onClick={() =>
-                      void navigate({
-                        to: "/teacher/class/$id/student/$studentId",
-                        params: { id, studentId: encodeURIComponent(s.name) },
-                      })
-                    }
+                    onClick={() => setSelectedName(s.name)}
                   >
-                    <td className="px-4 py-3 font-medium text-fg">{s.name}</td>
+                    <td className="px-4 py-3 font-medium text-teal">{s.name}</td>
                     <td className="px-4 py-3">{s.average}%</td>
                     <td className="px-4 py-3">{s.lastQuiz != null ? `${s.lastQuiz}%` : "—"}</td>
                     <td className="px-4 py-3">
@@ -213,6 +368,15 @@ function StatCard({
       <div className="text-[11px] text-muted">{label}</div>
       <div className={`mt-1 text-2xl font-bold text-fg ${valueClass || ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-muted">{sub}</div>}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="text-[11px] text-muted">{label}</div>
+      <div className="mt-1 text-lg font-bold text-fg">{value}</div>
     </div>
   );
 }
