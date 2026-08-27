@@ -142,37 +142,24 @@ function ProfilePage() {
   const email = user?.primaryEmail || "";
 
   return (
-    <AppShell
-      title="Profile"
-      right={
-        <button
-          type="button"
-          onClick={toggleDark}
-          className="grid size-10 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg"
-          aria-label={dark ? "Switch to light mode" : "Switch to night mode"}
-          title={dark ? "Light mode" : "Night mode"}
-        >
-          {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
-        </button>
-      }
-    >
+<AppShell title="Profile">
       <div className="mx-auto max-w-xl space-y-5">
         <p className="text-xs font-medium text-teal">App update: August 20</p>
-        <form onSubmit={handleSave} className="card-surface relative space-y-5 rounded-xl p-5 sm:p-6">
-          <button
-            type="button"
-            onClick={toggleDark}
-            className="absolute right-4 top-4 grid size-9 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg sm:hidden"
-            aria-label={dark ? "Switch to light mode" : "Switch to night mode"}
-            title={dark ? "Light mode" : "Night mode"}
-          >
-            {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
+        <form onSubmit={handleSave} className="card-surface space-y-5 rounded-xl p-5 sm:p-6">
           <div className="flex items-center gap-4">
             <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-teal text-lg font-semibold text-white">
               {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : initialsFromName(name)}
             </div>
-            <div>
+            <button
+              type="button"
+              onClick={toggleDark}
+              className="grid size-10 shrink-0 place-items-center rounded-lg border border-border text-muted hover:bg-bg hover:text-fg"
+              aria-label={dark ? "Switch to light mode" : "Switch to night mode"}
+              title={dark ? "Light mode" : "Night mode"}
+            >
+              {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </button>
+            <div className="min-w-0 flex-1">
               <label className="mb-1 block text-xs text-muted">Profile photo</label>
               <input
                 type="file"
