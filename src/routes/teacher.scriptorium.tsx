@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, generateScriptoriumPacket } from "@/lib/ai";
-import { getProfile } from "@/lib/data";
+import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
 import { brandFromProfile } from "@/lib/schools";
 import { EDUCATION_APPROACHES, type EducationApproach } from "@/lib/types";
 
@@ -89,6 +89,15 @@ function ScriptoriumPage() {
 
   useEffect(() => {
     setLog(loadLog());
+    void getTeacherToolState()
+      .then((s) => {
+        const remote = Array.isArray(s.scriptoriumLog) ? s.scriptoriumLog : [];
+        if (remote.length) {
+          saveLog(remote as LogItem[]);
+          setLog(remote as LogItem[]);
+        }
+      })
+      .catch(() => {});
     void getProfile()
       .then((p) => {
         const brand = brandFromProfile(p);
@@ -154,6 +163,7 @@ function ScriptoriumPage() {
       const nextLog = [entry, ...loadLog()].slice(0, 30);
       saveLog(nextLog);
       setLog(nextLog);
+      void saveTeacherToolState({ data: { scriptoriumLog: nextLog } }).catch(() => {});
       setStatus("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generation failed");

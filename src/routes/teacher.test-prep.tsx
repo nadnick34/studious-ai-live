@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { generateTestPrepLesson, generateTestPrepPlan } from "@/lib/ai";
-import { getProfile, listTeacherClasses } from "@/lib/data";
+import { getProfile, getTeacherToolState, listTeacherClasses, saveTeacherToolState } from "@/lib/data";
 import { TEST_FOCUS_OPTIONS, type TeacherClass } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/test-prep")({
@@ -104,23 +104,31 @@ function TestPrepPage() {
   const [printTarget, setPrintTarget] = useState<"teacher" | "student" | "both">("both");
 
   useEffect(() => {
-    void Promise.all([listTeacherClasses(), getProfile()]).then(([cls, profile]) => {
-      const list = (cls || []).filter((c) => !c.archived);
-      setClasses(list);
-      const next: Record<string, CardState> = {};
-      for (const c of list) next[c.id] = loadCard(c.id);
-      setCards(next);
-      setStateName(profile.state || "");
-      setSchoolType(profile.educationApproach || list[0]?.schoolType || "");
-    });
+    void Promise.all([listTeacherClasses(), getProfile(), getTeacherToolState().catch(() => null)]).then(
+      ([cls, profile, tools]) => {
+        const list = (cls || []).filter((c) => !c.archived);
+        setClasses(list);
+        const remote = (tools?.testPrepCards || {}) as Record<string, CardState>;
+        const next: Record<string, CardState> = {};
+        for (const c of list) {
+          next[c.id] = remote[c.id] ? { ...loadCard(c.id), ...remote[c.id], log: remote[c.id].log || [] } : loadCard(c.id);
+          saveCard(c.id, next[c.id]);
+        }
+        setCards(next);
+        setStateName(profile.state || "");
+        setSchoolType(profile.educationApproach || list[0]?.schoolType || "");
+      },
+    );
   }, []);
 
   function patchCard(classId: string, partial: Partial<CardState>) {
     setCards((prev) => {
       const cur = prev[classId] || loadCard(classId);
-      const next = { ...cur, ...partial };
-      saveCard(classId, next);
-      return { ...prev, [classId]: next };
+      const nextCard = { ...cur, ...partial };
+      saveCard(classId, nextCard);
+      const all = { ...prev, [classId]: nextCard };
+      void saveTeacherToolState({ data: { testPrepCards: all } }).catch(() => {});
+      return all;
     });
   }
 
@@ -389,7 +397,10 @@ function TestPrepPage() {
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
                   <div className="h-full bg-teal" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="mt-1 text-[11px] text-muted">{topics.length ? `${done}/${topics.length} covered` : "No plan yet"}</p>
+                <p className="mt-1 text-[11px] text-muted">
+                  {topics.length ? `${done}/${topics.length} covered` : "No plan yet"}
+                  {(card.log || []).length ? ` · ${(card.log || []).length} lesson(s)` : ""}
+                </p>
                 <div className="mt-3 flex items-end justify-between gap-2" onClick={(e) => e.stopPropagation()}>
                   <p className="flex items-center gap-1 text-[11px] text-muted">
                     {stale && <span title="Plan older than 30 days">⚠️</span>}

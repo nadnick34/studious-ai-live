@@ -1285,6 +1285,12 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       results jsonb not null default '[]'::jsonb
     )`,
     `create index if not exists teacher_assessments_class_idx on teacher_assessments (user_id, class_id)`,
+    `create table if not exists teacher_tool_state (
+      user_id text primary key,
+      scriptorium_log jsonb not null default '[]'::jsonb,
+      testprep_cards jsonb not null default '{}'::jsonb,
+      updated_at timestamptz not null default now()
+    )`,
   ];
   for (const stmt of statements) {
     try {
@@ -1719,4 +1725,49 @@ export const upsertTeacherAssessmentResult = createServerFn({ method: "POST" })
       where id = ${data.assessmentId} and user_id = ${context.userId}
     `;
     return { ...cur, results, classAverage };
+  });
+
+
+export const getTeacherToolState = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown }>`
+      select scriptorium_log, testprep_cards from teacher_tool_state where user_id = ${context.userId} limit 1
+    `;
+    const row = rows[0];
+    return {
+      scriptoriumLog: parseJson(row?.scriptorium_log, []),
+      testPrepCards: parseJson(row?.testprep_cards, {}),
+    };
+  });
+
+export const saveTeacherToolState = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      scriptoriumLog?: unknown;
+      testPrepCards?: unknown;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const cur = await sql<{ scriptorium_log: unknown; testprep_cards: unknown }>`
+      select scriptorium_log, testprep_cards from teacher_tool_state where user_id = ${context.userId} limit 1
+    `;
+    const scriptoriumLog =
+      data.scriptoriumLog !== undefined ? data.scriptoriumLog : parseJson(cur[0]?.scriptorium_log, []);
+    const testPrepCards =
+      data.testPrepCards !== undefined ? data.testPrepCards : parseJson(cur[0]?.testprep_cards, {});
+    await sql`
+      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, updated_at)
+      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, now())
+      on conflict (user_id) do update set
+        scriptorium_log = excluded.scriptorium_log,
+        testprep_cards = excluded.testprep_cards,
+        updated_at = now()
+    `;
+    return { ok: true as const };
   });
