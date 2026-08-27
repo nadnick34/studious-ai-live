@@ -2101,58 +2101,65 @@ export const generateCollegeComparison = createServerFn({ method: "POST" })
     const colleges = data.colleges.map((c) => c.trim()).filter(Boolean).slice(0, 5);
     const interests = data.interests.map((c) => c.trim()).filter(Boolean).slice(0, 5);
     const cycle = data.year || "2026-2027";
-    const system = `You build a clean COLLEGE COMPARISON MATRIX for a student.
-Colleges (max 5): ${colleges.join(" | ")}
-Student interests (max 5): ${interests.join(" | ") || "general"}
-Student: ${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""} in ${data.state || "unspecified"}.
-Admissions cycle to use: ${cycle}.
+    const system = `Build a ONE-PAGE college comparison. Colleges as rows. Categories as columns.
+Colleges: ${colleges.join(" | ")}
+Interests: ${interests.join(" | ") || "general"}
+Cycle: ${cycle}. Student: ${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""} ${data.state || ""}.
 
-Be factual and cautious. If a date is typical but not verified this hour, write "Confirm on the official admissions site" next to it.
-Do not invent scholarship dollar amounts.
-Atmosphere: report commonly described campus political lean (conservative-leaning / mixed / liberal-leaning) as a generalization, plus cost-of-living/income mix of the area, weather, and safety in plain terms. No activism lecture. No racial framing.
+CELL RULES — this failed last time because cells were essays:
+- Every cell is 3-12 words OR a date list. No reasoning paragraphs.
+- Dates MUST be MM/DD/YY (e.g. 11/01/26). Pull from official .edu admissions/aid/housing/orientation pages when known.
+- If a date is uncertain write "Confirm on .edu" — do not invent a fake exact day.
+- Safety = campus AND the surrounding city. Format: "Campus Low; City Moderate".
+- Atmosphere lean in 1-2 words: Conservative / Mixed / Liberal.
+- Income mix: Low / Mixed / High (area, not the student's).
+- Weather: short ("Hot humid summers").
+- Scholarships/admissions: "Priority 11/15/26; Final 02/01/26".
+- Interest fit: name the 1-2 strongest matches to the listed interests only.
+- Jobs: employers or sector in a few words.
+
+Use official university sites first. Also allowed: U.S. News program lists, Niche/city crime context, climate normals, first-destination reports. Do not limit to one directory.
 
 Return ONLY JSON:
 {
   "title": "${cycle} College Comparison",
-  "disclaimer": "one sentence",
-  "colleges": [
+  "disclaimer": "Confirm dates on each school's .edu site.",
+  "rows": [
     {
-      "name": "string",
-      "location": "string",
-      "admissions": ["deadline bullets"],
-      "scholarships": ["deadline bullets"],
-      "orientationHousing": ["bullets"],
-      "interestFit": ["how it matches the listed interests"],
-      "postGrad": ["placement / employers / outcomes"],
-      "area": ["food", "extracurriculars", "things to do"],
-      "atmosphere": {
-        "politicalLean": "string",
-        "incomeMix": "string",
-        "weather": "string",
-        "safety": "string"
-      }
+      "name": "University of Arkansas",
+      "location": "Fayetteville, AR",
+      "admissions": "Preferred 11/01/26; rolling",
+      "scholarships": "Priority 11/15/26; final 02/01/26",
+      "orientationHousing": "Housing spring; orient. summer",
+      "interestFit": "Business, Engineering",
+      "jobs": "Walmart, Tyson pipeline",
+      "area": "Ozarks; SEC Saturdays",
+      "lean": "Mixed",
+      "income": "Mixed",
+      "weather": "Four seasons",
+      "safety": "Campus Low-Mod; City Low-Mod"
     }
-  ]
+  ],
+  "sources": [{ "label": "UARK Scholarships", "url": "https://scholarships.uark.edu/" }]
 }`;
     const fallback = {
       title: `${cycle} College Comparison`,
-      disclaimer: "Confirm every date on the official college site before you act.",
-      colleges: colleges.map((name) => ({
+      disclaimer: "Confirm dates on each school's .edu site.",
+      rows: colleges.map((name) => ({
         name,
         location: "",
-        admissions: ["Confirm priority and regular dates on the official site."],
-        scholarships: ["Confirm merit and competitive scholarship deadlines."],
-        orientationHousing: ["Confirm orientation and housing application windows."],
-        interestFit: interests.map((i) => `${i}: check department pages`),
-        postGrad: ["Review recent first-destination / outcomes reports."],
-        area: ["Food and weekend options vary by campus."],
-        atmosphere: {
-          politicalLean: "Confirm from recent campus reporting.",
-          incomeMix: "See regional cost of living.",
-          weather: "See city climate normals.",
-          safety: "Read the current annual security report.",
-        },
+        admissions: "Confirm on .edu",
+        scholarships: "Confirm on .edu",
+        orientationHousing: "Confirm on .edu",
+        interestFit: interests.slice(0, 2).join(", ") || "—",
+        jobs: "See outcomes report",
+        area: "See city site",
+        lean: "—",
+        income: "—",
+        weather: "—",
+        safety: "Campus —; City —",
       })),
+      sources: [],
     };
     if (!key) return fallback;
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -2160,11 +2167,15 @@ Return ONLY JSON:
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "grok-4.5",
-        temperature: 0.2,
-        max_tokens: 5000,
+        temperature: 0.1,
+        max_tokens: 3500,
         messages: [
           { role: "system", content: system },
-          { role: "user", content: `Compare:\n${colleges.map((c, i) => `${i + 1}. ${c}`).join("\n")}\nInterests:\n${interests.join(", ")}` },
+          {
+            role: "user",
+            content:
+              `Compare these colleges as rows:\n${colleges.map((c, i) => `${i + 1}. ${c}`).join("\n")}\nInterests: ${interests.join(", ") || "general"}\nPreferred starting pages if relevant: scholarships.uark.edu, lsu.edu/admissions, latech.edu/admissions/scholarships, centenary.edu/admission/how-to-apply/dates-deadlines. Also city crime and climate — not campus-only safety.`,
+          },
         ],
       }),
     });

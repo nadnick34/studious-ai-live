@@ -71,17 +71,21 @@ function StudentTestPrepPage() {
   const [comparison, setComparison] = useState<null | {
     title?: string;
     disclaimer?: string;
-    colleges?: {
+    rows?: {
       name: string;
       location?: string;
-      admissions?: string[];
-      scholarships?: string[];
-      orientationHousing?: string[];
-      interestFit?: string[];
-      postGrad?: string[];
-      area?: string[];
-      atmosphere?: { politicalLean?: string; incomeMix?: string; weather?: string; safety?: string };
+      admissions?: string;
+      scholarships?: string;
+      orientationHousing?: string;
+      interestFit?: string;
+      jobs?: string;
+      area?: string;
+      lean?: string;
+      income?: string;
+      weather?: string;
+      safety?: string;
     }[];
+    sources?: { label?: string; url?: string }[];
   }>(null);
 
   useEffect(() => {
@@ -269,6 +273,102 @@ function StudentTestPrepPage() {
     } finally {
       setRowBusy(null);
     }
+  }
+
+
+  if (compareOpen) {
+    const rows = comparison?.rows || [];
+    return (
+      <AppShell title="College comparison">
+        <style>{`@media print { @page { size: landscape; margin: 0.4in; } body { font-size: 11px; } .print-hide { display: none !important; } }`}</style>
+        <div className="mx-auto max-w-[1100px] space-y-4">
+          <button type="button" className="print-hide text-sm text-teal hover:underline" onClick={() => setCompareOpen(false)}>
+            ← Practicum & Prep
+          </button>
+          <div className="print-hide rounded-2xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-fg">College comparison</h2>
+                <p className="text-xs text-muted">Max 5 colleges and 5 interests. Short cells. Dates as MM/DD/YY from school sites when known.</p>
+              </div>
+              <Button disabled={busy} onClick={() => void runCompare()}>
+                {busy ? "Building…" : "Compare"}
+              </Button>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs text-muted">Colleges</p>
+                {colleges.map((v, i) => (
+                  <input
+                    key={`c-${i}`}
+                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    placeholder={`College ${i + 1}`}
+                    value={v}
+                    onChange={(e) => setColleges(colleges.map((x, idx) => (idx === i ? e.target.value : x)))}
+                  />
+                ))}
+              </div>
+              <div>
+                <p className="mb-1 text-xs text-muted">Areas of interest</p>
+                {interests.map((v, i) => (
+                  <input
+                    key={`i-${i}`}
+                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    placeholder={`Interest ${i + 1}`}
+                    value={v}
+                    onChange={(e) => setInterests(interests.map((x, idx) => (idx === i ? e.target.value : x)))}
+                  />
+                ))}
+              </div>
+            </div>
+            {error && <p className="text-sm text-red">{error}</p>}
+          </div>
+
+          {rows.length > 0 && (
+            <section className="overflow-x-auto rounded-2xl border border-border bg-card p-3">
+              <div className="print-hide mb-2 flex justify-end">
+                <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+                  Print landscape / save PDF
+                </Button>
+              </div>
+              <h3 className="text-base font-semibold text-fg">{comparison?.title}</h3>
+              {comparison?.disclaimer && <p className="text-[11px] text-muted">{comparison.disclaimer}</p>}
+              <table className="mt-2 w-full min-w-[980px] border-collapse text-left text-[12px] leading-snug">
+                <thead>
+                  <tr className="border-b border-border bg-bg/70">
+                    {["College", "Admissions", "Scholarships", "Orient. / housing", "Interest fit", "Jobs", "Area", "Lean", "Income", "Weather", "Safety (campus + city)"].map((h) => (
+                      <th key={h} className="px-2 py-2 font-semibold text-fg">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.name} className="border-b border-border align-top">
+                      <td className="px-2 py-2 font-medium">
+                        {r.name}
+                        {r.location ? <div className="text-[11px] font-normal text-muted">{r.location}</div> : null}
+                      </td>
+                      <td className="px-2 py-2">{r.admissions}</td>
+                      <td className="px-2 py-2">{r.scholarships}</td>
+                      <td className="px-2 py-2">{r.orientationHousing}</td>
+                      <td className="px-2 py-2">{r.interestFit}</td>
+                      <td className="px-2 py-2">{r.jobs}</td>
+                      <td className="px-2 py-2">{r.area}</td>
+                      <td className="px-2 py-2">{r.lean}</td>
+                      <td className="px-2 py-2">{r.income}</td>
+                      <td className="px-2 py-2">{r.weather}</td>
+                      <td className="px-2 py-2">{r.safety}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+        </div>
+      </AppShell>
+    );
   }
 
   if (open) {
@@ -465,113 +565,14 @@ function StudentTestPrepPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setCompareOpen((v) => !v)}>
+            <Button onClick={() => setAdding(true)}>Add New Prep</Button>
+            <Button variant="secondary" onClick={() => setCompareOpen(true)}>
               College comparison
             </Button>
-            <Button onClick={() => setAdding(true)}>Add card</Button>
           </div>
         </div>
 
         
-        {compareOpen && (
-          <div className="print:hidden rounded-2xl border border-border bg-card p-4">
-            <h3 className="font-semibold text-fg">College comparison</h3>
-            <p className="mt-1 text-xs text-muted">Up to 5 colleges and 5 areas of interest.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className="mb-1 text-xs text-muted">Colleges</p>
-                {colleges.map((v, i) => (
-                  <input
-                    key={`c-${i}`}
-                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
-                    placeholder={`College ${i + 1}`}
-                    value={v}
-                    onChange={(e) => setColleges(colleges.map((x, idx) => (idx === i ? e.target.value : x)))}
-                  />
-                ))}
-              </div>
-              <div>
-                <p className="mb-1 text-xs text-muted">Areas of interest</p>
-                {interests.map((v, i) => (
-                  <input
-                    key={`i-${i}`}
-                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
-                    placeholder={`Interest ${i + 1}`}
-                    value={v}
-                    onChange={(e) => setInterests(interests.map((x, idx) => (idx === i ? e.target.value : x)))}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mt-2 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setCompareOpen(false)}>
-                Close
-              </Button>
-              <Button disabled={busy} onClick={() => void runCompare()}>
-                {busy ? "Building…" : "Compare"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {comparison?.colleges && comparison.colleges.length > 0 && (
-          <section className="overflow-x-auto rounded-2xl border border-border bg-card p-4">
-            <div className="print:hidden mb-3 flex justify-end">
-              <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
-                Print / save PDF
-              </Button>
-            </div>
-            <h3 className="text-lg font-semibold text-fg">{comparison.title || "College comparison"}</h3>
-            {comparison.disclaimer && <p className="mt-1 text-xs text-muted">{comparison.disclaimer}</p>}
-            <table className="mt-4 w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-border bg-bg/60">
-                  <th className="px-3 py-2 font-semibold"> </th>
-                  {comparison.colleges.map((c) => (
-                    <th key={c.name} className="px-3 py-2 font-semibold text-fg">
-                      {c.name}
-                      {c.location ? <div className="text-[11px] font-normal text-muted">{c.location}</div> : null}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ["Admissions", "admissions"],
-                  ["Scholarships", "scholarships"],
-                  ["Orientation & housing", "orientationHousing"],
-                  ["Fit for your interests", "interestFit"],
-                  ["Post-grad & jobs", "postGrad"],
-                  ["Area (food, activities)", "area"],
-                ].map(([label, key]) => (
-                  <tr key={key} className="border-b border-border align-top">
-                    <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-muted">{label}</td>
-                    {comparison.colleges!.map((c) => (
-                      <td key={c.name + key} className="px-3 py-2">
-                        <ul className="list-disc pl-4">
-                          {((c as Record<string, unknown>)[key] as string[] | undefined)?.map((x) => (
-                            <li key={x}>{x}</li>
-                          ))}
-                        </ul>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr className="align-top">
-                  <td className="px-3 py-2 text-xs font-semibold text-muted">Atmosphere</td>
-                  {comparison.colleges.map((c) => (
-                    <td key={c.name + "atm"} className="px-3 py-2 text-sm">
-                      <p><span className="font-medium">Campus lean:</span> {c.atmosphere?.politicalLean}</p>
-                      <p><span className="font-medium">Area income:</span> {c.atmosphere?.incomeMix}</p>
-                      <p><span className="font-medium">Weather:</span> {c.atmosphere?.weather}</p>
-                      <p><span className="font-medium">Safety:</span> {c.atmosphere?.safety}</p>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </section>
-        )}
         {adding && (
           <div className="rounded-2xl border border-border bg-card p-4">
             <label className="block text-xs text-muted">
