@@ -1893,6 +1893,7 @@ export const generateStudentTestPrepPlan = createServerFn({ method: "POST" })
       testName: string;
       educationLevel?: string;
       collegeClass?: string;
+      studentGrade?: string;
       state?: string;
       today?: string;
       createdAt?: string;
@@ -1923,7 +1924,7 @@ If it is a named exam (ACT, GRE, NCLEX, etc.), follow exam-coverage rules instea
 
 Student Test Prep / exam rules when NOT Real World:
 
-Student: education level=${data.educationLevel || "unspecified"}, classification=${data.collegeClass || "n/a"}, state=${data.state || "n/a"}.
+Student: education level=${data.educationLevel || "unspecified"}, grade=${data.studentGrade || "n/a"}, classification=${data.collegeClass || "n/a"}, state=${data.state || "n/a"}.
 Today=${today}. Track started=${data.createdAt || "unknown"}. Already checked=${data.checkedCount ?? 0}.
 
 Draw from typical official outlines and well-known prep sources (ETS, College Board, LSAC, AAMC, NCSBN, NCEES, ATI). Do not invent statutes. Label outside material as outside.
@@ -1947,7 +1948,7 @@ Return ONLY JSON:
 10-16 topics.`;
 
     const user = `Exam: ${data.testName}
-Level: ${data.educationLevel || ""} ${data.collegeClass || ""}
+Level: ${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""}
 State: ${data.state || ""}
 Today: ${today}
 Started: ${data.createdAt || ""}
@@ -1994,13 +1995,14 @@ export const generateStudentTestPrepLesson = createServerFn({ method: "POST" })
       testName: string;
       educationLevel?: string;
       collegeClass?: string;
+      studentGrade?: string;
       state?: string;
       topic: string;
     }) => input,
   )
   .handler(async ({ data }) => {
     const key = apiKey();
-    const level = `${data.educationLevel || ""} ${data.collegeClass || ""}`.trim();
+    const level = `${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""}`.trim();
     const system = `Write a STUDENT-ONLY Practicum sheet for ${data.testName}, topic: ${data.topic}.
 No teacher guide.
 

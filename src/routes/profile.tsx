@@ -9,7 +9,7 @@ import { getProfile, saveProfile } from "@/lib/data";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
 import type { ChildGender, EducationApproach, UserProfile, UserRole } from "@/lib/types";
-import { COLLEGE_CLASSES, EDUCATION_APPROACHES, EDUCATION_LEVELS, US_STATES, type CollegeClass, type EducationLevel } from "@/lib/types";
+import { COLLEGE_CLASSES, EDUCATION_APPROACHES, EDUCATION_LEVELS, STUDENT_GRADES, US_STATES, type CollegeClass, type EducationLevel, type StudentGrade } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -24,6 +24,7 @@ function ProfilePage() {
   const [usState, setUsState] = useState("");
   const [educationLevel, setEducationLevel] = useState<EducationLevel | "">("");
   const [collegeClass, setCollegeClass] = useState<CollegeClass | "">("");
+  const [studentGrade, setStudentGrade] = useState<StudentGrade | "">("");
   const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState<UserRole>("student");
   const [forChild, setForChild] = useState(false);
@@ -65,6 +66,7 @@ function ProfilePage() {
       setUsState(p.state || "");
       setEducationLevel(p.educationLevel || "");
       setCollegeClass(p.collegeClass || "");
+      setStudentGrade(p.studentGrade || "");
       setAvatar(p.avatarDataUrl || "");
       setRole(p.role === "both" ? "student" : p.role);
       setForChild(Boolean(p.forChild));
@@ -90,6 +92,7 @@ function ProfilePage() {
       state: usState || null,
       educationLevel: educationLevel || null,
       collegeClass: educationLevel === "College/Undergraduate" ? collegeClass || null : null,
+      studentGrade: ["Elementary","Middle School","Junior High","High School"].includes(educationLevel) ? studentGrade || null : null,
       paletteId,
       customSchoolName: customName,
       avatarDataUrl: avatar,
@@ -349,6 +352,24 @@ function ProfilePage() {
               ))}
             </select>
           </div>
+          {["Elementary","Middle School","Junior High","High School"].includes(educationLevel) && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Grade</label>
+              <select
+                className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+                value={studentGrade}
+                onChange={(e) => setStudentGrade(e.target.value as StudentGrade | "")}
+              >
+                <option value="">Select grade</option>
+                {STUDENT_GRADES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted">Used by Practicum for pace and Real World tasks.</p>
+            </div>
+          )}
           {educationLevel === "College/Undergraduate" && (
             <div>
               <label className="mb-1 block text-xs text-muted">Classification</label>

@@ -58,7 +58,9 @@ function StudentTestPrepPage() {
   const [newTest, setNewTest] = useState("ACT");
   const [level, setLevel] = useState("");
   const [klass, setKlass] = useState("");
+  const [grade, setGrade] = useState("");
   const [stateName, setStateName] = useState("");
+  const [showList, setShowList] = useState(true);
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,14 +70,26 @@ function StudentTestPrepPage() {
     void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
       setLevel(profile.educationLevel || "");
       setKlass(profile.collegeClass || "");
+      setGrade(profile.studentGrade || "");
       setStateName(profile.state || "");
       const remote = Array.isArray(tools?.studentTestPrep) ? (tools!.studentTestPrep as Track[]) : [];
-      setTracks(remote);
+      let local: Track[] = [];
+      try {
+        local = JSON.parse(localStorage.getItem("studious-practicum-tracks") || "[]") as Track[];
+      } catch {
+        local = [];
+      }
+      setTracks(remote.length ? remote : local);
     });
   }, []);
 
   function persist(next: Track[]) {
     setTracks(next);
+    try {
+      localStorage.setItem("studious-practicum-tracks", JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
     void saveTeacherToolState({ data: { studentTestPrep: next } }).catch(() => {});
   }
 
@@ -100,6 +114,7 @@ function StudentTestPrepPage() {
           testName: track.testName,
           educationLevel: level,
           collegeClass: klass,
+          studentGrade: grade,
           state: stateName,
           today: new Date().toISOString().slice(0, 10),
           createdAt: track.createdAt,
@@ -118,6 +133,30 @@ function StudentTestPrepPage() {
     persist(tracks.map((t) => (t.id === id ? { ...t, ...partial } : t)));
   }
 
+  async function refreshNamed(track: Track) {
+    setBusy(true);
+    setError(null);
+    try {
+      const plan = (await generateStudentTestPrepPlan({
+        data: {
+          testName: track.testName,
+          educationLevel: level,
+          collegeClass: klass,
+          studentGrade: grade,
+          state: stateName,
+          today: new Date().toISOString().slice(0, 10),
+          createdAt: track.createdAt,
+          checkedCount: Object.values(track.checked).filter(Boolean).length,
+        },
+      })) as Plan;
+      persist(tracks.map((x) => (x.id === track.id ? { ...x, plan, lastRefreshed: new Date().toISOString() } : x)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not refresh");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refreshOpen() {
     if (!open) return;
     setBusy(true);
@@ -128,6 +167,7 @@ function StudentTestPrepPage() {
           testName: open.testName,
           educationLevel: level,
           collegeClass: klass,
+          studentGrade: grade,
           state: stateName,
           today: new Date().toISOString().slice(0, 10),
           createdAt: open.createdAt,
@@ -151,11 +191,13 @@ function StudentTestPrepPage() {
           testName: track.testName,
           educationLevel: level,
           collegeClass: klass,
+          studentGrade: grade,
           state: stateName,
           topic: `${topic.label}${topic.detail ? ` — ${topic.detail}` : ""}`,
         },
       })) as Sheet;
       setSheet(result);
+      setShowList(false);
       updateTrack(track.id, {
         checked: { ...track.checked, [topic.id]: true },
         log: [
@@ -181,7 +223,7 @@ function StudentTestPrepPage() {
             <div>
               <h2 className="text-xl font-semibold text-fg">{open.testName}</h2>
               <p className="text-sm text-muted">
-                {[level, klass, stateName].filter(Boolean).join(" · ") || "Set education level in Profile"}
+                {[level, grade, klass, stateName].filter(Boolean).join(" · ") || "Set education level and grade in Profile"}
               </p>
             </div>
             <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusClass(open.plan?.status)}`}>
@@ -194,7 +236,14 @@ function StudentTestPrepPage() {
               {busy ? "Refreshing…" : "Refresh plan"}
             </Button>
           </div>
-          {open.plan && (
+          {sheet && (
+            <div className="print:hidden flex justify-end">
+              <Button variant="secondary" className="text-xs" onClick={() => setShowList((v) => !v)}>
+                {showList ? "Hide checklist" : "Show checklist"}
+              </Button>
+            </div>
+          )}
+          {open.plan && showList && (
             <section className="rounded-2xl border border-border bg-card p-5">
               <p className="text-sm text-muted">{open.plan.windowNote}</p>
               {open.plan.statusWhy && <p className="mt-2 text-sm">{open.plan.statusWhy}</p>}
@@ -407,11 +456,15 @@ function StudentTestPrepPage() {
                 className="cursor-pointer rounded-2xl border border-border bg-card p-4 hover:border-teal"
                 onClick={() => {
                   setSheet(null);
+                  setShowList(true);
                   setOpenId(track.id);
                 }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-fg">{track.testName}</h3>
+                  <div>
+                    <h3 className="font-semibold text-fg">{track.testName}</h3>
+                    <p className="text-xs text-muted">{[level, grade, klass].filter(Boolean).join(" · ") || "Set grade in Profile"}</p>
+                  </div>
                   {track.plan?.status && (
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(track.plan.status)}`}>
                       {track.plan.status}
@@ -422,13 +475,38 @@ function StudentTestPrepPage() {
                   <div className="h-full bg-teal" style={{ width: `${pct}%` }} />
                 </div>
                 <p className="mt-1 text-[11px] text-muted">
-                  {topics.length ? `${done}/${topics.length} covered` : "Open to load plan"}
-                  {track.log.length ? ` · ${track.log.length} sheet(s)` : ""}
+                  {topics.length ? `${done}/${topics.length} covered` : "No plan yet"}
+                  {track.log.length ? ` · ${track.log.length} lesson(s)` : ""}
                 </p>
-                <p className="mt-2 text-[11px] text-muted">
-                  {stale ? "⚠️ " : ""}
-                  {track.lastRefreshed ? `Refreshed ${new Date(track.lastRefreshed).toLocaleDateString()}` : "Not loaded yet"}
-                </p>
+                <div className="mt-3 flex items-end justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                  <p className="flex items-center gap-1 text-[11px] text-muted">
+                    {stale && <span title="Plan older than 30 days">⚠️</span>}
+                    {track.lastRefreshed ? `Refreshed ${new Date(track.lastRefreshed).toLocaleDateString()}` : "Never refreshed"}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="text-xs"
+                      disabled={busy}
+                      onClick={() => {
+                        setOpenId(track.id);
+                        void refreshNamed(track);
+                      }}
+                    >
+                      Refresh plan
+                    </Button>
+                    <Button
+                      className="text-xs"
+                      onClick={() => {
+                        setSheet(null);
+                        setShowList(true);
+                        setOpenId(track.id);
+                      }}
+                    >
+                      Checklist
+                    </Button>
+                  </div>
+                </div>
               </article>
             );
           })}

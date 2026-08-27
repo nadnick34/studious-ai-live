@@ -216,6 +216,7 @@ export interface UserProfile {
   state?: string | null;
   educationLevel?: EducationLevel | null;
   collegeClass?: CollegeClass | null;
+  studentGrade?: StudentGrade | null;
   paletteId?: string | null;
   customSchoolName?: string | null;
   schoolLogoUrl?: string | null;
@@ -492,6 +493,12 @@ export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
 
 export const COLLEGE_CLASSES = ["Freshman", "Sophomore", "Junior", "Senior"] as const;
 export type CollegeClass = (typeof COLLEGE_CLASSES)[number];
+
+export const STUDENT_GRADES = [
+  "Kindergarten","1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th","11th","12th",
+] as const;
+export type StudentGrade = (typeof STUDENT_GRADES)[number];
+
 
 export const STUDENT_TEST_GROUPS: { group: string; tests: string[] }[] = [
   { group: "Life", tests: ["Real World"] },
