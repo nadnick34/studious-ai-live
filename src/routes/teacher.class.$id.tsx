@@ -10,7 +10,7 @@ import {
   getTeacherClassById,
   getTeacherClassStats,
   listTeacherAssessments,
-  remapResultsToRoster,
+  upsertTeacherAssessmentResult,
 } from "@/lib/data";
 import {
   ASSESSMENT_TYPES,
@@ -29,6 +29,7 @@ type RosterRow = {
   name: string;
   average: number;
   lastQuiz: number | null;
+  testCount: number;
   status: string;
 };
 
@@ -71,6 +72,8 @@ type MissingRow = {
   rosterName: string;
   action: "skip" | "absent" | "manual";
   manualScore: string;
+  missed: string;
+  focus: string;
 };
 
 function statusStyle(status: string) {
@@ -109,6 +112,10 @@ function TeacherClassPage() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [soloFiles, setSoloFiles] = useState<CapturedFile[]>([]);
+  const [soloName, setSoloName] = useState("");
+  const [soloAttachId, setSoloAttachId] = useState("");
+  const [showSolo, setShowSolo] = useState(false);
   const [pending, setPending] = useState<{
     graded: Record<string, unknown>;
     scans: ScanRow[];
@@ -266,7 +273,7 @@ function TeacherClassPage() {
       const used = new Set(scans.filter((s) => s.rosterName).map((s) => normName(s.rosterName)));
       const missing: MissingRow[] = rosterNames
         .filter((n) => !used.has(normName(n)))
-        .map((rosterName) => ({ rosterName, action: "skip", manualScore: "" }));
+        .map((rosterName) => ({ rosterName, action: "skip", manualScore: "", missed: "", focus: "" }));
 
       setPending({
         graded: graded as Record<string, unknown>,
@@ -302,14 +309,20 @@ function TeacherClassPage() {
         if (row.action !== "manual") continue;
         const score = Math.max(0, Math.min(100, Number(row.manualScore)));
         if (!Number.isFinite(score)) continue;
+        const missedItems = (row.missed || "")
+          .split(/[,;]+/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((n) => ({ questionNumber: n.replace(/^#/, ""), question: `Question ${n}`, correct: "" }));
+        const focus = [row.focus, "Score entered manually — test page was not in the batch"].filter(Boolean) as string[];
         results.push({
           studentName: row.rosterName,
           score,
           pointsEarned: score,
           pointsPossible: Number(gPoints) || 100,
           status: score >= 90 ? "Strong" : score >= 75 ? "On Track" : score >= 60 ? "Needs Support" : "At Risk",
-          missed: [],
-          focusAreas: ["Score entered manually — test page was not in the batch"],
+          missed: missedItems,
+          focusAreas: focus,
           studyTips: [],
         });
       }
@@ -353,6 +366,79 @@ function TeacherClassPage() {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runSoloGrade() {
+    if (!cls || !selectedName) return;
+    if (!soloFiles.length) {
+      setError("Upload this student's test (and the key if you have it).");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setStatus("Reading this student's test…");
+    try {
+      const payloads = await capturedToPayloads(soloFiles);
+      const extracted = await extractMaterials({ data: { files: payloads } });
+      const name = soloName.trim() || `Individual — ${selectedName}`;
+      const graded = await gradeTeacherAssessment({
+        data: {
+          schoolType: cls.schoolType,
+          subject: cls.subject,
+          gradeLevel: cls.gradeLevel,
+          courseLevel: cls.courseLevel,
+          schoolName: cls.schoolName,
+          assessmentName: name,
+          assessmentType: "Quiz",
+          topics: "Individual makeup / missing page",
+          pointsPossible: Number(gPoints) || 100,
+          rosterNames: [selectedName],
+          extractedText: `STUDENT: ${selectedName}\n\n${extracted.text || ""}`,
+        },
+      });
+      const raw = Array.isArray(graded.results) ? graded.results : [];
+      const hit =
+        raw.find((r: StudentResult) => r.studentName.toLowerCase() === selectedName.toLowerCase()) ||
+        raw[0];
+      if (!hit) throw new Error("Could not grade this student's pages. Try a clearer scan.");
+      const result: StudentResult = { ...hit, studentName: selectedName };
+      if (soloAttachId) {
+        await upsertTeacherAssessmentResult({ data: { assessmentId: soloAttachId, result } });
+      } else {
+        await createTeacherAssessment({
+          data: {
+            classId: id,
+            name,
+            type: "Quiz",
+            topics: "Individual makeup",
+            pointsPossible: Number(gPoints) || 100,
+            sourceFiles: soloFiles.map((f) => f.file.name),
+            classAverage: result.score,
+            topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
+            strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
+            needs: Array.isArray(graded.needs) ? graded.needs : [],
+            results: [result],
+            questions: Array.isArray((graded as { questions?: unknown }).questions)
+              ? (graded as { questions: NonNullable<TeacherAssessment["questions"]> }).questions
+              : [],
+          },
+        });
+      }
+      await applyAssessmentResultsToRoster({
+        data: { classId: id, results: [{ studentName: selectedName, score: result.score }] },
+      });
+      setSoloFiles([]);
+      setSoloName("");
+      setSoloAttachId("");
+      setShowSolo(false);
+      await reload();
+      setStatus("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not grade this test");
       setStatus("");
     } finally {
       setBusy(false);
@@ -685,6 +771,28 @@ function TeacherClassPage() {
                       }
                     />
                   )}
+                  <input
+                    className="min-w-40 flex-1 rounded-lg border border-border px-2 py-1 text-sm"
+                    placeholder="Missed #s (e.g. 2, 4, 5)"
+                    value={row.missed}
+                    onChange={(e) =>
+                      setPending({
+                        ...pending,
+                        missing: pending.missing.map((m, idx) => (idx === i ? { ...m, missed: e.target.value } : m)),
+                      })
+                    }
+                  />
+                  <input
+                    className="min-w-40 flex-1 rounded-lg border border-border px-2 py-1 text-sm"
+                    placeholder="Focus / notes"
+                    value={row.focus}
+                    onChange={(e) =>
+                      setPending({
+                        ...pending,
+                        missing: pending.missing.map((m, idx) => (idx === i ? { ...m, focus: e.target.value } : m)),
+                      })
+                    }
+                  />
                 </li>
               ))}
             </ul>
@@ -827,6 +935,56 @@ function TeacherClassPage() {
                   ))}
                 </ul>
               </div>
+            </div>
+            <div className="mb-4 rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-fg">Individual test</h3>
+                <Button variant="secondary" className="text-xs" onClick={() => setShowSolo((v) => !v)}>
+                  {showSolo ? "Close" : "Upload / grade this student"}
+                </Button>
+              </div>
+              {showSolo && (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-muted">
+                    Use this when this student was missing from a batch. Upload their pages (and the key if needed).
+                    Attach to an existing quiz or save as a new one.
+                  </p>
+                  <label className="block text-xs text-muted">
+                    New assessment name
+                    <input
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                      value={soloName}
+                      onChange={(e) => setSoloName(e.target.value)}
+                      placeholder={`Makeup — ${selectedName}`}
+                      disabled={busy}
+                    />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Or add to existing
+                    <select
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                      value={soloAttachId}
+                      onChange={(e) => setSoloAttachId(e.target.value)}
+                      disabled={busy}
+                    >
+                      <option value="">Create new assessment</option>
+                      {assessments.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <CaptureBar items={soloFiles} onChange={setSoloFiles} disabled={busy} />
+                  {status && <p className="text-xs text-teal">{status}</p>}
+                  {error && <p className="text-sm text-red">{error}</p>}
+                  <div className="flex justify-end">
+                    <Button disabled={busy} onClick={() => void runSoloGrade()}>
+                      {busy ? "Grading…" : "Grade and add to student"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-card">
               <div className="border-b border-border px-4 py-3">
@@ -1087,6 +1245,7 @@ function TeacherClassPage() {
                 <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
                   <th className="px-4 py-2.5 font-semibold">Student</th>
                   <th className="px-4 py-2.5 font-semibold">Avg</th>
+                  <th className="px-4 py-2.5 font-semibold">Tests</th>
                   <th className="px-4 py-2.5 font-semibold">Last quiz</th>
                   <th className="px-4 py-2.5 font-semibold">Status</th>
                 </tr>
@@ -1104,6 +1263,11 @@ function TeacherClassPage() {
                   >
                     <td className="px-4 py-3 font-medium text-teal">{s.name}</td>
                     <td className="px-4 py-3">{s.average}%</td>
+                    <td className="px-4 py-3">
+                      <span className={(s.testCount || 0) < stats.assessmentCount ? "font-semibold text-amber-700" : ""}>
+                        {s.testCount || 0}/{stats.assessmentCount}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">{s.lastQuiz != null ? `${s.lastQuiz}%` : "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(s.status)}`}>

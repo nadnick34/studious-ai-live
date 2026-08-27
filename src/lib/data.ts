@@ -1488,6 +1488,7 @@ export const getTeacherClassStats = createServerFn({ method: "GET" })
         name: s.name,
         average: avg,
         lastQuiz,
+        testCount: scores.length,
         status,
       };
     });
@@ -1501,7 +1502,7 @@ export const getTeacherClassStats = createServerFn({ method: "GET" })
         else if (avg >= 75) status = "On Track";
         else if (avg >= 60) status = "Needs Support";
         else status = "At Risk";
-        roster.push({ id: name, name, average: avg, lastQuiz, status });
+        roster.push({ id: name, name, average: avg, lastQuiz, testCount: scores.length, status });
       }
       roster.sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -1679,4 +1680,38 @@ export const listAllTeacherAssessments = createServerFn({ method: "GET" })
       order by created_at desc limit 50
     `;
     return rows.map(mapTeacherAssessment);
+  });
+
+
+export const upsertTeacherAssessmentResult = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      assessmentId: string;
+      result: StudentResult;
+    }) => input,
+  )
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await ensureTeacherTables(sql);
+    const rows = await sql<TeacherAssessmentRow>`
+      select * from teacher_assessments
+      where id = ${data.assessmentId} and user_id = ${context.userId}
+      limit 1
+    `;
+    if (!rows[0]) throw new Error("Assessment not found.");
+    const cur = mapTeacherAssessment(rows[0]);
+    const name = data.result.studentName;
+    const rest = (cur.results || []).filter((r) => r.studentName.toLowerCase() !== name.toLowerCase());
+    const results = [...rest, data.result];
+    const classAverage = results.length
+      ? Math.round(results.reduce((s, r) => s + Number(r.score || 0), 0) / results.length)
+      : cur.classAverage;
+    await sql`
+      update teacher_assessments
+      set results = ${JSON.stringify(results)}::jsonb,
+          class_average = ${classAverage}
+      where id = ${data.assessmentId} and user_id = ${context.userId}
+    `;
+    return { ...cur, results, classAverage };
   });
