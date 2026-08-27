@@ -73,7 +73,7 @@ function AppShellInner({
   const name = user?.displayName || profile?.displayName || "Student";
 
   return (
-    <div className="flex min-h-dvh bg-bg">
+    <div className="flex min-h-dvh overflow-x-hidden bg-bg">
       <Sidebar
         userName={name}
         avatar={user?.profileImageUrl || profile?.avatarDataUrl}
@@ -96,15 +96,6 @@ function AppShellInner({
           </div>
           <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">
             {right}
-            <button
-              type="button"
-              onClick={() => void signOut("/")}
-              className="grid size-10 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg sm:hidden"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="size-5" />
-            </button>
           </div>
         </header>
         {title && (
@@ -112,7 +103,7 @@ function AppShellInner({
             <h1 className="text-base font-semibold text-fg">{title}</h1>
           </div>
         )}
-        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-8">{children}</main>
       </div>
       <BottomNav role={profile?.role} />
     </div>

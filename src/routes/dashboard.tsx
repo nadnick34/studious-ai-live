@@ -206,19 +206,37 @@ function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {classes.map((c) => (
-            <div key={c.id} className="card-surface relative rounded-xl p-4">
-              <Link to="/class/$id" params={{ id: c.id }} className="block pr-2">
-                <div className="mb-1 text-xs font-semibold text-teal">{c.code}</div>
-                <div className="mb-1 pr-20 font-semibold text-fg">{c.name}</div>
-                <div className="space-y-0.5 text-xs text-muted">
-                  {c.subject && <div>{c.subject}</div>}
-                  {c.professorName && <div>Prof. {c.professorName}</div>}
+            <div key={c.id} className="card-surface min-w-0 overflow-hidden rounded-xl p-4">
+              <div className="mb-2 flex items-start justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={(e) => openEdit(c, e)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-md border border-teal bg-card px-2 text-[11px] font-medium text-teal"
+                >
+                  <Pencil className="size-3" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => void handleArchive(c, e)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-[11px] text-muted"
+                >
+                  <Archive className="size-3" />
+                  Archive
+                </button>
+              </div>
+              <Link to="/class/$id" params={{ id: c.id }} className="block min-w-0">
+                <div className="mb-1 break-words text-xs font-semibold text-teal">{c.code}</div>
+                <div className="mb-1 break-words font-semibold text-fg">{c.name}</div>
+                <div className="space-y-0.5 break-words text-xs text-muted">
+                  {c.subject && <div className="break-words">{c.subject}</div>}
+                  {c.professorName && <div className="break-words">Prof. {c.professorName}</div>}
                   {(c.scheduleDays || c.scheduleTime) && (
-                    <div>{[c.scheduleDays, c.scheduleTime].filter(Boolean).join(" · ")}</div>
+                    <div className="break-words">{[c.scheduleDays, c.scheduleTime].filter(Boolean).join(" · ")}</div>
                   )}
-                  {c.semester && <div>{c.semester}</div>}
+                  {c.semester && <div className="break-words">{c.semester}</div>}
                 </div>
                 {(() => {
                   const upcoming = c.upcoming || [];
@@ -242,8 +260,8 @@ function DashboardPage() {
                     <div className="mb-1 text-[10px] font-semibold tracking-wide text-teal uppercase">Upcoming</div>
                     <ul className="space-y-1">
                       {c.upcoming.slice(0, 4).map((u) => (
-                        <li key={u.id} className="flex justify-between gap-2 text-[11px] text-fg">
-                          <span className="truncate">
+                        <li key={u.id} className="flex min-w-0 items-start justify-between gap-2 text-[11px] text-fg">
+                          <span className="min-w-0 break-words">
                             <span className="text-muted capitalize">{u.type}</span>
                             {" · "}
                             {u.title}
@@ -256,24 +274,6 @@ function DashboardPage() {
                 )}
                 <div className="mt-3 text-[10px] text-muted">Last opened {timeAgo(c.lastAccessed)}</div>
               </Link>
-              <div className="absolute top-3 right-3 flex gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => openEdit(c, e)}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-teal bg-card px-2.5 text-[11px] font-medium text-teal"
-                >
-                  <Pencil className="size-3" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => void handleArchive(c, e)}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-[11px] text-muted"
-                >
-                  <Archive className="size-3" />
-                  Archive
-                </button>
-              </div>
             </div>
           ))}
         </div>
