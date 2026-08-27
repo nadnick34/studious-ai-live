@@ -1571,11 +1571,17 @@ Adapt item types to SUBJECT:
 - Mixed: include a Vocabulary Fill-in-the-Blank section (terms from the sources) PLUS other item types suited to the subject.
 
 STUDY GUIDE rules:
-- Do NOT include practice questions, quizzes, or an answer key.
-- Order: Title/school/subject → Narrative → Key Terms/Vocabulary table → outline sections → Key Dates table → Additional Resources (aligned sources + YouTube).
+- Do NOT include practice questions, quizzes, or an answer key (worked examples are not a quiz).
+- Order: Title/school/subject → Narrative → Key Terms/Vocabulary table → Worked examples (math) or outline sections → Key Dates table (only if dates exist) → Additional Resources.
 - First section after the title block MUST be "Narrative": one tight summary paragraph (two at most) that retells the story/argument of the uploaded material. Not bullets. Not questions.
-- Key Dates only if the sources support dates; otherwise a short "Chronology / Sequence" list.
+- Key Dates only if the sources support dates; skip the table for pure skill math.
 - No student-name line and no date-blank line on a study guide.
+
+MATH / quantitative study guides (Algebra, Geometry, Pre-Algebra, Calculus, Statistics, Arithmetic, Physics problem work):
+- Center the guide on DEFINITIONS of every operation, property, theorem, or problem type named in the sources or teacher comments.
+- For EACH type mentioned, include one fully worked EXAMPLE: given, steps, and final answer. Do not leave "try this" blanks.
+- Vocabulary table = the formal definitions. Worked examples = how that definition is used.
+- Narrative should name the skill family in plain language (what this unit trains the student to do).
 
 QUIZ / TEST / PRACTICE rules:
 - No vocabulary definition table.
@@ -1598,6 +1604,7 @@ Return ONLY JSON:
   "narrative": "string",
   "keyTerms": [{ "term": "string", "definition": "string" }],
   "guideSections": [{ "heading": "string", "bullets": ["string"] }],
+  "workedExamples": [{ "type": "string", "definition": "string", "problem": "string", "steps": ["string"], "answer": "string" }],
   "keyDates": [{ "date": "string", "event": "string" }],
   "questions": [{
     "number": 1,

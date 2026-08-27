@@ -28,6 +28,7 @@ type Packet = {
   keyTerms?: { term: string; definition: string }[];
   guideSections?: { heading: string; bullets: string[] }[];
   keyDates?: { date: string; event: string }[];
+  workedExamples?: { type: string; definition: string; problem: string; steps?: string[]; answer?: string }[];
   questions?: {
     number: number;
     type: string;
@@ -469,6 +470,43 @@ function PacketView({
               ))}
             </tbody>
           </table>
+        </section>
+      )}
+
+      
+      {!isAssess && !!packet.workedExamples?.length && (
+        <section className="mb-5 space-y-4">
+          <h4 className="text-sm font-semibold text-fg">Definitions and worked examples</h4>
+          {packet.workedExamples.map((ex, i) => (
+            <div key={`${ex.type}-${i}`} className="rounded-xl border border-border p-4">
+              <p className="font-semibold text-fg">{ex.type}</p>
+              {ex.definition && (
+                <p className="mt-1 text-sm">
+                  <span className="font-medium">Definition. </span>
+                  {ex.definition}
+                </p>
+              )}
+              {ex.problem && (
+                <p className="mt-2 text-sm">
+                  <span className="font-medium">Example. </span>
+                  {ex.problem}
+                </p>
+              )}
+              {!!ex.steps?.length && (
+                <ol className="mt-1 list-decimal pl-5 text-sm">
+                  {ex.steps.map((st, j) => (
+                    <li key={j}>{st}</li>
+                  ))}
+                </ol>
+              )}
+              {ex.answer && (
+                <p className="mt-1 text-sm">
+                  <span className="font-medium">Answer. </span>
+                  {ex.answer}
+                </p>
+              )}
+            </div>
+          ))}
         </section>
       )}
 
