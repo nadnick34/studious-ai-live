@@ -214,6 +214,8 @@ export interface UserProfile {
   schoolSelect: string;
   educationApproach?: EducationApproach | null;
   state?: string | null;
+  educationLevel?: EducationLevel | null;
+  collegeClass?: CollegeClass | null;
   paletteId?: string | null;
   customSchoolName?: string | null;
   schoolLogoUrl?: string | null;
@@ -475,6 +477,30 @@ export const TEST_FOCUS_OPTIONS = [
   "State summative",
 ] as const;
 export type TestFocus = (typeof TEST_FOCUS_OPTIONS)[number];
+
+export const EDUCATION_LEVELS = [
+  "Elementary",
+  "Middle School",
+  "Junior High",
+  "High School",
+  "College/Undergraduate",
+  "Graduate School",
+  "Medical School",
+  "Law School",
+] as const;
+export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
+
+export const COLLEGE_CLASSES = ["Freshman", "Sophomore", "Junior", "Senior"] as const;
+export type CollegeClass = (typeof COLLEGE_CLASSES)[number];
+
+export const STUDENT_TEST_GROUPS: { group: string; tests: string[] }[] = [
+  { group: "High school & middle grades", tests: ["ACT", "SAT", "PSAT", "PreACT", "CLT", "LEAP", "Iowa Assessments", "State summative"] },
+  { group: "College admissions & graduate", tests: ["GRE", "LSAT", "GMAT", "MCAT"] },
+  { group: "Health professions", tests: ["DAT", "OAT", "PCAT", "ATI TEAS", "HESI", "NLN NEX", "NCLEX-RN", "NCLEX-PN"] },
+  { group: "Engineering & licensure", tests: ["FE (Fundamentals of Engineering)", "PE (Principles and Practice of Engineering)", "Praxis"] },
+  { group: "Other common", tests: ["AP subject exam", "CLEP", "TOEFL", "IELTS"] },
+];
+
 
 
 export type SchoolType =

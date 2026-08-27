@@ -9,7 +9,7 @@ import { getProfile, saveProfile } from "@/lib/data";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
 import type { ChildGender, EducationApproach, UserProfile, UserRole } from "@/lib/types";
-import { EDUCATION_APPROACHES, US_STATES } from "@/lib/types";
+import { COLLEGE_CLASSES, EDUCATION_APPROACHES, EDUCATION_LEVELS, US_STATES, type CollegeClass, type EducationLevel } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -22,6 +22,8 @@ function ProfilePage() {
   const [schoolSelect, setSchoolSelect] = useState("studious");
   const [educationApproach, setEducationApproach] = useState<EducationApproach | "">("");
   const [usState, setUsState] = useState("");
+  const [educationLevel, setEducationLevel] = useState<EducationLevel | "">("");
+  const [collegeClass, setCollegeClass] = useState<CollegeClass | "">("");
   const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState<UserRole>("student");
   const [forChild, setForChild] = useState(false);
@@ -61,6 +63,8 @@ function ProfilePage() {
       setSchoolSelect(p.schoolSelect);
       setEducationApproach(p.educationApproach || "");
       setUsState(p.state || "");
+      setEducationLevel(p.educationLevel || "");
+      setCollegeClass(p.collegeClass || "");
       setAvatar(p.avatarDataUrl || "");
       setRole(p.role === "both" ? "student" : p.role);
       setForChild(Boolean(p.forChild));
@@ -84,6 +88,8 @@ function ProfilePage() {
       schoolSelect,
       educationApproach: educationApproach || null,
       state: usState || null,
+      educationLevel: educationLevel || null,
+      collegeClass: educationLevel === "College/Undergraduate" ? collegeClass || null : null,
       paletteId,
       customSchoolName: customName,
       avatarDataUrl: avatar,
@@ -328,6 +334,41 @@ function ProfilePage() {
               Used for Teacher Test Prep (LEAP, state summatives, and other required exams).
             </p>
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Education level</label>
+            <select
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+              value={educationLevel}
+              onChange={(e) => setEducationLevel(e.target.value as EducationLevel | "")}
+            >
+              <option value="">Not specified</option>
+              {EDUCATION_LEVELS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          {educationLevel === "College/Undergraduate" && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Classification</label>
+              <select
+                className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+                value={collegeClass}
+                onChange={(e) => setCollegeClass(e.target.value as CollegeClass | "")}
+              >
+                <option value="">Select year</option>
+                {COLLEGE_CLASSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted">
+                Sets Test Prep pace and how advanced the generated material is.
+              </p>
+            </div>
+          )}
           {schoolSelect === "custom" && (
             <div className={role === "professional" ? "opacity-50" : ""}>
               <label className="mb-1 block text-xs text-muted">Custom school name</label>

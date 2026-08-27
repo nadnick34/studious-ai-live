@@ -89,6 +89,8 @@ type ProfileRow = {
   kids_mode?: boolean;
   education_approach?: string | null;
   state?: string | null;
+  education_level?: string | null;
+  college_class?: string | null;
 };
 
 function emptyNotes(title: string): StudyNotes {
@@ -153,6 +155,8 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
       kidsMode: false,
       educationApproach: null,
       state: null,
+      educationLevel: null,
+      collegeClass: null,
     };
   }
   const childAge = row.child_age == null ? null : Number(row.child_age);
@@ -179,6 +183,8 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
     kidsMode,
     educationApproach: (row.education_approach as UserProfile["educationApproach"]) || null,
     state: row.state || null,
+    educationLevel: (row.education_level as UserProfile["educationLevel"]) || null,
+    collegeClass: (row.college_class as UserProfile["collegeClass"]) || null,
   };
 }
 
@@ -204,6 +210,8 @@ export const saveProfile = createServerFn({ method: "POST" })
     try {
       await sql.query(`alter table profiles add column if not exists education_approach text`);
       await sql.query(`alter table profiles add column if not exists state text`);
+      await sql.query(`alter table profiles add column if not exists education_level text`);
+      await sql.query(`alter table profiles add column if not exists college_class text`);
     } catch {
       /* ignore */
     }
@@ -211,13 +219,13 @@ export const saveProfile = createServerFn({ method: "POST" })
       insert into profiles (
         user_id, display_name, phone, sms_alerts, school_select, palette_id,
         custom_school_name, school_logo_url, avatar_data_url, role, edition, setup_complete,
-        for_child, child_age, child_gender, kids_mode, education_approach, state, updated_at
+        for_child, child_age, child_gender, kids_mode, education_approach, state, education_level, college_class, updated_at
       ) values (
         ${context.userId}, ${data.displayName ?? null}, ${data.phone}, ${data.smsAlerts},
         ${data.schoolSelect}, ${data.paletteId ?? null}, ${data.customSchoolName ?? null},
         ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${data.role},
         ${data.edition}, ${data.setupComplete},
-        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, ${data.state ?? null}, now()
+        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, ${data.state ?? null}, ${data.educationLevel ?? null}, ${data.collegeClass ?? null}, now()
       )
       on conflict (user_id) do update set
         display_name = excluded.display_name,
@@ -237,6 +245,8 @@ export const saveProfile = createServerFn({ method: "POST" })
         kids_mode = excluded.kids_mode,
         education_approach = excluded.education_approach,
         state = excluded.state,
+        education_level = excluded.education_level,
+        college_class = excluded.college_class,
         updated_at = now()
     `;
     return { ok: true as const };
@@ -1289,6 +1299,7 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       user_id text primary key,
       scriptorium_log jsonb not null default '[]'::jsonb,
       testprep_cards jsonb not null default '{}'::jsonb,
+      student_testprep jsonb not null default '[]'::jsonb,
       updated_at timestamptz not null default now()
     )`,
   ];
@@ -1733,13 +1744,14 @@ export const getTeacherToolState = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     await ensureTeacherTables(sql);
-    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown }>`
-      select scriptorium_log, testprep_cards from teacher_tool_state where user_id = ${context.userId} limit 1
+    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown }>`
+      select scriptorium_log, testprep_cards, student_testprep from teacher_tool_state where user_id = ${context.userId} limit 1
     `;
     const row = rows[0];
     return {
       scriptoriumLog: parseJson(row?.scriptorium_log, []),
       testPrepCards: parseJson(row?.testprep_cards, {}),
+      studentTestPrep: parseJson(row?.student_testprep, []),
     };
   });
 
@@ -1749,24 +1761,31 @@ export const saveTeacherToolState = createServerFn({ method: "POST" })
     (input: {
       scriptoriumLog?: unknown;
       testPrepCards?: unknown;
+      studentTestPrep?: unknown;
     }) => input,
   )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     await ensureTeacherTables(sql);
-    const cur = await sql<{ scriptorium_log: unknown; testprep_cards: unknown }>`
-      select scriptorium_log, testprep_cards from teacher_tool_state where user_id = ${context.userId} limit 1
+    const cur = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown }>`
+      select scriptorium_log, testprep_cards, student_testprep from teacher_tool_state where user_id = ${context.userId} limit 1
     `;
     const scriptoriumLog =
       data.scriptoriumLog !== undefined ? data.scriptoriumLog : parseJson(cur[0]?.scriptorium_log, []);
     const testPrepCards =
       data.testPrepCards !== undefined ? data.testPrepCards : parseJson(cur[0]?.testprep_cards, {});
+    const studentTestPrep =
+      data.studentTestPrep !== undefined ? data.studentTestPrep : parseJson(cur[0]?.student_testprep, []);
+    try {
+      await sql.query(`alter table teacher_tool_state add column if not exists student_testprep jsonb not null default '[]'::jsonb`);
+    } catch { /* ignore */ }
     await sql`
-      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, updated_at)
-      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, now())
+      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, student_testprep, updated_at)
+      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, ${JSON.stringify(studentTestPrep)}::jsonb, now())
       on conflict (user_id) do update set
         scriptorium_log = excluded.scriptorium_log,
         testprep_cards = excluded.testprep_cards,
+        student_testprep = excluded.student_testprep,
         updated_at = now()
     `;
     return { ok: true as const };

@@ -1885,3 +1885,158 @@ ${data.unchecked.map((x, i) => `${i + 1}. ${x}`).join("\n") || "(none listed)"}`
       return fallback;
     }
   });
+
+export const generateStudentTestPrepPlan = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      testName: string;
+      educationLevel?: string;
+      collegeClass?: string;
+      state?: string;
+      today?: string;
+      createdAt?: string;
+      checkedCount?: number;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const today = data.today || new Date().toISOString().slice(0, 10);
+    const system = `You build a STUDENT Test Prep coverage plan for ONE exam: ${data.testName}.
+
+Student: education level=${data.educationLevel || "unspecified"}, classification=${data.collegeClass || "n/a"}, state=${data.state || "n/a"}.
+Today=${today}. Track started=${data.createdAt || "unknown"}. Already checked=${data.checkedCount ?? 0}.
+
+Draw from typical official outlines and well-known prep sources (ETS, College Board, LSAC, AAMC, NCSBN, NCEES, ATI). Do not invent statutes. Label outside material as outside.
+
+PACE RULES:
+- Freshman/Sophomore aiming at GRE/LSAT/MCAT/GMAT: they are NOT behind. Ahead of Schedule = at least one introductory checkbox per calendar month since the track started. On Pace = about one per month. Needs Focus = zero for 6+ weeks.
+- Junior: more items per month; include mid-difficulty official question types.
+- Senior / graduate / professional school: exam-ready complexity; more items per month; Behind if they are inside 6 months of a typical sitting with large gaps.
+- High school ACT/SAT: match grade (9–10 intro, 11 building, 12 exam-ready).
+
+Complexity of topic labels must match classification.
+
+Return ONLY JSON:
+{
+  "status": "Ahead of Schedule|On Pace|Needs Focus|Behind Schedule",
+  "statusWhy": "string",
+  "windowNote": "string",
+  "toCover": ["string"],
+  "topics": [{ "id": "t1", "label": "string", "detail": "string", "level": "intro|core|advanced" }]
+}
+10-16 topics.`;
+
+    const user = `Exam: ${data.testName}
+Level: ${data.educationLevel || ""} ${data.collegeClass || ""}
+State: ${data.state || ""}
+Today: ${today}
+Started: ${data.createdAt || ""}
+Checked so far: ${data.checkedCount ?? 0}`;
+
+    const fallback = {
+      status: "On Pace",
+      statusWhy: "Live plan unavailable until the API key is set.",
+      windowNote: `Coverage outline for ${data.testName}.`,
+      toCover: [`Core ${data.testName} skills`],
+      topics: [
+        { id: "t1", label: `${data.testName} format and timing`, detail: "How the exam is structured", level: "intro" },
+        { id: "t2", label: "Foundational content", detail: "First content domain", level: "intro" },
+        { id: "t3", label: "Official-style practice item", detail: "One representative item type", level: "core" },
+      ],
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+export const generateStudentTestPrepLesson = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      testName: string;
+      educationLevel?: string;
+      collegeClass?: string;
+      state?: string;
+      topic: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const level = `${data.educationLevel || ""} ${data.collegeClass || ""}`.trim();
+    const system = `Write a STUDENT-ONLY Test Prep sheet for ${data.testName}, topic: ${data.topic}.
+No teacher guide. No classroom talk track.
+
+Complexity MUST match ${level || "the student's level"}:
+- Freshman/Sophomore or early high school: introductory, short definitions, gentle examples.
+- Junior: standard official item difficulty.
+- Senior / graduate / professional: exam-ready stems and full worked examples.
+
+Student sheet:
+- Opening paragraph: 2-4 sentences.
+- Key ideas, key terms.
+- Heavier EXAMPLES (3-6).
+- Extra Resources: YouTube search URLs https://www.youtube.com/results?search_query=...
+- Test Taking Tips at the bottom.
+
+Conservative, traditional, no ideology. Draw from well-known official outlines.
+
+Return ONLY JSON:
+{
+  "title": "string",
+  "narrative": "string",
+  "keyIdeas": ["string"],
+  "terms": [{ "term": "string", "definition": "string" }],
+  "examples": ["string"],
+  "resources": [{ "title": "string", "url": "string", "note": "string" }],
+  "testTips": ["string"]
+}`;
+    const fallback = {
+      title: `${data.testName}: ${data.topic}`,
+      narrative: `A short look at ${data.topic} for the ${data.testName}.`,
+      keyIdeas: [data.topic],
+      terms: [],
+      examples: [],
+      resources: [],
+      testTips: ["Read the stem twice.", "Eliminate two wrong choices first."],
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 4500,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: `Exam ${data.testName}. Level ${level}. State ${data.state || ""}. Topic: ${data.topic}` },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
