@@ -284,8 +284,12 @@ function TestPrepPage() {
                         </span>
                       </label>
                       <Button
-                        className={`text-xs ${done ? "bg-muted text-fg hover:bg-muted" : ""}`}
-                        variant={done ? "secondary" : "default"}
+                        className={
+                          done
+                            ? "min-h-9 bg-slate-100 text-slate-400 shadow-none hover:bg-slate-100 dark:bg-slate-800/40 dark:text-slate-500"
+                            : "min-h-9"
+                        }
+                        variant={done ? "secondary" : "primary"}
                         disabled={rowBusy === t.id}
                         onClick={() => void generateRow(openClass, t)}
                       >
