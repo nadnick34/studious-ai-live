@@ -1921,6 +1921,10 @@ MUST cover these domains when the student is old enough (put age-right versions 
 9. Traffic stop: pull over safely, well-lit if possible, hands visible, license/registration/insurance ready, be calm and polite, do not argue on the roadside. Lawful, practical, no "gotcha" legal theories.
 10. Personal safety and awareness: well-lit routes, going with someone, locking doors, leaving a party that turns dangerous. "Bad parts of town" means higher-crime times and places — not a racial rule. Teach vigilance and culture of a place (noise, groups, time of night) without racial slurs or collectivist guilt lectures. It is not racist to avoid danger.
 11. Scheduling: written weekly plan, including a block to plan the next week ("schedule time to schedule").
+12. Gun safety: treat every firearm as loaded, muzzle direction, finger off trigger, know your target/backstop, lock/storage, never handle without an adult if underage. Safety and law only — no build, modify, or tactical how-to.
+13. Fishing: basic rod setup, local rules/license, catch-and-release vs keep, how to clean a fish when the student is old enough.
+14. Hunter education: hunter-ed course exists for a reason, orange/visibility, permission on land, zone-of-fire, tagging/rules. Point them to the official state hunter-ed course.
+15. Music appreciation: a short decade-by-decade listening list of important songs (traditional/widely known American and Western canon — hymns, folk, jazz standards, country, classic rock — not a political playlist).
 
 Tone: conservative, practical, traditional manners and personal responsibility. No leftist framing, no identity politics, no "systems" sermon. Short, doable checklist labels.
 
@@ -1935,6 +1939,14 @@ Examples by level (adapt; do not dump every adult topic on a child):
 
 Pace: one new life skill per month = On Pace for underclassmen; more than that = Ahead. Behind only if they are years past the usual window with nothing checked.
 No politics.
+
+If the track is "Computer Software & AI":
+Build a skills checklist heavy on Microsoft Office (Word, Excel, PowerPoint, Outlook) and Grok (xAI): prompting clearly, checking answers, using it to study without letting it do the thinking. Also file management, email etiquette, and when useful: Teams/OneDrive. Scale: elementary = typing and folders; high school = Word essays, Excel grades/budgets, PPT; college = mail merge, pivot-ready tables, professional decks, Grok for research with citations the student verifies.
+
+If the track is "Reading & Comprehension":
+Recommend a SCHOOL-YEAR checklist of exactly 5 books (plus optional rereads) drawn ONLY from this house list and scaled to age/grade/classification:
+Beatrix Potter; The Courage of Sarah Noble; Where the Red Fern Grows; Old Yeller; Black Beauty; The Black Stallion; The Wind in the Willows; The Secret Garden; Treasure Island; Hans Christian Andersen; The Hobbit; The Lord of the Rings; The Lion, the Witch and the Wardrobe and the rest of the Chronicles of Narnia; The Space Trilogy (Out of the Silent Planet, Perelandra, That Hideous Strength); The Screwtape Letters; The Great Divorce; Mere Christianity; The Abolition of Man; Paradise Lost; The Pilgrim's Progress; Mark Twain; Dante; Alexandre Dumas; Homer; Plato; Aristotle; King Lear; The Federalist Papers; Don Quixote; The Canterbury Tales; Beowulf.
+Pick 5 that stretch the student one step without being impossible (e.g. 4th grade: Potter / Sarah Noble / Secret Garden / Wind in the Willows / a Narnia; high-school junior: Hobbit or LOTR + a Lewis nonfiction + Twain or Dumas + a play or Homer excerpt + Pilgrim's Progress). Each checklist item is one book with a one-line why. Generated lessons = comprehension sheet for THAT book (plot/argument, vocabulary, 3 discussion questions). Conservative/classical. No modern replacement list.
 
 If it is a named exam (ACT, GRE, NCLEX, etc.), follow exam-coverage rules instead.
 
@@ -2022,7 +2034,9 @@ export const generateStudentTestPrepLesson = createServerFn({ method: "POST" })
     const system = `Write a STUDENT-ONLY Practicum sheet for ${data.testName}, topic: ${data.topic}.
 No teacher guide.
 
-If testName is "Real World": write a practical how-to for that life skill at the student's level (steps they can do this week). Conservative, personal-responsibility tone. No ideology. For safety/traffic-stop topics: lawful, calm, specific actions only. Still include examples, resources (YouTube search links), and short "habits that keep you ahead" tips instead of test-taking tips.
+If testName is "Real World": write a practical how-to for that life skill at the student's level (steps they can do this week). Conservative, personal-responsibility tone. No ideology. For safety/traffic-stop/gun/hunter topics: lawful, calm, specific safety actions only — no weapon construction. Fishing: how to fish and clean a fish when age-appropriate. Music: name songs and why they matter. Still include examples, resources (YouTube search links), and short "habits that keep you ahead" tips instead of test-taking tips.
+If testName is "Computer Software & AI": a hands-on Office or Grok lesson (clicks, a tiny exercise, what good vs lazy prompting looks like).
+If testName is "Reading & Comprehension": a comprehension sheet for that book — short framing, key ideas, terms, 3 questions. No spoiler dump of the ending if the student has not finished.
 
 If it is an exam:
 
@@ -2174,6 +2188,136 @@ Return ONLY JSON:
             role: "user",
             content:
               `Compare these colleges as rows:\n${colleges.map((c, i) => `${i + 1}. ${c}`).join("\n")}\nInterests: ${interests.join(", ") || "general"}\nPreferred starting pages if relevant: scholarships.uark.edu, lsu.edu/admissions, latech.edu/admissions/scholarships, centenary.edu/admission/how-to-apply/dates-deadlines. Also city crime and climate — not campus-only safety.`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+
+export const generateReadingComprehensionQuiz = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      book: string;
+      educationLevel?: string;
+      studentGrade?: string;
+      collegeClass?: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const level = `${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""}`.trim();
+    const system = `Write a 20-item READING COMPREHENSION check for: ${data.book}.
+Student level: ${level || "unspecified"}.
+
+Exactly:
+- Questions 1-19: mix of multiple choice (4 options A-D) and fill-in-the-blank. About half each.
+- Question 20: one essay that forces the key elements and the main idea/theme of the work.
+No trick trivia about page numbers. No ideology. Classical/conservative reading of the text.
+Include an answer key for 1-19 and a short rubric for 20.
+
+Return ONLY JSON:
+{
+  "book": "string",
+  "questions": [
+    { "n": 1, "type": "mc", "prompt": "string", "choices": ["A) ...","B) ...","C) ...","D) ..."], "answer": "B" },
+    { "n": 2, "type": "blank", "prompt": "______ was the character who...", "answer": "string" }
+  ],
+  "essay": { "n": 20, "prompt": "string", "rubric": ["string"] }
+}`;
+    const fallback = {
+      book: data.book,
+      questions: Array.from({ length: 19 }, (_, i) =>
+        i % 2 === 0
+          ? {
+              n: i + 1,
+              type: "mc",
+              prompt: `About ${data.book}: which best states a main concern of the work?`,
+              choices: ["A) Chance", "B) Virtue and consequence", "C) Fashion", "D) Sports"],
+              answer: "B",
+            }
+          : {
+              n: i + 1,
+              type: "blank",
+              prompt: `Name one important character or figure in ${data.book}: ______`,
+              answer: "(from the text)",
+            },
+      ),
+      essay: {
+        n: 20,
+        prompt: `In 8-12 sentences, explain the central conflict or argument of ${data.book} and what the author wants the reader to see.`,
+        rubric: ["Names the main conflict or thesis", "Uses a concrete moment from the work", "States the point, not only the plot"],
+      },
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.3,
+        max_tokens: 5000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: `Book: ${data.book}` },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+export const gradeReadingComprehensionQuiz = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      book: string;
+      quiz: unknown;
+      answers: Record<string, string>;
+      essay: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const system = `Grade this reading quiz for ${data.book}.
+Questions 1-19: mark correct/incorrect against the key. Fill-ins: accept close spelling and clear synonyms.
+Essay (20): score 0-10 on understanding of key elements and concepts, not grammar polish.
+Return ONLY JSON:
+{
+  "score19": 15,
+  "essayScore": 8,
+  "total": "23/29",
+  "percent": 79,
+  "missed": [{ "n": 3, "yours": "A", "correct": "C", "note": "short" }],
+  "essayNote": "what was strong and what to reread"
+}`;
+    const fallback = { score19: 0, essayScore: 0, total: "0/29", percent: 0, missed: [], essayNote: "Could not grade." };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.1,
+        max_tokens: 2500,
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: JSON.stringify({ quiz: data.quiz, answers: data.answers, essay: data.essay }).slice(0, 14000),
           },
         ],
       }),

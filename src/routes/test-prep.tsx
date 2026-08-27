@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { generateCollegeComparison, generateStudentTestPrepLesson, generateStudentTestPrepPlan } from "@/lib/ai";
+import { generateCollegeComparison, generateReadingComprehensionQuiz, generateStudentTestPrepLesson, generateStudentTestPrepPlan, gradeReadingComprehensionQuiz } from "@/lib/ai";
 import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
 import { STUDENT_TEST_GROUPS } from "@/lib/types";
 
@@ -27,6 +27,29 @@ type Sheet = {
   resources?: { title: string; url?: string; note?: string }[];
   testTips?: string[];
 };
+type ReadingQuiz = {
+  book?: string;
+  questions?: { n: number; type: string; prompt: string; choices?: string[]; answer?: string }[];
+  essay?: { n: number; prompt: string; rubric?: string[] };
+};
+type ReadingGrade = {
+  score19?: number;
+  essayScore?: number;
+  total?: string;
+  percent?: number;
+  missed?: { n: number; yours?: string; correct?: string; note?: string }[];
+  essayNote?: string;
+};
+type LogItem = {
+  at: string;
+  topicId: string;
+  topicLabel: string;
+  sheet?: Sheet;
+  quiz?: ReadingQuiz;
+  answers?: Record<string, string>;
+  essay?: string;
+  grade?: ReadingGrade;
+};
 type Track = {
   id: string;
   testName: string;
@@ -34,7 +57,7 @@ type Track = {
   lastRefreshed?: string;
   plan: Plan | null;
   checked: Record<string, boolean>;
-  log: { at: string; topicId: string; topicLabel: string; sheet: Sheet }[];
+  log: LogItem[];
 };
 
 function statusClass(s?: string) {
@@ -65,6 +88,11 @@ function StudentTestPrepPage() {
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [quiz, setQuiz] = useState<ReadingQuiz | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizEssay, setQuizEssay] = useState("");
+  const [quizGrade, setQuizGrade] = useState<ReadingGrade | null>(null);
+  const [grading, setGrading] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [colleges, setColleges] = useState(["", "", "", "", ""]);
   const [interests, setInterests] = useState(["", "", "", "", ""]);
@@ -252,6 +280,23 @@ function StudentTestPrepPage() {
     setRowBusy(topic.id);
     setError(null);
     try {
+      if (track.testName === "Reading & Comprehension") {
+        const result = (await generateReadingComprehensionQuiz({
+          data: {
+            book: `${topic.label}${topic.detail ? ` — ${topic.detail}` : ""}`,
+            educationLevel: level,
+            studentGrade: grade,
+            collegeClass: klass,
+          },
+        })) as ReadingQuiz;
+        setQuiz(result);
+        setQuizAnswers({});
+        setQuizEssay("");
+        setQuizGrade(null);
+        setSheet(null);
+        setShowList(false);
+        return;
+      }
       const result = (await generateStudentTestPrepLesson({
         data: {
           testName: track.testName,
@@ -275,6 +320,37 @@ function StudentTestPrepPage() {
       setError(err instanceof Error ? err.message : "Could not generate");
     } finally {
       setRowBusy(null);
+    }
+  }
+
+  async function gradeQuiz(track: Track, topicLabel: string, topicId: string) {
+    if (!quiz) return;
+    setGrading(true);
+    setError(null);
+    try {
+      const grade = (await gradeReadingComprehensionQuiz({
+        data: { book: quiz.book || topicLabel, quiz, answers: quizAnswers, essay: quizEssay },
+      })) as ReadingGrade;
+      setQuizGrade(grade);
+      updateTrack(track.id, {
+        checked: { ...track.checked, [topicId]: true },
+        log: [
+          {
+            at: new Date().toISOString(),
+            topicId,
+            topicLabel,
+            quiz,
+            answers: quizAnswers,
+            essay: quizEssay,
+            grade,
+          },
+          ...track.log,
+        ].slice(0, 40),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not grade");
+    } finally {
+      setGrading(false);
     }
   }
 
@@ -397,6 +473,82 @@ function StudentTestPrepPage() {
               {busy ? "Refreshing…" : "Refresh plan"}
             </Button>
           </div>
+
+          {quiz && open && (
+            <article className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="text-lg font-semibold text-fg">{quiz.book || "Reading check"}</h3>
+              <p className="text-xs text-muted">19 short items + 1 essay. Submit to grade and save to the log.</p>
+              <ol className="mt-4 space-y-4">
+                {(quiz.questions || []).slice(0, 19).map((q) => (
+                  <li key={q.n} className="text-sm">
+                    <p className="font-medium">
+                      {q.n}. {q.prompt}
+                    </p>
+                    {q.type === "mc" && q.choices ? (
+                      <div className="mt-1 space-y-1">
+                        {q.choices.map((c) => (
+                          <label key={c} className="flex items-start gap-2">
+                            <input
+                              type="radio"
+                              name={`q-${q.n}`}
+                              checked={quizAnswers[String(q.n)] === c}
+                              onChange={() => setQuizAnswers({ ...quizAnswers, [String(q.n)]: c })}
+                            />
+                            <span>{c}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border px-3 py-2"
+                        value={quizAnswers[String(q.n)] || ""}
+                        onChange={(e) => setQuizAnswers({ ...quizAnswers, [String(q.n)]: e.target.value })}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {quiz.essay && (
+                <div className="mt-5">
+                  <p className="text-sm font-medium">20. {quiz.essay.prompt}</p>
+                  <textarea
+                    className="mt-2 min-h-32 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    value={quizEssay}
+                    onChange={(e) => setQuizEssay(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="mt-4 flex justify-end">
+                <Button
+                  disabled={grading}
+                  onClick={() => {
+                    const topic = (open.plan?.topics || []).find((x) => quiz.book?.includes(x.label));
+                    void gradeQuiz(open, quiz.book || "Reading", topic?.id || "reading");
+                  }}
+                >
+                  {grading ? "Grading…" : "Grade and save to log"}
+                </Button>
+              </div>
+              {quizGrade && (
+                <div className="mt-4 rounded-lg border border-border bg-bg p-3 text-sm">
+                  <p className="font-semibold">
+                    {quizGrade.total || ""} {quizGrade.percent != null ? `(${quizGrade.percent}%)` : ""}
+                  </p>
+                  <p>Items 1–19: {quizGrade.score19}/19 · Essay: {quizGrade.essayScore}/10</p>
+                  {quizGrade.essayNote && <p className="mt-2">{quizGrade.essayNote}</p>}
+                  {!!quizGrade.missed?.length && (
+                    <ul className="mt-2 list-disc pl-5">
+                      {quizGrade.missed.map((m) => (
+                        <li key={m.n}>
+                          #{m.n}: you {m.yours}; key {m.correct}. {m.note}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </article>
+          )}
           {sheet && (
             <div className="print:hidden flex justify-end">
               <Button variant="secondary" className="text-xs" onClick={() => setShowList((v) => !v)}>
@@ -453,6 +605,82 @@ function StudentTestPrepPage() {
             </section>
           )}
 
+
+          {quiz && open && (
+            <article className="rounded-2xl border border-border bg-card p-6">
+              <h3 className="text-lg font-semibold text-fg">{quiz.book || "Reading check"}</h3>
+              <p className="text-xs text-muted">19 short items + 1 essay. Submit to grade and save to the log.</p>
+              <ol className="mt-4 space-y-4">
+                {(quiz.questions || []).slice(0, 19).map((q) => (
+                  <li key={q.n} className="text-sm">
+                    <p className="font-medium">
+                      {q.n}. {q.prompt}
+                    </p>
+                    {q.type === "mc" && q.choices ? (
+                      <div className="mt-1 space-y-1">
+                        {q.choices.map((c) => (
+                          <label key={c} className="flex items-start gap-2">
+                            <input
+                              type="radio"
+                              name={`q-${q.n}`}
+                              checked={quizAnswers[String(q.n)] === c}
+                              onChange={() => setQuizAnswers({ ...quizAnswers, [String(q.n)]: c })}
+                            />
+                            <span>{c}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border px-3 py-2"
+                        value={quizAnswers[String(q.n)] || ""}
+                        onChange={(e) => setQuizAnswers({ ...quizAnswers, [String(q.n)]: e.target.value })}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ol>
+              {quiz.essay && (
+                <div className="mt-5">
+                  <p className="text-sm font-medium">20. {quiz.essay.prompt}</p>
+                  <textarea
+                    className="mt-2 min-h-32 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    value={quizEssay}
+                    onChange={(e) => setQuizEssay(e.target.value)}
+                  />
+                </div>
+              )}
+              <div className="mt-4 flex justify-end">
+                <Button
+                  disabled={grading}
+                  onClick={() => {
+                    const topic = (open.plan?.topics || []).find((x) => quiz.book?.includes(x.label));
+                    void gradeQuiz(open, quiz.book || "Reading", topic?.id || "reading");
+                  }}
+                >
+                  {grading ? "Grading…" : "Grade and save to log"}
+                </Button>
+              </div>
+              {quizGrade && (
+                <div className="mt-4 rounded-lg border border-border bg-bg p-3 text-sm">
+                  <p className="font-semibold">
+                    {quizGrade.total || ""} {quizGrade.percent != null ? `(${quizGrade.percent}%)` : ""}
+                  </p>
+                  <p>Items 1–19: {quizGrade.score19}/19 · Essay: {quizGrade.essayScore}/10</p>
+                  {quizGrade.essayNote && <p className="mt-2">{quizGrade.essayNote}</p>}
+                  {!!quizGrade.missed?.length && (
+                    <ul className="mt-2 list-disc pl-5">
+                      {quizGrade.missed.map((m) => (
+                        <li key={m.n}>
+                          #{m.n}: you {m.yours}; key {m.correct}. {m.note}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </article>
+          )}
           {sheet && (
             <article className="rounded-2xl border border-border bg-card p-6">
               <div className="print:hidden mb-3 flex justify-end gap-2">
@@ -539,9 +767,24 @@ function StudentTestPrepPage() {
                     <button
                       type="button"
                       className="flex w-full justify-between gap-2 py-2 text-left text-sm"
-                      onClick={() => setSheet(item.sheet)}
+                      onClick={() => {
+                        if (item.quiz) {
+                          setQuiz(item.quiz);
+                          setQuizAnswers(item.answers || {});
+                          setQuizEssay(item.essay || "");
+                          setQuizGrade(item.grade || null);
+                          setSheet(null);
+                          setShowList(false);
+                        } else {
+                          setSheet(item.sheet || null);
+                          setQuiz(null);
+                        }
+                      }}
                     >
-                      <span className="font-medium">{item.topicLabel}</span>
+                      <span className="font-medium">
+                        {item.topicLabel}
+                        {item.grade?.percent != null ? ` · ${item.grade.percent}%` : ""}
+                      </span>
                       <span className="text-xs text-muted">{new Date(item.at).toLocaleString()}</span>
                     </button>
                   </li>

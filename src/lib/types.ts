@@ -501,7 +501,7 @@ export type StudentGrade = (typeof STUDENT_GRADES)[number];
 
 
 export const STUDENT_TEST_GROUPS: { group: string; tests: string[] }[] = [
-  { group: "Life", tests: ["Real World"] },
+  { group: "Life & skills", tests: ["Real World", "Computer Software & AI", "Reading & Comprehension"] },
   { group: "High school & middle grades", tests: ["ACT", "SAT", "PSAT", "PreACT", "CLT", "LEAP", "Iowa Assessments", "State summative"] },
   { group: "College admissions & graduate", tests: ["GRE", "LSAT", "GMAT", "MCAT"] },
   { group: "Health professions", tests: ["DAT", "OAT", "PCAT", "ATI TEAS", "HESI", "NLN NEX", "NCLEX-RN", "NCLEX-PN"] },
