@@ -1906,19 +1906,35 @@ export const generateStudentTestPrepPlan = createServerFn({ method: "POST" })
     const system = `You build a STUDENT Practicum plan.
 
 If the exam/track is "Real World": this is LIFE SKILLS, not a standardized test.
-Build a checklist that keeps this student slightly ahead of a healthy life timeline for their level.
-Examples by level (adapt; do not dump all ages):
-- Elementary: chores (dishes, trash, room, pet care), manners, telling time/money basics.
-- Middle / Junior High: laundry, simple cooking, phone/screen habits, saving allowance.
-- High school freshman/sophomore: learner's permit / driver's ed, time management, first volunteer hours.
-- High school junior: checking account, banking, part-time job, volunteering, clubs, resume for college.
-- High school senior: FAFSA awareness, applications, interviews, budgeting a first job.
-- College freshman: building credit (responsibly), campus orgs, professional clubs, work-study habits.
-- Sophomore: internships search, LinkedIn/resume, summer work.
-- Junior: internships, networking, major-aligned experience.
-- Senior / graduate / professional: interviews, relocation basics, taxes, retirement-account literacy.
-Pace: one new life skill per month = On Pace for underclassmen; more than that = Ahead. Behind only if they are years past the usual window with nothing checked (e.g. senior with no banking basics).
-Conservative, practical, traditional household/civic skills. No politics.
+Build a checklist that keeps this student slightly ahead of a healthy life timeline for their age, grade, and classification.
+Scale complexity. Do not give a 3rd grader auto insurance. Do give a licensed teen oil/tires/wash. Do give a college student insurance + traffic-stop + file backups.
+
+MUST cover these domains when the student is old enough (put age-right versions on the checklist; omit or simplify if too young):
+1. Vehicle care: oil change intervals, tire pressure/tread, washer fluid, washing, when to see a shop.
+2. Basic house maintenance: filters, smoke detectors, plunging a drain, changing a bulb, who to call.
+3. Restaurant etiquette and tipping: how to behave, when and how much to tip in the US, saying please/thank you.
+4. Health insurance and auto insurance: premiums, deductible, what a card is for, when to call.
+5. Doctor and dentist appointments: making them, showing up, records, not ignoring teeth.
+6. E-commerce and security: passwords, 2FA, fake sites, not sharing cards in chat, package theft basics.
+7. Tech setup: home internet, Wi-Fi name/password, printer, HDMI/USB-C/DisplayPort on a TV or monitor.
+8. Files: folders for school/work, backups, flash drive vs external drive vs cloud, do not keep one copy.
+9. Traffic stop: pull over safely, well-lit if possible, hands visible, license/registration/insurance ready, be calm and polite, do not argue on the roadside. Lawful, practical, no "gotcha" legal theories.
+10. Personal safety and awareness: well-lit routes, going with someone, locking doors, leaving a party that turns dangerous. "Bad parts of town" means higher-crime times and places — not a racial rule. Teach vigilance and culture of a place (noise, groups, time of night) without racial slurs or collectivist guilt lectures. It is not racist to avoid danger.
+11. Scheduling: written weekly plan, including a block to plan the next week ("schedule time to schedule").
+
+Tone: conservative, practical, traditional manners and personal responsibility. No leftist framing, no identity politics, no "systems" sermon. Short, doable checklist labels.
+
+Examples by level (adapt; do not dump every adult topic on a child):
+- Elementary: chores, manners, screen limits with a parent, simple tidy-and-backup of school papers.
+- Middle / Junior High: laundry, simple cooking, allowance saving, being aware of surroundings with a parent.
+- High school freshman/sophomore: driver's ed, basic car wash/air in tires with an adult, restaurant manners/tipping, first volunteer hours, a weekly schedule.
+- High school junior: checking account, part-time job, clubs, resume, oil-change reminder, doctor/dentist on the calendar.
+- High school senior: insurance basics, interviews, budgeting, traffic-stop conduct, file backups.
+- College freshman: credit (responsibly), orgs, Wi-Fi/printer/HDMI, cloud backup, insurance cards in the wallet.
+- Sophomore–Senior / graduate: internships, taxes intro, renters/auto insurance, full house/car maintenance, safety when traveling.
+
+Pace: one new life skill per month = On Pace for underclassmen; more than that = Ahead. Behind only if they are years past the usual window with nothing checked.
+No politics.
 
 If it is a named exam (ACT, GRE, NCLEX, etc.), follow exam-coverage rules instead.
 
@@ -2006,7 +2022,7 @@ export const generateStudentTestPrepLesson = createServerFn({ method: "POST" })
     const system = `Write a STUDENT-ONLY Practicum sheet for ${data.testName}, topic: ${data.topic}.
 No teacher guide.
 
-If testName is "Real World": write a practical how-to for that life skill at the student's level (steps they can do this week). Still include examples, resources (YouTube search links), and short "habits that keep you ahead" tips instead of test-taking tips.
+If testName is "Real World": write a practical how-to for that life skill at the student's level (steps they can do this week). Conservative, personal-responsibility tone. No ideology. For safety/traffic-stop topics: lawful, calm, specific actions only. Still include examples, resources (YouTube search links), and short "habits that keep you ahead" tips instead of test-taking tips.
 
 If it is an exam:
 
@@ -2054,6 +2070,101 @@ Return ONLY JSON:
         messages: [
           { role: "system", content: system },
           { role: "user", content: `Exam ${data.testName}. Level ${level}. State ${data.state || ""}. Topic: ${data.topic}` },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+
+export const generateCollegeComparison = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      colleges: string[];
+      interests: string[];
+      educationLevel?: string;
+      studentGrade?: string;
+      collegeClass?: string;
+      state?: string;
+      year?: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const colleges = data.colleges.map((c) => c.trim()).filter(Boolean).slice(0, 5);
+    const interests = data.interests.map((c) => c.trim()).filter(Boolean).slice(0, 5);
+    const cycle = data.year || "2026-2027";
+    const system = `You build a clean COLLEGE COMPARISON MATRIX for a student.
+Colleges (max 5): ${colleges.join(" | ")}
+Student interests (max 5): ${interests.join(" | ") || "general"}
+Student: ${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""} in ${data.state || "unspecified"}.
+Admissions cycle to use: ${cycle}.
+
+Be factual and cautious. If a date is typical but not verified this hour, write "Confirm on the official admissions site" next to it.
+Do not invent scholarship dollar amounts.
+Atmosphere: report commonly described campus political lean (conservative-leaning / mixed / liberal-leaning) as a generalization, plus cost-of-living/income mix of the area, weather, and safety in plain terms. No activism lecture. No racial framing.
+
+Return ONLY JSON:
+{
+  "title": "${cycle} College Comparison",
+  "disclaimer": "one sentence",
+  "colleges": [
+    {
+      "name": "string",
+      "location": "string",
+      "admissions": ["deadline bullets"],
+      "scholarships": ["deadline bullets"],
+      "orientationHousing": ["bullets"],
+      "interestFit": ["how it matches the listed interests"],
+      "postGrad": ["placement / employers / outcomes"],
+      "area": ["food", "extracurriculars", "things to do"],
+      "atmosphere": {
+        "politicalLean": "string",
+        "incomeMix": "string",
+        "weather": "string",
+        "safety": "string"
+      }
+    }
+  ]
+}`;
+    const fallback = {
+      title: `${cycle} College Comparison`,
+      disclaimer: "Confirm every date on the official college site before you act.",
+      colleges: colleges.map((name) => ({
+        name,
+        location: "",
+        admissions: ["Confirm priority and regular dates on the official site."],
+        scholarships: ["Confirm merit and competitive scholarship deadlines."],
+        orientationHousing: ["Confirm orientation and housing application windows."],
+        interestFit: interests.map((i) => `${i}: check department pages`),
+        postGrad: ["Review recent first-destination / outcomes reports."],
+        area: ["Food and weekend options vary by campus."],
+        atmosphere: {
+          politicalLean: "Confirm from recent campus reporting.",
+          incomeMix: "See regional cost of living.",
+          weather: "See city climate normals.",
+          safety: "Read the current annual security report.",
+        },
+      })),
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 5000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: `Compare:\n${colleges.map((c, i) => `${i + 1}. ${c}`).join("\n")}\nInterests:\n${interests.join(", ")}` },
         ],
       }),
     });

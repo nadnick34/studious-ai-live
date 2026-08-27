@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { generateStudentTestPrepLesson, generateStudentTestPrepPlan } from "@/lib/ai";
+import { generateCollegeComparison, generateStudentTestPrepLesson, generateStudentTestPrepPlan } from "@/lib/ai";
 import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
 import { STUDENT_TEST_GROUPS } from "@/lib/types";
 
@@ -65,6 +65,24 @@ function StudentTestPrepPage() {
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [colleges, setColleges] = useState(["", "", "", "", ""]);
+  const [interests, setInterests] = useState(["", "", "", "", ""]);
+  const [comparison, setComparison] = useState<null | {
+    title?: string;
+    disclaimer?: string;
+    colleges?: {
+      name: string;
+      location?: string;
+      admissions?: string[];
+      scholarships?: string[];
+      orientationHousing?: string[];
+      interestFit?: string[];
+      postGrad?: string[];
+      area?: string[];
+      atmosphere?: { politicalLean?: string; incomeMix?: string; weather?: string; safety?: string };
+    }[];
+  }>(null);
 
   useEffect(() => {
     void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
@@ -80,8 +98,49 @@ function StudentTestPrepPage() {
         local = [];
       }
       setTracks(remote.length ? remote : local);
+      try {
+        const saved = localStorage.getItem("studious-college-compare");
+        if (saved) setComparison(JSON.parse(saved));
+      } catch {
+        /* ignore */
+      }
     });
   }, []);
+
+
+  async function runCompare() {
+    const list = colleges.map((c) => c.trim()).filter(Boolean).slice(0, 5);
+    const ints = interests.map((c) => c.trim()).filter(Boolean).slice(0, 5);
+    if (!list.length) {
+      setError("Enter at least one college.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await generateCollegeComparison({
+        data: {
+          colleges: list,
+          interests: ints,
+          educationLevel: level,
+          studentGrade: grade,
+          collegeClass: klass,
+          state: stateName,
+          year: "2026-2027",
+        },
+      });
+      setComparison(result);
+      try {
+        localStorage.setItem("studious-college-compare", JSON.stringify(result));
+      } catch {
+        /* ignore */
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not build the comparison");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function persist(next: Track[]) {
     setTracks(next);
@@ -214,7 +273,7 @@ function StudentTestPrepPage() {
 
   if (open) {
     return (
-      <AppShell title="Practicum">
+      <AppShell title="Practicum & Prep">
         <div className="mx-auto max-w-3xl space-y-5">
           <button type="button" className="print:hidden text-sm text-teal hover:underline" onClick={() => setOpenId(null)}>
             ← Dashboard
@@ -394,20 +453,125 @@ function StudentTestPrepPage() {
   }
 
   return (
-    <AppShell title="Practicum">
+    <AppShell title="Practicum & Prep">
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Student</p>
-            <h2 className="text-xl font-semibold text-fg">Practicum</h2>
+            <h2 className="text-xl font-semibold text-fg">Practicum & Prep</h2>
             <p className="mt-1 text-sm text-muted">
               Add Real World life skills or an exam you are preparing for. Pace uses your education level
               {klass ? ` (${klass})` : ""} and what you have checked off.
             </p>
           </div>
-          <Button onClick={() => setAdding(true)}>Add practicum</Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setCompareOpen((v) => !v)}>
+              College comparison
+            </Button>
+            <Button onClick={() => setAdding(true)}>Add card</Button>
+          </div>
         </div>
 
+        
+        {compareOpen && (
+          <div className="print:hidden rounded-2xl border border-border bg-card p-4">
+            <h3 className="font-semibold text-fg">College comparison</h3>
+            <p className="mt-1 text-xs text-muted">Up to 5 colleges and 5 areas of interest.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs text-muted">Colleges</p>
+                {colleges.map((v, i) => (
+                  <input
+                    key={`c-${i}`}
+                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    placeholder={`College ${i + 1}`}
+                    value={v}
+                    onChange={(e) => setColleges(colleges.map((x, idx) => (idx === i ? e.target.value : x)))}
+                  />
+                ))}
+              </div>
+              <div>
+                <p className="mb-1 text-xs text-muted">Areas of interest</p>
+                {interests.map((v, i) => (
+                  <input
+                    key={`i-${i}`}
+                    className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    placeholder={`Interest ${i + 1}`}
+                    value={v}
+                    onChange={(e) => setInterests(interests.map((x, idx) => (idx === i ? e.target.value : x)))}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-2 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setCompareOpen(false)}>
+                Close
+              </Button>
+              <Button disabled={busy} onClick={() => void runCompare()}>
+                {busy ? "Building…" : "Compare"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {comparison?.colleges && comparison.colleges.length > 0 && (
+          <section className="overflow-x-auto rounded-2xl border border-border bg-card p-4">
+            <div className="print:hidden mb-3 flex justify-end">
+              <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+                Print / save PDF
+              </Button>
+            </div>
+            <h3 className="text-lg font-semibold text-fg">{comparison.title || "College comparison"}</h3>
+            {comparison.disclaimer && <p className="mt-1 text-xs text-muted">{comparison.disclaimer}</p>}
+            <table className="mt-4 w-full min-w-[720px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-border bg-bg/60">
+                  <th className="px-3 py-2 font-semibold"> </th>
+                  {comparison.colleges.map((c) => (
+                    <th key={c.name} className="px-3 py-2 font-semibold text-fg">
+                      {c.name}
+                      {c.location ? <div className="text-[11px] font-normal text-muted">{c.location}</div> : null}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Admissions", "admissions"],
+                  ["Scholarships", "scholarships"],
+                  ["Orientation & housing", "orientationHousing"],
+                  ["Fit for your interests", "interestFit"],
+                  ["Post-grad & jobs", "postGrad"],
+                  ["Area (food, activities)", "area"],
+                ].map(([label, key]) => (
+                  <tr key={key} className="border-b border-border align-top">
+                    <td className="whitespace-nowrap px-3 py-2 text-xs font-semibold text-muted">{label}</td>
+                    {comparison.colleges!.map((c) => (
+                      <td key={c.name + key} className="px-3 py-2">
+                        <ul className="list-disc pl-4">
+                          {((c as Record<string, unknown>)[key] as string[] | undefined)?.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr className="align-top">
+                  <td className="px-3 py-2 text-xs font-semibold text-muted">Atmosphere</td>
+                  {comparison.colleges.map((c) => (
+                    <td key={c.name + "atm"} className="px-3 py-2 text-sm">
+                      <p><span className="font-medium">Campus lean:</span> {c.atmosphere?.politicalLean}</p>
+                      <p><span className="font-medium">Area income:</span> {c.atmosphere?.incomeMix}</p>
+                      <p><span className="font-medium">Weather:</span> {c.atmosphere?.weather}</p>
+                      <p><span className="font-medium">Safety:</span> {c.atmosphere?.safety}</p>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        )}
         {adding && (
           <div className="rounded-2xl border border-border bg-card p-4">
             <label className="block text-xs text-muted">
