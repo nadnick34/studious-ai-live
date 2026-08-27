@@ -102,8 +102,11 @@ function StudentTestPrepPage() {
       }
       setTracks(remote.length ? remote : local);
       try {
-        const saved = localStorage.getItem("studious-college-compare");
-        if (saved) setComparison(JSON.parse(saved));
+        if (tools?.collegeCompare) setComparison(tools.collegeCompare as typeof comparison);
+        else {
+          const saved = localStorage.getItem("studious-college-compare");
+          if (saved) setComparison(JSON.parse(saved));
+        }
       } catch {
         /* ignore */
       }
@@ -138,6 +141,7 @@ function StudentTestPrepPage() {
       } catch {
         /* ignore */
       }
+      void saveTeacherToolState({ data: { collegeCompare: result } }).catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not build the comparison");
     } finally {
@@ -371,7 +375,7 @@ function StudentTestPrepPage() {
 
   if (open) {
     return (
-      <AppShell title="Practicum & Prep">
+      <AppShell title="Prep">
         <div className="mx-auto max-w-3xl space-y-5">
           <button type="button" className="print:hidden text-sm text-teal hover:underline" onClick={() => setOpenId(null)}>
             ← Dashboard
@@ -551,7 +555,7 @@ function StudentTestPrepPage() {
   }
 
   return (
-    <AppShell title="Practicum & Prep">
+    <AppShell title="Prep">
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -26,7 +26,7 @@ function getNav(role?: string | null) {
   return [
     { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
     { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
-    { to: "/test-prep", label: "Practicum & Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
+    { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
     { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
     { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
   ];
@@ -74,7 +74,7 @@ export function Sidebar({
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {item.label}
+              {"shortLabel" in item && item.shortLabel ? item.shortLabel : item.label}
             </Link>
           );
         })}
@@ -127,7 +127,7 @@ export function BottomNav({ role }: { role?: string | null } = {}) {
             )}
           >
             <Icon className="size-5" />
-            {item.label}
+            {"shortLabel" in item && item.shortLabel ? item.shortLabel : item.label}
           </Link>
         );
       })}

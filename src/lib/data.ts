@@ -1305,6 +1305,7 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       scriptorium_log jsonb not null default '[]'::jsonb,
       testprep_cards jsonb not null default '{}'::jsonb,
       student_testprep jsonb not null default '[]'::jsonb,
+      college_compare jsonb not null default 'null'::jsonb,
       updated_at timestamptz not null default now()
     )`,
   ];
@@ -1749,14 +1750,21 @@ export const getTeacherToolState = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     await ensureTeacherTables(sql);
-    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown }>`
-      select scriptorium_log, testprep_cards, student_testprep from teacher_tool_state where user_id = ${context.userId} limit 1
+    try {
+      await sql.query(`alter table teacher_tool_state add column if not exists student_testprep jsonb not null default '[]'::jsonb`);
+      await sql.query(`alter table teacher_tool_state add column if not exists college_compare jsonb`);
+    } catch {
+      /* ignore */
+    }
+    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown; college_compare: unknown }>`
+      select scriptorium_log, testprep_cards, student_testprep, college_compare from teacher_tool_state where user_id = ${context.userId} limit 1
     `;
     const row = rows[0];
     return {
       scriptoriumLog: parseJson(row?.scriptorium_log, []),
       testPrepCards: parseJson(row?.testprep_cards, {}),
       studentTestPrep: parseJson(row?.student_testprep, []),
+      collegeCompare: parseJson(row?.college_compare, row?.college_compare ?? null),
     };
   });
 
@@ -1767,13 +1775,14 @@ export const saveTeacherToolState = createServerFn({ method: "POST" })
       scriptoriumLog?: unknown;
       testPrepCards?: unknown;
       studentTestPrep?: unknown;
+      collegeCompare?: unknown;
     }) => input,
   )
   .handler(async ({ context, data }) => {
     const sql = await getSql();
     await ensureTeacherTables(sql);
     const cur = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown }>`
-      select scriptorium_log, testprep_cards, student_testprep from teacher_tool_state where user_id = ${context.userId} limit 1
+      select scriptorium_log, testprep_cards, student_testprep, college_compare from teacher_tool_state where user_id = ${context.userId} limit 1
     `;
     const scriptoriumLog =
       data.scriptoriumLog !== undefined ? data.scriptoriumLog : parseJson(cur[0]?.scriptorium_log, []);
@@ -1781,16 +1790,20 @@ export const saveTeacherToolState = createServerFn({ method: "POST" })
       data.testPrepCards !== undefined ? data.testPrepCards : parseJson(cur[0]?.testprep_cards, {});
     const studentTestPrep =
       data.studentTestPrep !== undefined ? data.studentTestPrep : parseJson(cur[0]?.student_testprep, []);
+    const collegeCompare =
+      data.collegeCompare !== undefined ? data.collegeCompare : cur[0]?.college_compare ?? null;
     try {
       await sql.query(`alter table teacher_tool_state add column if not exists student_testprep jsonb not null default '[]'::jsonb`);
+      await sql.query(`alter table teacher_tool_state add column if not exists college_compare jsonb`);
     } catch { /* ignore */ }
     await sql`
-      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, student_testprep, updated_at)
-      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, ${JSON.stringify(studentTestPrep)}::jsonb, now())
+      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, student_testprep, college_compare, updated_at)
+      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, ${JSON.stringify(studentTestPrep)}::jsonb, ${JSON.stringify(collegeCompare)}::jsonb, now())
       on conflict (user_id) do update set
         scriptorium_log = excluded.scriptorium_log,
         testprep_cards = excluded.testprep_cards,
         student_testprep = excluded.student_testprep,
+        college_compare = excluded.college_compare,
         updated_at = now()
     `;
     return { ok: true as const };
