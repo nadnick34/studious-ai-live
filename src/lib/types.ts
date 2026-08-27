@@ -494,6 +494,7 @@ export const COLLEGE_CLASSES = ["Freshman", "Sophomore", "Junior", "Senior"] as 
 export type CollegeClass = (typeof COLLEGE_CLASSES)[number];
 
 export const STUDENT_TEST_GROUPS: { group: string; tests: string[] }[] = [
+  { group: "Life", tests: ["Real World"] },
   { group: "High school & middle grades", tests: ["ACT", "SAT", "PSAT", "PreACT", "CLT", "LEAP", "Iowa Assessments", "State summative"] },
   { group: "College admissions & graduate", tests: ["GRE", "LSAT", "GMAT", "MCAT"] },
   { group: "Health professions", tests: ["DAT", "OAT", "PCAT", "ATI TEAS", "HESI", "NLN NEX", "NCLEX-RN", "NCLEX-PN"] },

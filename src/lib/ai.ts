@@ -1902,7 +1902,26 @@ export const generateStudentTestPrepPlan = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = apiKey();
     const today = data.today || new Date().toISOString().slice(0, 10);
-    const system = `You build a STUDENT Test Prep coverage plan for ONE exam: ${data.testName}.
+    const system = `You build a STUDENT Practicum plan.
+
+If the exam/track is "Real World": this is LIFE SKILLS, not a standardized test.
+Build a checklist that keeps this student slightly ahead of a healthy life timeline for their level.
+Examples by level (adapt; do not dump all ages):
+- Elementary: chores (dishes, trash, room, pet care), manners, telling time/money basics.
+- Middle / Junior High: laundry, simple cooking, phone/screen habits, saving allowance.
+- High school freshman/sophomore: learner's permit / driver's ed, time management, first volunteer hours.
+- High school junior: checking account, banking, part-time job, volunteering, clubs, resume for college.
+- High school senior: FAFSA awareness, applications, interviews, budgeting a first job.
+- College freshman: building credit (responsibly), campus orgs, professional clubs, work-study habits.
+- Sophomore: internships search, LinkedIn/resume, summer work.
+- Junior: internships, networking, major-aligned experience.
+- Senior / graduate / professional: interviews, relocation basics, taxes, retirement-account literacy.
+Pace: one new life skill per month = On Pace for underclassmen; more than that = Ahead. Behind only if they are years past the usual window with nothing checked (e.g. senior with no banking basics).
+Conservative, practical, traditional household/civic skills. No politics.
+
+If it is a named exam (ACT, GRE, NCLEX, etc.), follow exam-coverage rules instead.
+
+Student Test Prep / exam rules when NOT Real World:
 
 Student: education level=${data.educationLevel || "unspecified"}, classification=${data.collegeClass || "n/a"}, state=${data.state || "n/a"}.
 Today=${today}. Track started=${data.createdAt || "unknown"}. Already checked=${data.checkedCount ?? 0}.
@@ -1982,8 +2001,12 @@ export const generateStudentTestPrepLesson = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = apiKey();
     const level = `${data.educationLevel || ""} ${data.collegeClass || ""}`.trim();
-    const system = `Write a STUDENT-ONLY Test Prep sheet for ${data.testName}, topic: ${data.topic}.
-No teacher guide. No classroom talk track.
+    const system = `Write a STUDENT-ONLY Practicum sheet for ${data.testName}, topic: ${data.topic}.
+No teacher guide.
+
+If testName is "Real World": write a practical how-to for that life skill at the student's level (steps they can do this week). Still include examples, resources (YouTube search links), and short "habits that keep you ahead" tips instead of test-taking tips.
+
+If it is an exam:
 
 Complexity MUST match ${level || "the student's level"}:
 - Freshman/Sophomore or early high school: introductory, short definitions, gentle examples.

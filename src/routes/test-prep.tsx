@@ -172,7 +172,7 @@ function StudentTestPrepPage() {
 
   if (open) {
     return (
-      <AppShell title="Test Prep">
+      <AppShell title="Practicum">
         <div className="mx-auto max-w-3xl space-y-5">
           <button type="button" className="print:hidden text-sm text-teal hover:underline" onClick={() => setOpenId(null)}>
             ← Dashboard
@@ -345,18 +345,18 @@ function StudentTestPrepPage() {
   }
 
   return (
-    <AppShell title="Test Prep">
+    <AppShell title="Practicum">
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Student</p>
-            <h2 className="text-xl font-semibold text-fg">Test Prep</h2>
+            <h2 className="text-xl font-semibold text-fg">Practicum</h2>
             <p className="mt-1 text-sm text-muted">
-              Add each exam you are preparing for. Pace uses your education level
+              Add Real World life skills or an exam you are preparing for. Pace uses your education level
               {klass ? ` (${klass})` : ""} and what you have checked off.
             </p>
           </div>
-          <Button onClick={() => setAdding(true)}>Add test</Button>
+          <Button onClick={() => setAdding(true)}>Add practicum</Button>
         </div>
 
         {adding && (
@@ -394,7 +394,7 @@ function StudentTestPrepPage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           {tracks.length === 0 && !adding && (
-            <p className="text-sm text-muted">No exams yet. Add ACT, GRE, NCLEX, FE — whatever you are working toward.</p>
+            <p className="text-sm text-muted">Nothing yet. Add Real World, or an exam such as ACT, GRE, or NCLEX.</p>
           )}
           {tracks.map((track) => {
             const topics = track.plan?.topics || [];
