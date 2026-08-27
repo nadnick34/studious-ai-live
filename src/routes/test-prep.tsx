@@ -74,16 +74,15 @@ function StudentTestPrepPage() {
     rows?: {
       name: string;
       location?: string;
-      admissions?: string;
-      scholarships?: string;
-      orientationHousing?: string;
+      admissionsAid?: string;
+      acceptRate?: string;
       interestFit?: string;
       jobs?: string;
       area?: string;
       lean?: string;
-      income?: string;
+      cost?: string;
       weather?: string;
-      safety?: string;
+      crime?: string;
     }[];
     sources?: { label?: string; url?: string }[];
   }>(null);
@@ -336,7 +335,7 @@ function StudentTestPrepPage() {
               <table className="mt-2 w-full min-w-[980px] border-collapse text-left text-[12px] leading-snug">
                 <thead>
                   <tr className="border-b border-border bg-bg/70">
-                    {["College", "Admissions", "Scholarships", "Orient. / housing", "Interest fit", "Jobs", "Area", "Lean", "Income", "Weather", "Safety (campus + city)"].map((h) => (
+                    {["College", "Admissions & aid", "Accept %", "Interest fit / known for", "Jobs & placement", "Area", "Lean", "Cost", "Weather", "Crime (campus + city)"].map((h) => (
                       <th key={h} className="px-2 py-2 font-semibold text-fg">
                         {h}
                       </th>
@@ -350,16 +349,15 @@ function StudentTestPrepPage() {
                         {r.name}
                         {r.location ? <div className="text-[11px] font-normal text-muted">{r.location}</div> : null}
                       </td>
-                      <td className="px-2 py-2">{r.admissions}</td>
-                      <td className="px-2 py-2">{r.scholarships}</td>
-                      <td className="px-2 py-2">{r.orientationHousing}</td>
+                      <td className="px-2 py-2">{r.admissionsAid}</td>
+                      <td className="px-2 py-2">{r.acceptRate}</td>
                       <td className="px-2 py-2">{r.interestFit}</td>
                       <td className="px-2 py-2">{r.jobs}</td>
                       <td className="px-2 py-2">{r.area}</td>
                       <td className="px-2 py-2">{r.lean}</td>
-                      <td className="px-2 py-2">{r.income}</td>
+                      <td className="px-2 py-2">{r.cost}</td>
                       <td className="px-2 py-2">{r.weather}</td>
-                      <td className="px-2 py-2">{r.safety}</td>
+                      <td className="px-2 py-2">{r.crime}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -2106,17 +2106,18 @@ Colleges: ${colleges.join(" | ")}
 Interests: ${interests.join(" | ") || "general"}
 Cycle: ${cycle}. Student: ${data.educationLevel || ""} ${data.studentGrade || ""} ${data.collegeClass || ""} ${data.state || ""}.
 
-CELL RULES — this failed last time because cells were essays:
-- Every cell is 3-12 words OR a date list. No reasoning paragraphs.
-- Dates MUST be MM/DD/YY (e.g. 11/01/26). Pull from official .edu admissions/aid/housing/orientation pages when known.
-- If a date is uncertain write "Confirm on .edu" — do not invent a fake exact day.
-- Safety = campus AND the surrounding city. Format: "Campus Low; City Moderate".
-- Atmosphere lean in 1-2 words: Conservative / Mixed / Liberal.
-- Income mix: Low / Mixed / High (area, not the student's).
-- Weather: short ("Hot humid summers").
-- Scholarships/admissions: "Priority 11/15/26; Final 02/01/26".
-- Interest fit: name the 1-2 strongest matches to the listed interests only.
-- Jobs: employers or sector in a few words.
+CELL RULES:
+- Tight but useful: 1-2 short lines per cell, not an essay, not a 4-word stub.
+- Dates MM/DD/YY from official .edu pages. Uncertain: "Confirm on .edu".
+- admissionsAid COMBINES admission + scholarship deadlines in one cell.
+- Do NOT include orientation/housing.
+- interestFit: what the school is known for / excels at, then how it matches the student's listed interests.
+- jobs: start with exactly one of Excels | Good | Low, then employers or sector.
+- cost: living+typical attendance feel as $ to $$$$ (not a fake tuition to the dollar).
+- lean: Conservative / Mixed / Liberal.
+- weather: short climate.
+- crime: campus AND surrounding city. e.g. "Campus Low; City Moderate-High".
+- acceptRate: official or commonly published % if known, else "n/a".
 
 Use official university sites first. Also allowed: U.S. News program lists, Niche/city crime context, climate normals, first-destination reports. Do not limit to one directory.
 
@@ -2128,16 +2129,15 @@ Return ONLY JSON:
     {
       "name": "University of Arkansas",
       "location": "Fayetteville, AR",
-      "admissions": "Preferred 11/01/26; rolling",
-      "scholarships": "Priority 11/15/26; final 02/01/26",
-      "orientationHousing": "Housing spring; orient. summer",
-      "interestFit": "Business, Engineering",
-      "jobs": "Walmart, Tyson pipeline",
-      "area": "Ozarks; SEC Saturdays",
+      "admissionsAid": "Admit preferred 11/01/26; rolling. Aid priority 11/15/26; final 02/01/26",
+      "acceptRate": "72%",
+      "interestFit": "Known for Walton Business and Engineering. Strong match to business.",
+      "jobs": "Excels — Walmart, Tyson, regional HQs",
+      "area": "Ozarks hiking; SEC Saturdays",
       "lean": "Mixed",
-      "income": "Mixed",
+      "cost": "$$",
       "weather": "Four seasons",
-      "safety": "Campus Low-Mod; City Low-Mod"
+      "crime": "Campus Low-Mod; City Low-Mod"
     }
   ],
   "sources": [{ "label": "UARK Scholarships", "url": "https://scholarships.uark.edu/" }]
@@ -2148,16 +2148,15 @@ Return ONLY JSON:
       rows: colleges.map((name) => ({
         name,
         location: "",
-        admissions: "Confirm on .edu",
-        scholarships: "Confirm on .edu",
-        orientationHousing: "Confirm on .edu",
+        admissionsAid: "Confirm admit + aid dates on .edu",
+        acceptRate: "n/a",
         interestFit: interests.slice(0, 2).join(", ") || "—",
-        jobs: "See outcomes report",
+        jobs: "Good — see outcomes report",
         area: "See city site",
         lean: "—",
-        income: "—",
+        cost: "$$",
         weather: "—",
-        safety: "Campus —; City —",
+        crime: "Campus —; City —",
       })),
       sources: [],
     };
