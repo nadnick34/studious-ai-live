@@ -23,6 +23,7 @@ import { Route as TeacherRouteImport } from './routes/teacher'
 import { Route as TeacherIndexRouteImport } from './routes/teacher.index'
 import { Route as TeacherAnalyticsRouteImport } from './routes/teacher.analytics'
 import { Route as TeacherScriptoriumRouteImport } from './routes/teacher.scriptorium'
+import { Route as TeacherTestPrepRouteImport } from './routes/teacher.test-prep'
 import { Route as TeacherClassIdRouteImport } from './routes/teacher.class.$id'
 import { Route as TeacherClassIdGradeRouteImport } from './routes/teacher.class.$id.grade'
 import { Route as TeacherClassIdAssessmentAssessmentIdRouteImport } from './routes/teacher.class.$id.assessment.$assessmentId'
@@ -60,6 +61,7 @@ const TeacherRoute = TeacherRouteImport.update({ id: '/teacher', path: '/teacher
 const TeacherIndexRoute = TeacherIndexRouteImport.update({ id: '/teacher/', path: '/', getParentRoute: () => TeacherRoute } as any)
 const TeacherAnalyticsRoute = TeacherAnalyticsRouteImport.update({ id: '/teacher/analytics', path: '/analytics', getParentRoute: () => TeacherRoute } as any)
 const TeacherScriptoriumRoute = TeacherScriptoriumRouteImport.update({ id: '/teacher/scriptorium', path: '/scriptorium', getParentRoute: () => TeacherRoute } as any)
+const TeacherTestPrepRoute = TeacherTestPrepRouteImport.update({ id: '/teacher/test-prep', path: '/test-prep', getParentRoute: () => TeacherRoute } as any)
 const TeacherClassIdRoute = TeacherClassIdRouteImport.update({ id: '/teacher/class/$id', path: '/class/$id', getParentRoute: () => TeacherRoute } as any)
 const TeacherClassIdGradeRoute = TeacherClassIdGradeRouteImport.update({ id: '/teacher/class/$id/grade', path: '/class/$id/grade', getParentRoute: () => TeacherRoute } as any)
 const TeacherClassIdAssessmentAssessmentIdRoute = TeacherClassIdAssessmentAssessmentIdRouteImport.update({ id: '/teacher/class/$id/assessment/$assessmentId', path: '/class/$id/assessment/$assessmentId', getParentRoute: () => TeacherRoute } as any)
@@ -98,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute,
   '/teacher/scriptorium': typeof TeacherScriptoriumRoute
+  '/teacher/test-prep': typeof TeacherTestPrepRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
   '/teacher/class/$id/assessment/$assessmentId': typeof TeacherClassIdAssessmentAssessmentIdRoute
@@ -135,6 +138,7 @@ export interface FileRoutesByTo {
   '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute,
   '/teacher/scriptorium': typeof TeacherScriptoriumRoute
+  '/teacher/test-prep': typeof TeacherTestPrepRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
   '/teacher/class/$id/assessment/$assessmentId': typeof TeacherClassIdAssessmentAssessmentIdRoute
@@ -170,6 +174,7 @@ export interface FileRoutesById {
   '/teacher/': typeof TeacherIndexRoute
   '/teacher/analytics': typeof TeacherAnalyticsRoute,
   '/teacher/scriptorium': typeof TeacherScriptoriumRoute
+  '/teacher/test-prep': typeof TeacherTestPrepRoute
   '/teacher/class/$id': typeof TeacherClassIdRoute
   '/teacher/class/$id/grade': typeof TeacherClassIdGradeRoute
   '/teacher/class/$id/assessment/$assessmentId': typeof TeacherClassIdAssessmentAssessmentIdRoute
@@ -207,6 +212,8 @@ export interface FileRouteTypes {
     | '/project/$id'
     | '/teacher'
     | '/teacher/analytics'
+    | '/teacher/scriptorium'
+    | '/teacher/test-prep'
     | '/teacher/class/$id'
     | '/teacher/class/$id/grade'
     | '/teacher/class/$id/assessment/$assessmentId'
@@ -242,6 +249,8 @@ export interface FileRouteTypes {
     | '/project/$id'
     | '/teacher'
     | '/teacher/analytics'
+    | '/teacher/scriptorium'
+    | '/teacher/test-prep'
     | '/teacher/class/$id'
     | '/teacher/class/$id/grade'
     | '/teacher/class/$id/assessment/$assessmentId'
@@ -274,6 +283,8 @@ export interface FileRouteTypes {
     | '/project/$id'
     | '/teacher'
     | '/teacher/analytics'
+    | '/teacher/scriptorium'
+    | '/teacher/test-prep'
     | '/teacher/class/$id'
     | '/teacher/class/$id/grade'
     | '/teacher/class/$id/assessment/$assessmentId'
@@ -379,6 +390,7 @@ const TeacherRouteWithChildren = TeacherRoute._addFileChildren({
   TeacherIndexRoute,
   TeacherAnalyticsRoute,
   TeacherScriptoriumRoute,
+  TeacherTestPrepRoute,
   TeacherClassIdRoute,
   TeacherClassIdGradeRoute,
   TeacherClassIdAssessmentAssessmentIdRoute,

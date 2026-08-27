@@ -9,7 +9,7 @@ import { getProfile, saveProfile } from "@/lib/data";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
 import type { ChildGender, EducationApproach, UserProfile, UserRole } from "@/lib/types";
-import { EDUCATION_APPROACHES } from "@/lib/types";
+import { EDUCATION_APPROACHES, US_STATES } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -21,6 +21,7 @@ function ProfilePage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [schoolSelect, setSchoolSelect] = useState("studious");
   const [educationApproach, setEducationApproach] = useState<EducationApproach | "">("");
+  const [usState, setUsState] = useState("");
   const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState<UserRole>("student");
   const [forChild, setForChild] = useState(false);
@@ -59,6 +60,7 @@ function ProfilePage() {
       setSmsAlerts(p.smsAlerts);
       setSchoolSelect(p.schoolSelect);
       setEducationApproach(p.educationApproach || "");
+      setUsState(p.state || "");
       setAvatar(p.avatarDataUrl || "");
       setRole(p.role === "both" ? "student" : p.role);
       setForChild(Boolean(p.forChild));
@@ -81,6 +83,7 @@ function ProfilePage() {
       smsAlerts,
       schoolSelect,
       educationApproach: educationApproach || null,
+      state: usState || null,
       paletteId,
       customSchoolName: customName,
       avatarDataUrl: avatar,
@@ -305,6 +308,24 @@ function ProfilePage() {
             </select>
             <p className="mt-1 text-[11px] text-muted">
               Used by Teacher Scriptorium and class materials so wording and structure match the school’s approach.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">State</label>
+            <select
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+              value={usState}
+              onChange={(e) => setUsState(e.target.value)}
+            >
+              <option value="">Not specified</option>
+              {US_STATES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted">
+              Used for Teacher Test Prep (LEAP, state summatives, and other required exams).
             </p>
           </div>
           {schoolSelect === "custom" && (
