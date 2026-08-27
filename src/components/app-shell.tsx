@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { signOut } from "@/lib/auth/client";
@@ -96,6 +96,15 @@ function AppShellInner({
           </div>
           <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">
             {right}
+            <button
+              type="button"
+              onClick={toggleDark}
+              className="grid size-10 place-items-center rounded-lg text-muted hover:bg-bg hover:text-fg sm:hidden"
+              aria-label={dark ? "Switch to light mode" : "Switch to night mode"}
+              title={dark ? "Light mode" : "Night mode"}
+            >
+              {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
+            </button>
             <button
               type="button"
               onClick={() => void signOut("/")}

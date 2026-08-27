@@ -381,9 +381,7 @@ function GanttChart({
     URL.revokeObjectURL(url);
   }
 
-  function printGantt() {
-    const w = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
-    if (!w) return;
+  function ganttHtml() {
     const rows = local
       .map((t) => {
         const s = new Date(t.start).getTime();
@@ -391,28 +389,74 @@ function GanttChart({
         const left = Number.isNaN(s) ? 0 : ((s - min) / span) * 100;
         const width = Number.isNaN(s) || Number.isNaN(e) ? 8 : Math.max(((e - s) / span) * 100, 2);
         const color = t.completed ? "#059669" : t.risk === "high" ? "#dc2626" : t.risk === "medium" ? "#f97316" : "#fbbf24";
-        return `<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center;margin:6px 0;font-size:12px">
-          <div>${t.name}${t.owner ? " · " + t.owner : ""}</div>
-          <div style="position:relative;height:22px;background:#f1f5f9;border-radius:4px">
-            <div title="${formatMDY(t.start)} – ${formatMDY(t.end)}" style="position:absolute;left:${left}%;width:${width}%;top:3px;height:16px;border-radius:4px;background:${color}"></div>
+        const name = String(t.name || "").replace(/</g, "&lt;");
+        const owner = t.owner ? " · " + String(t.owner).replace(/</g, "&lt;") : "";
+        return `<div style="display:grid;grid-template-columns:180px 1fr 90px;gap:8px;align-items:center;margin:8px 0;font-size:12px">
+          <div>${name}${owner}</div>
+          <div style="position:relative;height:22px;background:#eef2f6;border-radius:4px">
+            <div style="position:absolute;left:${left}%;width:${width}%;top:3px;height:16px;border-radius:4px;background:${color}"></div>
           </div>
+          <div style="font-size:11px;color:#444">${formatMDY(t.start)} – ${formatMDY(t.end)}</div>
         </div>`;
       })
       .join("");
-    w.document.write(`<!doctype html><html><head><title>${projectName} Gantt</title>
-      <style>body{font-family:system-ui,sans-serif;padding:24px;color:#111} h1{font-size:18px} .legend span{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;vertical-align:middle}</style>
-      </head><body>
-      <h1>${projectName} — Gantt</h1>
+    const safeTitle = String(projectName || "Project").replace(/</g, "&lt;");
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${safeTitle} Gantt</title>
+      <style>
+        body{font-family:Georgia,system-ui,sans-serif;padding:28px;color:#111;background:#fff}
+        h1{font-size:20px;margin:0 0 8px}
+        .legend{font-size:12px;margin:0 0 16px;color:#333}
+        .legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin:0 4px 0 14px;vertical-align:middle}
+        .legend i:first-child{margin-left:0}
+        @page{size:landscape;margin:16mm}
+      </style></head><body>
+      <h1>${safeTitle} — Gantt</h1>
       <p class="legend">
-        <span style="background:#059669"></span> Completed
-        <span style="background:#fbbf24;margin-left:12px"></span> Incomplete
-        <span style="background:#f97316;margin-left:12px"></span> Medium risk
-        <span style="background:#dc2626;margin-left:12px"></span> High risk
+        <i style="background:#059669"></i> Completed
+        <i style="background:#fbbf24"></i> Incomplete
+        <i style="background:#f97316"></i> Medium risk
+        <i style="background:#dc2626"></i> High risk
       </p>
       ${rows}
-      <script>window.onload=()=>{window.print()}<\/script>
-      </body></html>`);
-    w.document.close();
+      </body></html>`;
+  }
+
+  function printGantt() {
+    const html = ganttHtml();
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    if (!doc) {
+      document.body.removeChild(frame);
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const run = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } finally {
+        setTimeout(() => {
+          frame.remove();
+        }, 800);
+      }
+    };
+    if (frame.contentWindow?.document.readyState === "complete") setTimeout(run, 150);
+    else frame.onload = () => setTimeout(run, 150);
+  }
+
+  function saveGanttHtml() {
+    const blob = new Blob([ganttHtml()], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName.replace(/[^a-z0-9]+/gi, "-")}-gantt.html`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -424,7 +468,10 @@ function GanttChart({
             Download CSV
           </Button>
           <Button type="button" variant="secondary" className="text-xs" onClick={printGantt}>
-            Print / PDF
+            Print / Save PDF
+          </Button>
+          <Button type="button" variant="secondary" className="text-xs" onClick={saveGanttHtml}>
+            Download HTML
           </Button>
         </div>
       </div>
