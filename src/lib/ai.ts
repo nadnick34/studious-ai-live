@@ -1688,3 +1688,179 @@ ${(data.extractedText || "").slice(0, 50000)}`;
       throw new Error("Could not parse the generated packet. Try fewer pages or a clearer prompt.");
     }
   });
+
+export const generateTestPrepPlan = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      state?: string;
+      schoolType?: string;
+      gradeLevel?: string;
+      subject: string;
+      testFocus: string;
+      className?: string;
+      today?: string;
+      coveredNotes?: string;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const today = data.today || new Date().toISOString().slice(0, 10);
+    const system = `You write a Test Prep coverage plan for ONE teacher, ONE subject, ONE exam.
+
+Only include content relevant to:
+state=${data.state || "unspecified"}, school type=${data.schoolType || "unspecified"},
+grade=${data.gradeLevel || "unspecified"}, subject=${data.subject}, test=${data.testFocus}.
+
+Do not mention other subjects or unrelated exams.
+Conservative, traditional classroom tone. No ideology.
+
+Use typical windows for that exam (e.g. Louisiana LEAP spring; ACT national dates; PSAT October).
+Judge pace vs TODAY (${today}) and grade level.
+
+Return ONLY JSON:
+{
+  "testFocus": "string",
+  "subject": "string",
+  "windowNote": "when this exam usually hits this grade/state",
+  "status": "Ahead of Schedule|On Pace|Needs Focus|Behind Schedule",
+  "statusWhy": "1-2 sentences",
+  "toCover": ["priority remaining items"],
+  "topics": [{ "id": "t1", "label": "string", "detail": "string", "priority": "high|medium|low" }]
+}
+8-14 topics max. Topics are the checklist items.`;
+
+    const user = `Class: ${data.className || ""}
+Subject: ${data.subject}
+Test in focus: ${data.testFocus}
+Grade: ${data.gradeLevel || ""}
+State: ${data.state || ""}
+School type: ${data.schoolType || ""}
+Today: ${today}
+Teacher notes on what is already taught:
+${data.coveredNotes || "(none)"}`;
+
+    const fallback = {
+      testFocus: data.testFocus,
+      subject: data.subject,
+      windowNote: "Set XAI_API_KEY to load a live plan.",
+      status: "Needs Focus",
+      statusWhy: "Live plan unavailable.",
+      toCover: [`Core ${data.subject} skills for ${data.testFocus}`],
+      topics: [
+        { id: "t1", label: `Foundations for ${data.testFocus}`, detail: "Definitions and core item types", priority: "high" },
+        { id: "t2", label: "Worked examples", detail: "One example of each item type", priority: "high" },
+        { id: "t3", label: "Timed practice", detail: "Short mixed set", priority: "medium" },
+      ],
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+export const generateTestPrepLesson = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      state?: string;
+      schoolType?: string;
+      gradeLevel?: string;
+      subject: string;
+      testFocus: string;
+      className?: string;
+      unchecked: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const system = `Write a 5-10 minute classroom lesson (1-2 printed pages) covering ONLY the unchecked Test Prep items.
+
+Produce TWO documents:
+1) Teacher's Guide — how to teach it in 5-10 minutes: objective, talk track, one example to work on the board, common errors, 2 check-for-understanding questions.
+2) Student Test Prep Summary — short narrative, key ideas, key terms table, 2-4 bullets with examples. No answer key dump. No homework essay.
+
+Tone: conservative, traditional, clear. Match subject and the named exam. No other subjects.
+
+Return ONLY JSON:
+{
+  "teacherGuide": {
+    "title": "string",
+    "minutes": "5-10",
+    "objective": "string",
+    "talkTrack": ["string"],
+    "boardExample": { "prompt": "string", "steps": ["string"], "answer": "string" },
+    "pitfalls": ["string"],
+    "checks": ["string"]
+  },
+  "studentSummary": {
+    "title": "string",
+    "narrative": "string",
+    "keyIdeas": ["string"],
+    "terms": [{ "term": "string", "definition": "string" }],
+    "examples": ["string"]
+  }
+}`;
+    const user = `Class ${data.className || ""} | ${data.gradeLevel || ""} | ${data.subject}
+Exam: ${data.testFocus}
+State: ${data.state || ""} | School type: ${data.schoolType || ""}
+UNCHECKED items to cover:
+${data.unchecked.map((x, i) => `${i + 1}. ${x}`).join("\n") || "(none listed)"}`;
+
+    const fallback = {
+      teacherGuide: {
+        title: `${data.subject} — ${data.testFocus} focus lesson`,
+        minutes: "5-10",
+        objective: "Review the unchecked items below.",
+        talkTrack: data.unchecked.slice(0, 6),
+        boardExample: { prompt: "Work one typical item from the exam.", steps: ["Read the stem", "Mark the skill", "Solve"], answer: "" },
+        pitfalls: ["Rushing the stem"],
+        checks: ["Have a student restate the method."],
+      },
+      studentSummary: {
+        title: `${data.subject} Test Prep Summary — ${data.testFocus}`,
+        narrative: `This sheet covers remaining ${data.testFocus} items in ${data.subject}.`,
+        keyIdeas: data.unchecked.slice(0, 6),
+        terms: [],
+        examples: [],
+      },
+    };
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 5000,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });

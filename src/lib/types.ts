@@ -213,6 +213,7 @@ export interface UserProfile {
   smsAlerts: boolean;
   schoolSelect: string;
   educationApproach?: EducationApproach | null;
+  state?: string | null;
   paletteId?: string | null;
   customSchoolName?: string | null;
   schoolLogoUrl?: string | null;
@@ -451,6 +452,30 @@ export const EDUCATION_APPROACHES = [
   "Special Education",
 ] as const;
 export type EducationApproach = (typeof EDUCATION_APPROACHES)[number];
+
+export const US_STATES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+  "Virginia","Washington","West Virginia","Wisconsin","Wyoming","District of Columbia",
+] as const;
+export type USState = (typeof US_STATES)[number];
+
+export const TEST_FOCUS_OPTIONS = [
+  "ACT",
+  "SAT",
+  "PSAT",
+  "PreACT",
+  "CLT",
+  "LEAP",
+  "Iowa Assessments",
+  "State summative",
+] as const;
+export type TestFocus = (typeof TEST_FOCUS_OPTIONS)[number];
+
 
 export type SchoolType =
   | "Classical"
