@@ -1794,7 +1794,13 @@ export const generateTestPrepLesson = createServerFn({ method: "POST" })
     const system = `Write a 5-10 minute classroom lesson (1-2 printed pages) covering ONLY the listed Test Prep item(s).
 
 Produce TWO documents:
-1) Teacher's Guide — how to teach it in 5-10 minutes: objective, talk track, one example to work on the board, common errors, 2 check-for-understanding questions.
+1) Teacher's Guide — 5-10 minutes:
+   - Narrative paragraph that explains the material (richer than the student paragraph).
+   - Objective + talk track.
+   - THREE board examples (worked).
+   - ONE word problem when the subject allows (math, science, applied social studies). Skip only if the skill cannot be a word problem.
+   - Key terms and examples: SAME items as the student sheet, but more complete definitions and fuller worked solutions.
+   - Common errors + 2 checks for understanding.
 2) Student Test Prep Summary:
    - Opening paragraph: 2-4 sentences max. Do not lecture.
    - Heavier EXAMPLES section (3-6 worked or sketched examples tied to this exam).
@@ -1809,9 +1815,17 @@ Return ONLY JSON:
   "teacherGuide": {
     "title": "string",
     "minutes": "5-10",
+    "narrative": "string",
     "objective": "string",
     "talkTrack": ["string"],
-    "boardExample": { "prompt": "string", "steps": ["string"], "answer": "string" },
+    "boardExamples": [
+      { "prompt": "string", "steps": ["string"], "answer": "string" },
+      { "prompt": "string", "steps": ["string"], "answer": "string" },
+      { "prompt": "string", "steps": ["string"], "answer": "string" }
+    ],
+    "wordProblem": { "prompt": "string", "steps": ["string"], "answer": "string" },
+    "terms": [{ "term": "string", "definition": "string" }],
+    "examples": ["string"],
     "pitfalls": ["string"],
     "checks": ["string"]
   },
