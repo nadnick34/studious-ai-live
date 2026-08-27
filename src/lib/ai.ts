@@ -1791,11 +1791,16 @@ export const generateTestPrepLesson = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const key = apiKey();
-    const system = `Write a 5-10 minute classroom lesson (1-2 printed pages) covering ONLY the unchecked Test Prep items.
+    const system = `Write a 5-10 minute classroom lesson (1-2 printed pages) covering ONLY the listed Test Prep item(s).
 
 Produce TWO documents:
 1) Teacher's Guide — how to teach it in 5-10 minutes: objective, talk track, one example to work on the board, common errors, 2 check-for-understanding questions.
-2) Student Test Prep Summary — short narrative, key ideas, key terms table, 2-4 bullets with examples. No answer key dump. No homework essay.
+2) Student Test Prep Summary:
+   - Opening paragraph: 2-4 sentences max. Do not lecture.
+   - Heavier EXAMPLES section (3-6 worked or sketched examples tied to this exam).
+   - Key ideas as short bullets; key terms table if needed.
+   - Extra Resources: 3-6 YouTube videos that teach THIS skill. Real search-style titles + https://www.youtube.com/results?search_query=... links (do not invent watch IDs). Label as outside resources.
+   - Test Taking Tips at the very bottom: 4-6 strategy bullets for this exam and skill (timing, stem reading, eliminate, show work, guess rules). No fluff.
 
 Tone: conservative, traditional, clear. Match subject and the named exam. No other subjects.
 
@@ -1815,7 +1820,9 @@ Return ONLY JSON:
     "narrative": "string",
     "keyIdeas": ["string"],
     "terms": [{ "term": "string", "definition": "string" }],
-    "examples": ["string"]
+    "examples": ["string"],
+    "resources": [{ "title": "string", "url": "string", "note": "string" }],
+    "testTips": ["string"]
   }
 }`;
     const user = `Class ${data.className || ""} | ${data.gradeLevel || ""} | ${data.subject}
