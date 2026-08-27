@@ -15,6 +15,7 @@ import {
 import {
   ASSESSMENT_TYPES,
   type AssessmentType,
+  type StudentResult,
   type TeacherAssessment,
   type TeacherClass,
 } from "@/lib/types";
@@ -31,7 +32,46 @@ type RosterRow = {
   status: string;
 };
 
-type View = "overview" | "student" | "grade" | "test";
+type View = "overview" | "student" | "grade" | "test" | "review";
+
+
+function normName(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function matchName(candidate: string, roster: string[]): string | null {
+  const c = normName(candidate);
+  if (!c) return null;
+  const exact = roster.find((r) => normName(r) === c);
+  if (exact) return exact;
+  const cTok = c.split(" ").filter((x) => x.length > 1);
+  if (!cTok.length) return null;
+  let best: { name: string; score: number } | null = null;
+  for (const r of roster) {
+    const rTok = normName(r).split(" ").filter((x) => x.length > 1);
+    if (!rTok.length) continue;
+    let score = 0;
+    if (cTok[cTok.length - 1] === rTok[rTok.length - 1]) score += 3;
+    if (cTok[0] === rTok[0]) score += 2;
+    else if (cTok[0][0] === rTok[0][0] && cTok[cTok.length - 1] === rTok[rTok.length - 1]) score += 2;
+    score += cTok.filter((tok) => rTok.includes(tok)).length;
+    if (!best || score > best.score) best = { name: r, score };
+  }
+  return best && best.score >= 3 ? best.name : null;
+}
+
+type ScanRow = {
+  scanName: string;
+  result: StudentResult;
+  rosterName: string;
+  action: "map" | "add" | "ignore";
+};
+
+type MissingRow = {
+  rosterName: string;
+  action: "skip" | "absent" | "manual";
+  manualScore: string;
+};
 
 function statusStyle(status: string) {
   if (status === "Strong") return "bg-emerald-50 text-emerald-700";
@@ -69,6 +109,11 @@ function TeacherClassPage() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    graded: Record<string, unknown>;
+    scans: ScanRow[];
+    missing: MissingRow[];
+  } | null>(null);
 
   async function reload() {
     const [c, s, a] = await Promise.all([
@@ -209,9 +254,69 @@ function TeacherClassPage() {
         );
       }
 
-      results = await remapResultsToRoster({ data: { classId: id, results } });
+      const scans: ScanRow[] = results.map((r: StudentResult) => {
+        const hit = matchName(r.studentName, rosterNames);
+        return {
+          scanName: r.studentName,
+          result: r,
+          rosterName: hit || "",
+          action: hit ? "map" : "add",
+        };
+      });
+      const used = new Set(scans.filter((s) => s.rosterName).map((s) => normName(s.rosterName)));
+      const missing: MissingRow[] = rosterNames
+        .filter((n) => !used.has(normName(n)))
+        .map((rosterName) => ({ rosterName, action: "skip", manualScore: "" }));
 
-      setStatus(`Saving ${results.length} student result(s) and updating roster…`);
+      setPending({
+        graded: graded as Record<string, unknown>,
+        scans,
+        missing,
+      });
+      setView("review");
+      setStatus("");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Grading failed");
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
+  async function confirmReview() {
+    if (!pending || !cls) return;
+    setBusy(true);
+    setError(null);
+    setStatus("Saving confirmed matches…");
+    try {
+      const results: StudentResult[] = [];
+      for (const row of pending.scans) {
+        if (row.action === "ignore") continue;
+        const name = row.action === "map" ? row.rosterName || row.scanName : row.scanName.trim();
+        if (!name) continue;
+        results.push({ ...row.result, studentName: name });
+      }
+      for (const row of pending.missing) {
+        if (row.action !== "manual") continue;
+        const score = Math.max(0, Math.min(100, Number(row.manualScore)));
+        if (!Number.isFinite(score)) continue;
+        results.push({
+          studentName: row.rosterName,
+          score,
+          pointsEarned: score,
+          pointsPossible: Number(gPoints) || 100,
+          status: score >= 90 ? "Strong" : score >= 75 ? "On Track" : score >= 60 ? "Needs Support" : "At Risk",
+          missed: [],
+          focusAreas: ["Score entered manually — test page was not in the batch"],
+          studyTips: [],
+        });
+      }
+      if (!results.length) throw new Error("Nothing to save. Map at least one student or enter a manual score.");
+
+      const avg = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);
+      const graded = pending.graded;
       const assessment = await createTeacherAssessment({
         data: {
           classId: id,
@@ -220,40 +325,34 @@ function TeacherClassPage() {
           topics: gTopics.trim(),
           pointsPossible: Number(gPoints) || 100,
           sourceFiles: allFiles.map((f) => f.file.name),
-          classAverage: Number(graded.classAverage) || 0,
-          topicScores: Array.isArray(graded.topicScores) ? graded.topicScores : [],
-          strengths: Array.isArray(graded.strengths) ? graded.strengths : [],
-          needs: Array.isArray(graded.needs) ? graded.needs : [],
+          classAverage: Number(graded.classAverage) || avg,
+          topicScores: Array.isArray(graded.topicScores) ? (graded.topicScores as TeacherAssessment["topicScores"]) : [],
+          strengths: Array.isArray(graded.strengths) ? (graded.strengths as string[]) : [],
+          needs: Array.isArray(graded.needs) ? (graded.needs as TeacherAssessment["needs"]) : [],
           results,
-          questions: Array.isArray((graded as { questions?: unknown }).questions)
-            ? (graded as { questions: { number: string; prompt: string; correct: string; topic?: string }[] }).questions
+          questions: Array.isArray(graded.questions)
+            ? (graded.questions as TeacherAssessment["questions"])
             : [],
         },
       });
-
       await applyAssessmentResultsToRoster({
         data: {
           classId: id,
-          results: results.map((r: { studentName: string; score: number }) => ({
-            studentName: r.studentName,
-            score: r.score,
-          })),
+          results: results.map((r) => ({ studentName: r.studentName, score: r.score })),
         },
       });
-
-      setStatus("Done — opening analytics…");
-      setView("overview");
+      setPending(null);
       setAllFiles([]);
       setGName("");
       setGTopics("");
+      setView("overview");
       await reload();
       await navigate({
         to: "/teacher/class/$id/assessment/$assessmentId",
         params: { id, assessmentId: assessment.id },
       });
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Grading failed");
+      setError(err instanceof Error ? err.message : "Could not save");
       setStatus("");
     } finally {
       setBusy(false);
@@ -388,6 +487,226 @@ function TeacherClassPage() {
               {busy ? "Grading…" : "Grade & Analyze"}
             </Button>
           </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // —— MATCH REVIEW ——
+  if (view === "review" && pending) {
+    const rosterNames = (stats.students || []).map((s) => s.name);
+    const mapped = pending.scans.filter((s) => s.action === "map" && s.rosterName);
+    const unmatched = pending.scans.filter((s) => s.action !== "map" || !s.rosterName);
+    return (
+      <AppShell title="Confirm roster matches">
+        <button
+          type="button"
+          className="mb-3 text-sm text-teal hover:underline"
+          onClick={() => {
+            setView("grade");
+            setPending(null);
+          }}
+        >
+          ← Back to upload
+        </button>
+        <p className="mb-4 text-sm text-muted">
+          Check how scanned names landed on the roster before scores are saved. Fix mismatches now — this is the
+          best time.
+        </p>
+
+        <section className="mb-5 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="font-semibold text-fg">Matched ({mapped.length})</h3>
+          </div>
+          {mapped.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted">No automatic matches.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {pending.scans.map((row, i) => {
+                if (!(row.action === "map" && row.rosterName)) return null;
+                return (
+                  <li key={`m-${i}`} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+                    <span className="min-w-32 font-medium text-fg">{row.scanName}</span>
+                    <span className="text-muted">→</span>
+                    <select
+                      className="rounded-lg border border-border px-2 py-1 text-sm"
+                      value={row.rosterName}
+                      onChange={(e) => {
+                        const rosterName = e.target.value;
+                        setPending({
+                          ...pending,
+                          scans: pending.scans.map((s, idx) =>
+                            idx === i ? { ...s, rosterName, action: rosterName ? "map" : "add" } : s,
+                          ),
+                        });
+                      }}
+                    >
+                      {rosterNames.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-muted">{row.result.score}%</span>
+                    <button
+                      type="button"
+                      className="text-xs text-muted hover:text-red"
+                      onClick={() =>
+                        setPending({
+                          ...pending,
+                          scans: pending.scans.map((s, idx) => (idx === i ? { ...s, action: "ignore" } : s)),
+                        })
+                      }
+                    >
+                      Ignore
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className="mb-5 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="font-semibold text-fg">Unmatched scans ({unmatched.length})</h3>
+            <p className="text-xs text-muted">Name was read from the test but did not land on the roster.</p>
+          </div>
+          {unmatched.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted">All scans matched.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {pending.scans.map((row, i) => {
+                if (row.action === "map" && row.rosterName) return null;
+                return (
+                  <li key={`u-${i}`} className="space-y-2 px-4 py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-fg">{row.scanName}</span>
+                      <span className="text-muted">{row.result.score}%</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        className="rounded-lg border border-border px-2 py-1 text-sm"
+                        value={row.action === "map" ? row.rosterName : ""}
+                        onChange={(e) => {
+                          const rosterName = e.target.value;
+                          setPending({
+                            ...pending,
+                            scans: pending.scans.map((s, idx) =>
+                              idx === i
+                                ? { ...s, rosterName, action: rosterName ? "map" : s.action === "ignore" ? "ignore" : "add" }
+                                : s,
+                            ),
+                          });
+                        }}
+                      >
+                        <option value="">Assign to roster…</option>
+                        {rosterNames.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        variant="secondary"
+                        className="text-xs"
+                        onClick={() =>
+                          setPending({
+                            ...pending,
+                            scans: pending.scans.map((s, idx) => (idx === i ? { ...s, action: "add", rosterName: "" } : s)),
+                          })
+                        }
+                      >
+                        Add as new student
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="text-xs"
+                        onClick={() =>
+                          setPending({
+                            ...pending,
+                            scans: pending.scans.map((s, idx) => (idx === i ? { ...s, action: "ignore" } : s)),
+                          })
+                        }
+                      >
+                        Ignore
+                      </Button>
+                    </div>
+                    {row.action === "add" && (
+                      <p className="text-xs text-teal">Will add “{row.scanName}” to the roster.</p>
+                    )}
+                    {row.action === "ignore" && <p className="text-xs text-muted">This scan will not be saved.</p>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section className="mb-5 overflow-hidden rounded-xl border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="font-semibold text-fg">Roster with no page ({pending.missing.length})</h3>
+            <p className="text-xs text-muted">On the class list, but no test was found in this batch.</p>
+          </div>
+          {pending.missing.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted">Every roster student has a page.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {pending.missing.map((row, i) => (
+                <li key={row.rosterName} className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+                  <span className="min-w-32 font-medium text-fg">{row.rosterName}</span>
+                  <select
+                    className="rounded-lg border border-border px-2 py-1 text-sm"
+                    value={row.action}
+                    onChange={(e) => {
+                      const action = e.target.value as MissingRow["action"];
+                      setPending({
+                        ...pending,
+                        missing: pending.missing.map((m, idx) => (idx === i ? { ...m, action } : m)),
+                      });
+                    }}
+                  >
+                    <option value="skip">Leave blank</option>
+                    <option value="absent">Mark absent</option>
+                    <option value="manual">Enter score</option>
+                  </select>
+                  {row.action === "manual" && (
+                    <input
+                      className="w-20 rounded-lg border border-border px-2 py-1 text-sm"
+                      placeholder="%"
+                      value={row.manualScore}
+                      onChange={(e) =>
+                        setPending({
+                          ...pending,
+                          missing: pending.missing.map((m, idx) =>
+                            idx === i ? { ...m, manualScore: e.target.value } : m,
+                          ),
+                        })
+                      }
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {error && <p className="mb-3 text-sm text-red">{error}</p>}
+        {status && <p className="mb-3 text-xs text-teal">{status}</p>}
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => {
+              setView("grade");
+              setPending(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button disabled={busy} onClick={() => void confirmReview()}>
+            {busy ? "Saving…" : "Save matches"}
+          </Button>
         </div>
       </AppShell>
     );
