@@ -7,7 +7,8 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile, saveProfile } from "@/lib/data";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
-import type { ChildGender, UserProfile, UserRole } from "@/lib/types";
+import type { ChildGender, EducationApproach, UserProfile, UserRole } from "@/lib/types";
+import { EDUCATION_APPROACHES } from "@/lib/types";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -18,6 +19,7 @@ function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [schoolSelect, setSchoolSelect] = useState("studious");
+  const [educationApproach, setEducationApproach] = useState<EducationApproach | "">("");
   const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState<UserRole>("student");
   const [forChild, setForChild] = useState(false);
@@ -38,6 +40,7 @@ function ProfilePage() {
       setPhone(p.phone);
       setSmsAlerts(p.smsAlerts);
       setSchoolSelect(p.schoolSelect);
+      setEducationApproach(p.educationApproach || "");
       setAvatar(p.avatarDataUrl || "");
       setRole(p.role === "both" ? "student" : p.role);
       setForChild(Boolean(p.forChild));
@@ -59,6 +62,7 @@ function ProfilePage() {
       phone,
       smsAlerts,
       schoolSelect,
+      educationApproach: educationApproach || null,
       paletteId,
       customSchoolName: customName,
       avatarDataUrl: avatar,
@@ -257,6 +261,24 @@ function ProfilePage() {
             {role === "professional" && (
               <p className="mt-1 text-[11px] text-muted">School branding is not used for Professional accounts.</p>
             )}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">School type</label>
+            <select
+              className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm"
+              value={educationApproach}
+              onChange={(e) => setEducationApproach(e.target.value as EducationApproach | "")}
+            >
+              <option value="">Not specified</option>
+              {EDUCATION_APPROACHES.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted">
+              Used by Teacher Scriptorium and class materials so wording and structure match the school’s approach.
+            </p>
           </div>
           {schoolSelect === "custom" && (
             <div className={role === "professional" ? "opacity-50" : ""}>

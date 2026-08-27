@@ -212,6 +212,7 @@ export interface UserProfile {
   phone: string;
   smsAlerts: boolean;
   schoolSelect: string;
+  educationApproach?: EducationApproach | null;
   paletteId?: string | null;
   customSchoolName?: string | null;
   schoolLogoUrl?: string | null;
@@ -439,6 +440,17 @@ export const MEETING_TYPES: MeetingType[] = [
   "Google Meet",
   "Other Remote",
 ];
+
+export const EDUCATION_APPROACHES = [
+  "Classical",
+  "Religious",
+  "Public (Standard)",
+  "Public (Common Core)",
+  "Montessori",
+  "Vocational",
+  "Special Education",
+] as const;
+export type EducationApproach = (typeof EDUCATION_APPROACHES)[number];
 
 export type SchoolType =
   | "Classical"

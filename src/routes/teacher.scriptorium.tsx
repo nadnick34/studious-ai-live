@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { extractMaterials, generateScriptoriumPacket } from "@/lib/ai";
 import { getProfile } from "@/lib/data";
 import { brandFromProfile } from "@/lib/schools";
+import { EDUCATION_APPROACHES, type EducationApproach } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/scriptorium")({
   component: ScriptoriumPage,
@@ -68,6 +69,7 @@ function ScriptoriumPage() {
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("");
   const [schoolName, setSchoolName] = useState("");
+  const [educationApproach, setEducationApproach] = useState<EducationApproach | "">("");
   const [date, setDate] = useState("");
   const [format, setFormat] = useState<(typeof FORMATS)[number]>("Mixed");
   const [count, setCount] = useState(10);
@@ -91,6 +93,7 @@ function ScriptoriumPage() {
         const brand = brandFromProfile(p);
         const name = brand?.name || p.customSchoolName || "";
         if (name && name.toLowerCase() !== "studious") setSchoolName(name);
+        if (p.educationApproach) setEducationApproach(p.educationApproach);
       })
       .catch(() => {});
   }, []);
@@ -131,7 +134,7 @@ function ScriptoriumPage() {
           questionCount: count,
           comments: comments.trim(),
           extractedText,
-          schoolType: profile?.schoolSelect || "Classical",
+          schoolType: educationApproach || profile?.educationApproach || "Classical",
         },
       })) as Packet;
       setPacket(result);
@@ -241,15 +244,31 @@ function ScriptoriumPage() {
                     disabled={busy}
                   />
                 </label>
-                <label className="block text-xs text-muted sm:col-span-2">
+                <label className="block text-xs text-muted">
                   School name
                   <input
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
                     value={schoolName}
                     onChange={(e) => setSchoolName(e.target.value)}
-                    placeholder="Pulled from your profile — edit if needed"
+                    placeholder="From profile — edit if needed"
                     disabled={busy}
                   />
+                </label>
+                <label className="block text-xs text-muted">
+                  School type
+                  <select
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm text-fg"
+                    value={educationApproach}
+                    onChange={(e) => setEducationApproach(e.target.value as EducationApproach | "")}
+                    disabled={busy}
+                  >
+                    <option value="">Not specified</option>
+                    {EDUCATION_APPROACHES.map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className={`block text-xs ${isAssess ? "text-muted" : "text-muted/50"}`}>
                   Date

@@ -87,6 +87,7 @@ type ProfileRow = {
   child_age?: number | null;
   child_gender?: string | null;
   kids_mode?: boolean;
+  education_approach?: string | null;
 };
 
 function emptyNotes(title: string): StudyNotes {
@@ -149,6 +150,7 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
       childAge: null,
       childGender: null,
       kidsMode: false,
+      educationApproach: null,
     };
   }
   const childAge = row.child_age == null ? null : Number(row.child_age);
@@ -173,6 +175,7 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
     childAge,
     childGender: row.child_gender === "boy" || row.child_gender === "girl" ? row.child_gender : null,
     kidsMode,
+    educationApproach: (row.education_approach as UserProfile["educationApproach"]) || null,
   };
 }
 
@@ -195,17 +198,22 @@ export const saveProfile = createServerFn({ method: "POST" })
       Boolean(data.kidsMode) ||
       forChild ||
       (data.role === "student" && childAge != null && !Number.isNaN(childAge) && childAge <= 9);
+    try {
+      await sql.query(`alter table profiles add column if not exists education_approach text`);
+    } catch {
+      /* ignore */
+    }
     await sql`
       insert into profiles (
         user_id, display_name, phone, sms_alerts, school_select, palette_id,
         custom_school_name, school_logo_url, avatar_data_url, role, edition, setup_complete,
-        for_child, child_age, child_gender, kids_mode, updated_at
+        for_child, child_age, child_gender, kids_mode, education_approach, updated_at
       ) values (
         ${context.userId}, ${data.displayName ?? null}, ${data.phone}, ${data.smsAlerts},
         ${data.schoolSelect}, ${data.paletteId ?? null}, ${data.customSchoolName ?? null},
         ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${data.role},
         ${data.edition}, ${data.setupComplete},
-        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, now()
+        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, now()
       )
       on conflict (user_id) do update set
         display_name = excluded.display_name,
@@ -223,6 +231,7 @@ export const saveProfile = createServerFn({ method: "POST" })
         child_age = excluded.child_age,
         child_gender = excluded.child_gender,
         kids_mode = excluded.kids_mode,
+        education_approach = excluded.education_approach,
         updated_at = now()
     `;
     return { ok: true as const };
