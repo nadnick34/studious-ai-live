@@ -59,6 +59,7 @@ type Track = {
   plan: Plan | null;
   checked: Record<string, boolean>;
   log: LogItem[];
+  archived?: boolean;
 };
 
 function statusClass(s?: string) {
@@ -80,6 +81,7 @@ function StudentTestPrepPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [newTest, setNewTest] = useState("ACT");
   const [level, setLevel] = useState("");
   const [klass, setKlass] = useState("");
@@ -196,6 +198,7 @@ function StudentTestPrepPage() {
   }
 
   const open = tracks.find((t) => t.id === openId) || null;
+  const visible = tracks.filter((t) => (showArchived ? t.archived : !t.archived));
 
   async function addTrack() {
     const track: Track = {
@@ -818,6 +821,9 @@ function StudentTestPrepPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setShowArchived((v) => !v)}>
+              {showArchived ? "Active cards" : "Archived"}
+            </Button>
             <Button onClick={() => setAdding(true)}>Add New Prep</Button>
             <Button variant="secondary" onClick={() => setCompareOpen(true)}>
               College comparison
@@ -860,10 +866,10 @@ function StudentTestPrepPage() {
         {error && <p className="text-sm text-red">{error}</p>}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          {tracks.length === 0 && !adding && (
-            <p className="text-sm text-muted">Nothing yet. Add Real World, or an exam such as ACT, GRE, or NCLEX.</p>
+          {visible.length === 0 && !adding && (
+            <p className="text-sm text-muted">{showArchived ? "No archived cards." : "Nothing yet. Add Real World, or an exam such as ACT, GRE, or NCLEX."}</p>
           )}
-          {tracks.map((track) => {
+          {visible.map((track) => {
             const topics = track.plan?.topics || [];
             const done = topics.filter((t) => track.checked[t.id]).length;
             const pct = topics.length ? Math.round((done / topics.length) * 100) : 0;
@@ -902,6 +908,13 @@ function StudentTestPrepPage() {
                     {track.lastRefreshed ? `Refreshed ${new Date(track.lastRefreshed).toLocaleDateString()}` : "Never refreshed"}
                   </p>
                   <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="text-xs"
+                      onClick={() => updateTrack(track.id, { archived: !track.archived })}
+                    >
+                      {track.archived ? "Restore" : "Archive"}
+                    </Button>
                     <Button
                       variant="secondary"
                       className="text-xs"
