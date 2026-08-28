@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { generateTestPrepLesson, generateTestPrepPlan } from "@/lib/ai";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
 import { PREP_SUBJECTS, STUDENT_TEST_GROUPS } from "@/lib/types";
 
@@ -73,6 +74,7 @@ function daysSince(iso?: string) {
 }
 
 function TeacherPrepPage() {
+  const user = useCurrentUser();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -89,13 +91,17 @@ function TeacherPrepPage() {
   const [printTarget, setPrintTarget] = useState<"teacher" | "student" | "both">("both");
 
   useEffect(() => {
+    if (!user?.id) {
+      setTracks([]);
+      return;
+    }
     void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
       setStateName(profile.state || "");
       setSchoolType(profile.educationApproach || "");
       const remote = Array.isArray(tools?.teacherPrepTracks) ? (tools!.teacherPrepTracks as Track[]) : [];
       setTracks(remote);
     });
-  }, []);
+  }, [user?.id]);
 
   function persist(next: Track[]) {
     setTracks(next);

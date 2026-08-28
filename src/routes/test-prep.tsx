@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { generateCollegeComparison, generateReadingComprehensionQuiz, generateStudentTestPrepLesson, generateStudentTestPrepPlan, gradeReadingComprehensionQuiz } from "@/lib/ai";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
 import { STUDENT_TEST_GROUPS } from "@/lib/types";
 
@@ -75,6 +76,7 @@ function daysSince(iso?: string) {
 }
 
 function StudentTestPrepPage() {
+  const user = useCurrentUser();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -116,6 +118,12 @@ function StudentTestPrepPage() {
   }>(null);
 
   useEffect(() => {
+    if (!user?.id) {
+      setTracks([]);
+      setComparison(null);
+      return;
+    }
+    const uid = user.id;
     void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
       setLevel(profile.educationLevel || "");
       setKlass(profile.collegeClass || "");
@@ -124,7 +132,7 @@ function StudentTestPrepPage() {
       const remote = Array.isArray(tools?.studentTestPrep) ? (tools!.studentTestPrep as Track[]) : [];
       let local: Track[] = [];
       try {
-        local = JSON.parse(localStorage.getItem("studious-practicum-tracks") || "[]") as Track[];
+        local = JSON.parse(localStorage.getItem(`studious-practicum-tracks:${uid}`) || "[]") as Track[];
       } catch {
         local = [];
       }
@@ -132,14 +140,14 @@ function StudentTestPrepPage() {
       try {
         if (tools?.collegeCompare) setComparison(tools.collegeCompare as typeof comparison);
         else {
-          const saved = localStorage.getItem("studious-college-compare");
+          const saved = localStorage.getItem(`studious-college-compare:${uid}`);
           if (saved) setComparison(JSON.parse(saved));
         }
       } catch {
         /* ignore */
       }
     });
-  }, []);
+  }, [user?.id]);
 
 
   async function runCompare() {
@@ -165,7 +173,7 @@ function StudentTestPrepPage() {
       });
       setComparison(result);
       try {
-        localStorage.setItem("studious-college-compare", JSON.stringify(result));
+        if (user?.id) localStorage.setItem(`studious-college-compare:${user.id}`, JSON.stringify(result));
       } catch {
         /* ignore */
       }
@@ -180,7 +188,7 @@ function StudentTestPrepPage() {
   function persist(next: Track[]) {
     setTracks(next);
     try {
-      localStorage.setItem("studious-practicum-tracks", JSON.stringify(next));
+      if (user?.id) localStorage.setItem(`studious-practicum-tracks:${user.id}`, JSON.stringify(next));
     } catch {
       /* ignore */
     }
