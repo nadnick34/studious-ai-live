@@ -479,6 +479,18 @@ export const TEST_FOCUS_OPTIONS = [
 ] as const;
 export type TestFocus = (typeof TEST_FOCUS_OPTIONS)[number];
 
+export const PREP_SUBJECTS = [
+  "English / ELA",
+  "Mathematics",
+  "Science",
+  "Social Studies",
+  "Reading & Comprehension",
+  "Computer Software & AI",
+  "Real World",
+  "Other",
+] as const;
+
+
 export const EDUCATION_LEVELS = [
   "Elementary",
   "Middle School",

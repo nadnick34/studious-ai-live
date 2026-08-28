@@ -19,7 +19,7 @@ function getNav(role?: string | null) {
       { to: "/teacher", label: "Classes", icon: GraduationCap, match: (p: string) => p === "/teacher" || p.startsWith("/teacher/class") },
       { to: "/teacher/analytics", label: "Analytics", icon: LayoutDashboard, match: (p: string) => p.startsWith("/teacher/analytics") },
       { to: "/teacher/scriptorium", label: "Scriptorium", icon: ScrollText, match: (p: string) => p.startsWith("/teacher/scriptorium") },
-      { to: "/teacher/test-prep", label: "Test Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/teacher/test-prep") },
+      { to: "/teacher/test-prep", label: "Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/teacher/test-prep") },
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
   }
