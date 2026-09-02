@@ -22,24 +22,26 @@ const EDITIONS: {
     tag: "Academic excellence",
     title: "Student edition",
     summary:
-      "Your masterclass for every class. Gather what the course already gave you and study it in more than one way.",
+      "Your masterclass for every class. Gather what the course already gave you and study it in more than one way. Built for mastery, not just tests.",
     does: [
       "Compile notes, PDFs, photos, scans, and lecture audio into one study packet.",
       "Read comprehensive notes, listen while you work out, flip flash cards, and take a quiz.",
-      "Classical mode, assignment check, Practicum & Prep, and college comparison when you need them.",
+      "Assignment Assistant: upload the instructions and/or finished work. Get a review of what to do, an assessment of the completed work (what looks good and what to fix), and Extra Mile suggestions. Print or share that feedback as a PDF.",
+      "Classical mode, Practicum & Prep, and college comparison when you need them.",
     ],
     how: [
       "Create an account and set Student in your profile.",
       "Add a class and a chapter.",
       "Upload notes, photos, or audio, then generate.",
+      "Use Assignment Assistant from the class menu when you have homework to plan or check.",
       "Study the packet. Combine chapters for a midterm or final.",
     ],
     icon: (
-      <svg viewBox="0 0 64 64" className="mx-auto h-12 w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.6">
-        <path d="M8 28 L32 16 L56 28 L32 40 Z" />
-        <path d="M16 32 v10 c8 6 24 6 32 0 V32" />
-        <path d="M50 30 v14" />
-        <path d="M50 44 h4" />
+      <svg viewBox="0 0 64 64" className="mx-auto h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 28 L32 14 L56 28 L32 42 Z" />
+        <path d="M18 33 v9 c7 5 21 5 28 0 v-9" />
+        <path d="M50 31 v16" />
+        <path d="M50 47 h5" />
       </svg>
     ),
   },
@@ -61,10 +63,9 @@ const EDITIONS: {
       "Open Scriptorium or Prep when you need materials or a coverage plan.",
     ],
     icon: (
-      <svg viewBox="0 0 64 64" className="mx-auto h-12 w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.6">
-        <path d="M32 14 c4 8 6 12 6 16 a6 6 0 1 1 -12 0 c0-4 2-8 6-16 Z" />
-        <path d="M26 36 c-8 2 -12 8 -12 14 h36 c0-6-4-12-12-14" />
-        <path d="M22 28 h20" />
+      <svg viewBox="0 0 64 64" className="mx-auto h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M32 26 c-9-12 -22-2 -16 12 c4 10 12 16 16 18 c4-2 12-8 16-18 c6-14 -7-24 -16-12 Z" />
+        <path d="M34 16 c4 1 9 6 8 12" />
       </svg>
     ),
   },
@@ -86,9 +87,9 @@ const EDITIONS: {
       "Open Projects to group work and watch the timeline.",
     ],
     icon: (
-      <svg viewBox="0 0 64 64" className="mx-auto h-12 w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.6">
+      <svg viewBox="0 0 64 64" className="mx-auto h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="10" y="24" width="44" height="28" rx="3" />
-        <path d="M22 24 v-4 a10 6 0 0 1 20 0 v4" />
+        <path d="M24 24 v-5 a8 5 0 0 1 16 0 v5" />
         <path d="M10 34 h44" />
       </svg>
     ),
@@ -96,7 +97,7 @@ const EDITIONS: {
 ];
 
 const glass =
-  "border border-[#e8d7a8]/35 bg-[rgba(12,18,32,0.28)] shadow-[inset_0_1px_0_rgba(232,215,168,0.28),0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-[10px]";
+  "border border-[#f0e2b8]/45 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md";
 
 function Landing() {
   const { user } = useCurrentUserState();
@@ -106,68 +107,64 @@ function Landing() {
   if (user) return <RoleHomeRedirect />;
 
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-[#2a2018] text-[#f4ead6]">
+    <div className="relative min-h-dvh overflow-x-hidden bg-[#4a3a2a] text-[#f4ead6]">
       <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        className="pointer-events-none absolute inset-0 bg-cover bg-center brightness-125 contrast-105 saturate-110"
         style={{ backgroundImage: "url('/library-bg.jpg')" }}
         aria-hidden
       />
-      <div className="pointer-events-none absolute inset-0 bg-black/20" aria-hidden />
+      <div className="pointer-events-none absolute inset-0 bg-[#3b2a18]/15" aria-hidden />
 
-      <main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl flex-col items-center justify-center px-4 py-10">
-        <section className={`w-full max-w-3xl rounded-[28px] px-6 py-10 text-center sm:px-14 sm:py-12 ${glass}`}>
-          <img src="/hero-mark.png" alt="" className="mx-auto h-[4.25rem] w-auto sm:h-20" />
-          <h1 className="mt-5 font-serif text-[1.85rem] leading-[1.12] font-semibold text-[#f4ead6] sm:text-[2.6rem]">
-            Your masterclass
-            <br className="hidden sm:block" /> for every class
+      <main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl flex-col items-center justify-between px-3 py-3 sm:justify-center sm:px-4 sm:py-10">
+        <section className={`w-full max-w-3xl rounded-2xl px-4 py-4 text-center sm:rounded-[28px] sm:px-14 sm:py-12 ${glass}`}>
+          <p className="font-serif text-[11px] font-semibold tracking-[0.22em] text-[#e8d7a8] sm:text-sm">STUDIOUS AI</p>
+          <img src="/hero-mark.png" alt="" className="mx-auto mt-1 h-12 w-auto sm:mt-3 sm:h-20" />
+          <h1 className="mt-2 font-serif text-[1.35rem] leading-[1.12] font-semibold text-[#f7f0dc] sm:mt-5 sm:text-[2.6rem]">
+            Your masterclass for every class
           </h1>
-          <p className="mt-4 font-serif text-xl italic text-[#e8d7a8] sm:text-2xl">
-            <span className="mx-3 inline-block h-px w-8 align-middle bg-[#e8d7a8]/50" />
-            Get Studious!
-            <span className="mx-3 inline-block h-px w-8 align-middle bg-[#e8d7a8]/50" />
-          </p>
-          <p className="mx-auto mt-4 max-w-lg text-[13px] leading-relaxed text-[#f4ead6]/85 sm:text-sm">
+          <p className="mt-1 font-serif text-base italic text-[#e8d7a8] sm:mt-4 sm:text-2xl">Get Studious!</p>
+          <p className="mx-auto mt-1 hidden max-w-lg text-sm leading-relaxed text-[#f4ead6]/90 sm:mt-4 sm:block">
             Notes, lectures, and photos become one study place: a packet you can read, hear, quiz, and master.
           </p>
           <button
             type="button"
             onClick={() => setShowOverview(true)}
-            className="mt-2 text-xs tracking-wide text-[#e8d7a8]/85 underline decoration-[#e8d7a8]/40 underline-offset-4"
+            className="mt-1 text-[11px] tracking-wide text-[#e8d7a8] underline decoration-[#e8d7a8]/50 underline-offset-4 sm:mt-2 sm:text-xs"
           >
             More info
           </button>
-          <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+          <div className="mx-auto mt-3 grid w-full max-w-xs grid-cols-2 gap-2 sm:mt-8 sm:max-w-md sm:gap-3">
             <Link
               to="/login"
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#c9a24a] px-8 text-sm font-semibold text-[#1a1510] hover:bg-[#e8d7a8]"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[#c9a24a] px-3 text-xs font-semibold text-[#1a1510] hover:bg-[#e8d7a8] sm:h-11 sm:text-sm"
             >
-              Login →
+              Login
             </Link>
             <Link
               to="/signup"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#e8d7a8]/70 px-8 text-sm font-semibold text-[#e8d7a8] hover:bg-[#e8d7a8]/10"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-[#e8d7a8] px-3 text-xs font-semibold text-[#e8d7a8] hover:bg-[#e8d7a8]/10 sm:h-11 sm:text-sm"
             >
-              Create Path →
+              Create Path
             </Link>
           </div>
         </section>
 
-        <div className="mt-5 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+        <div className="mt-2 grid w-full max-w-3xl grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
           {EDITIONS.map((ed) => (
             <button
               key={ed.id}
               type="button"
               onClick={() => setEdition(ed)}
-              className={`rounded-2xl px-4 py-6 text-center transition hover:border-[#e8d7a8]/60 ${glass}`}
+              className={`rounded-xl px-1.5 py-3 text-center sm:rounded-2xl sm:px-4 sm:py-6 ${glass}`}
             >
               {ed.icon}
-              <h2 className="mt-3 font-serif text-lg text-[#f4ead6]">{ed.name}</h2>
-              <p className="mt-1 text-[12px] text-[#e8d7a8]/80">{ed.tag}</p>
+              <h2 className="mt-1 font-serif text-[12px] text-[#f7f0dc] sm:mt-3 sm:text-lg">{ed.name}</h2>
+              <p className="mt-0.5 hidden text-[12px] text-[#e8d7a8]/85 sm:block">{ed.tag}</p>
             </button>
           ))}
         </div>
 
-        <p className="mt-8 text-center text-[10px] tracking-[0.14em] text-[#e8d7a8]/70">
+        <p className="mt-2 pb-[env(safe-area-inset-bottom)] text-center text-[9px] tracking-[0.12em] text-[#e8d7a8]/80 sm:mt-8 sm:text-[10px]">
           created by The Nickersonian Institute for Excellence
         </p>
       </main>
@@ -179,8 +176,8 @@ function Landing() {
             PDFs. The app puts those in one place and turns them into tools you can actually study with.
           </p>
           <p>
-            It does not write papers for you. It is built so the content is learned — reading, listening, reciting,
-            testing — not so a test is merely passed.
+            Built for mastery, not just tests. It does not write papers for you. You read, listen, recite, and check
+            yourself until the material is actually learned.
           </p>
         </InfoModal>
       )}
@@ -200,12 +197,12 @@ function Landing() {
               <li key={x}>{x}</li>
             ))}
           </ol>
-          <div className="flex gap-2 pt-1">
-            <Link to="/signup" className="inline-flex min-h-10 items-center rounded-lg bg-teal px-4 text-sm font-semibold text-white">
-              Create Path
-            </Link>
-            <Link to="/login" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm">
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Link to="/login" className="inline-flex h-10 items-center justify-center rounded-lg border border-border text-sm">
               Login
+            </Link>
+            <Link to="/signup" className="inline-flex h-10 items-center justify-center rounded-lg bg-teal text-sm font-semibold text-white">
+              Create Path
             </Link>
           </div>
         </InfoModal>
