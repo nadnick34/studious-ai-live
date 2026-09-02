@@ -6,11 +6,13 @@ function blocks(report: AssignmentFeedback): Block[] {
   const review: string[] = [];
   if (report.reviewOfAssignment) review.push(report.reviewOfAssignment);
   for (const s of report.reviewSteps || []) review.push("• " + s);
-  for (const pg of report.problemGuides || []) {
-    review.push(pg.problem);
+  report.problemGuides?.forEach((pg, i) => {
+    if (i > 0 || review.length) review.push("");
+    review.push(`Problem ${i + 1}. ${pg.problem}`);
     if (pg.howTo) review.push("How to: " + pg.howTo);
     if (pg.example) review.push("Example: " + pg.example);
-  }
+    review.push("");
+  });
   const assess: string[] = [];
   if (report.assignmentAssessment) assess.push(report.assignmentAssessment);
   if (report.strengths?.length) {
@@ -18,6 +20,7 @@ function blocks(report: AssignmentFeedback): Block[] {
     for (const s of report.strengths) assess.push("• " + s);
   }
   if (report.issues?.length) {
+    if (assess.length) assess.push("", "");
     assess.push("What to fix");
     for (const s of report.issues) assess.push("• " + s);
   }
@@ -55,6 +58,7 @@ export function printFeedback(title: string, report: AssignmentFeedback) {
   .box { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; }
   h2 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #0f766e; }
   p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+  p:empty { height: 10px; margin: 0 0 12px; }
   p:last-child { margin-bottom: 0; }
 </style></head><body>
 <header>
@@ -139,7 +143,7 @@ export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob
   y -= 22;
 
   for (const block of blocks(report)) {
-    const wrapped = block.paragraphs.flatMap((p) => wrap(p));
+    const wrapped = block.paragraphs.flatMap((p) => (p === "" ? [""] : wrap(p)));
     const headH = 16;
     const bodyH = wrapped.length * lineH;
     const boxH = boxPad * 2 + headH + bodyH + 4;
@@ -150,8 +154,8 @@ export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob
     text("F2", headSize, margin + boxPad, top - boxPad - headSize + 2, block.heading.toUpperCase());
     let ty = top - boxPad - headH - 4;
     for (const line of wrapped) {
-      text("F1", bodySize, margin + boxPad, ty - bodySize, line);
-      ty -= lineH;
+      if (line) text("F1", bodySize, margin + boxPad, ty - bodySize, line);
+      ty -= line ? lineH : lineH + 6;
     }
     y = bottom - 12;
   }
