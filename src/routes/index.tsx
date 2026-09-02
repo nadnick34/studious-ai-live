@@ -63,9 +63,10 @@ const EDITIONS: {
       "Open Scriptorium or Prep when you need materials or a coverage plan.",
     ],
     icon: (
-      <svg viewBox="0 0 64 64" className="mx-auto h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M32 26 c-9-12 -22-2 -16 12 c4 10 12 16 16 18 c4-2 12-8 16-18 c6-14 -7-24 -16-12 Z" />
-        <path d="M34 16 c4 1 9 6 8 12" />
+      <svg viewBox="0 0 64 64" className="mx-auto h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="#e8d7a8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M32 18 v8" />
+        <path d="M32 18 c6-1 10 3 11 8" />
+        <path d="M24 26 c-8 2-12 10-12 18 c0 10 7 16 20 16 c13 0 20-6 20-16 c0-8-4-16-12-18 c-2 6-8 6-16 0 Z" />
       </svg>
     ),
   },
@@ -115,7 +116,7 @@ function Landing() {
       />
       <div className="pointer-events-none absolute inset-0 bg-[#3b2a18]/15" aria-hidden />
 
-      <main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl flex-col items-center justify-between px-3 py-3 sm:justify-center sm:px-4 sm:py-10">
+      <main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl flex-col items-center justify-center gap-3 px-3 py-4 sm:gap-5 sm:px-4 sm:py-10">
         <section className={`w-full max-w-3xl rounded-2xl px-4 py-4 text-center sm:rounded-[28px] sm:px-14 sm:py-12 ${glass}`}>
           <p className="font-serif text-[11px] font-semibold tracking-[0.22em] text-[#e8d7a8] sm:text-sm">STUDIOUS AI</p>
           <img src="/hero-mark.png" alt="" className="mx-auto mt-1 h-12 w-auto sm:mt-3 sm:h-20" />
@@ -149,7 +150,7 @@ function Landing() {
           </div>
         </section>
 
-        <div className="mt-2 grid w-full max-w-3xl grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
+        <div className="grid w-full max-w-3xl grid-cols-3 gap-2 sm:gap-3">
           {EDITIONS.map((ed) => (
             <button
               key={ed.id}
@@ -164,7 +165,7 @@ function Landing() {
           ))}
         </div>
 
-        <p className="mt-2 pb-[env(safe-area-inset-bottom)] text-center text-[9px] tracking-[0.12em] text-[#e8d7a8]/80 sm:mt-8 sm:text-[10px]">
+        <p className="mt-1 pb-[env(safe-area-inset-bottom)] sm:mt-6 text-center text-[9px] tracking-[0.12em] text-[#e8d7a8]/80 sm:mt-8 sm:text-[10px]">
           created by The Nickersonian Institute for Excellence
         </p>
       </main>

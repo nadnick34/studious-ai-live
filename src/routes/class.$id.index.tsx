@@ -12,6 +12,7 @@ import {
   deleteStudySet,
   getClassById,
   getProfile,
+  listAssignments,
   listStudySets,
   touchClass,
   updateStudySet,
@@ -20,7 +21,7 @@ import { extractMaterials, generateStudyPackage } from "@/lib/ai";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
 import { uid } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
-import type { Attachment, ClassRecord, StudySet } from "@/lib/types";
+import type { AssignmentRecord, Attachment, ClassRecord, StudySet } from "@/lib/types";
 
 export const Route = createFileRoute("/class/$id/")({ component: ClassPage });
 
@@ -30,10 +31,13 @@ function ClassPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [sets, setSets] = useState<StudySet[]>([]);
   const [showChapterInfo, setShowChapterInfo] = useState(false);
-  const [showCombine, setShowCombine] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [showFocus, setShowFocus] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedWork, setSelectedWork] = useState<string[]>([]);
+  const [exclusions, setExclusions] = useState("");
+  const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
   const [focusText, setFocusText] = useState("");
   const [focusName, setFocusName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,18 +46,23 @@ function ClassPage() {
   const [editing, setEditing] = useState<StudySet | null>(null);
 
   async function refresh() {
-    const [c, s] = await Promise.all([getClassById({ data: classId }), listStudySets({ data: classId })]);
+    const [c, s, a] = await Promise.all([getClassById({ data: classId }), listStudySets({ data: classId }), listAssignments({ data: classId }).catch(() => [])]);
     if (!c) {
       void navigate({ to: "/dashboard" });
       return;
     }
     setCls(c);
     setSets(s);
+    setAssignments(a as AssignmentRecord[]);
   }
 
   useEffect(() => {
     void touchClass({ data: classId });
     void refresh();
+    const open = sessionStorage.getItem("studious-class-open");
+    if (open === "guide") setShowGuide(true);
+    if (open === "focus") setShowFocus(true);
+    if (open) sessionStorage.removeItem("studious-class-open");
   }, [classId]);
 
   useEffect(() => {
@@ -105,19 +114,30 @@ function ClassPage() {
     }
   }
 
-  async function handleCombine() {
-    if (!cls || selected.length < 2) return;
+  async function handleStudyGuide() {
+    if (!cls) return;
     const chosen = sets.filter((s) => selected.includes(s.id));
-    const extractedText = chosen
+    const work = assignments.filter((a) => selectedWork.includes(a.id));
+    if (chosen.length + work.length < 1) return;
+    const chapterText = chosen
       .map((s) => {
         const secs = (s.notes?.sections || [])
           .map((sec) => [sec.heading, sec.body || "", (sec.bullets || []).join("\n")].filter(Boolean).join("\n"))
           .join("\n\n");
-        return `===== ${s.name} =====\n${s.notes?.title || ""}\n${secs}`;
+        return `===== CHAPTER ${s.name} =====\n${s.notes?.title || ""}\n${secs}`;
       })
       .join("\n\n");
+    const workText = work
+      .map((a) => {
+        const fb = a.submissions?.[0]?.feedback;
+        return `===== ASSIGNMENT ${a.title} =====\n${fb?.reviewOfAssignment || ""}\n${fb?.assignmentAssessment || ""}\n${(fb?.strengths || []).join("; ")}\n${(fb?.issues || []).join("; ")}\n${fb?.extraMile || ""}`;
+      })
+      .join("\n\n");
+    const extractedText = [chapterText, workText, exclusions.trim() ? `===== EXCLUSIONS — do not include =====\n${exclusions.trim()}` : ""]
+      .filter(Boolean)
+      .join("\n\n");
     setBusy(true);
-    setStatus("Combining selected chapters…");
+    setStatus("Building study guide…");
     setError(null);
     try {
       const profile = await getProfile();
@@ -126,10 +146,10 @@ function ClassPage() {
           className: cls.name,
           classCode: cls.code,
           subject: cls.subject,
-          setName: "Midterm / Final review",
-          sourceFiles: chosen.map((s) => s.name),
+          setName: "Study Guide",
+          sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
           extractedText,
-          focusPrompt: "Combine these chapter notes into one comprehensive midterm/final review.",
+          focusPrompt: `Create one study guide from the selected chapters and assignment-assistant returns. Omit anything listed under EXCLUSIONS.${exclusions.trim() ? " Exclusions: " + exclusions.trim() : ""}`,
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
         },
@@ -137,16 +157,16 @@ function ClassPage() {
       const set = await createStudySet({
         data: {
           classId,
-          name: "Midterm / Final review",
+          name: "Study Guide",
           generated,
-          sourceFiles: chosen.map((s) => s.name),
+          sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
         },
       });
-      setShowCombine(false);
+      setShowGuide(false);
       setSelected([]);
       await navigate({ to: "/class/$id/set/$setId", params: { id: classId, setId: set.id } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Combine failed");
+      setError(err instanceof Error ? err.message : "Study guide failed");
     } finally {
       setBusy(false);
       setStatus("");
@@ -190,8 +210,8 @@ function ClassPage() {
             <Sparkles className="size-4" />
             Custom focus
           </Button>
-          <Button variant="secondary" className="justify-start" onClick={() => { setShowMore(false); setShowCombine(true); }}>
-            Combine for midterm / final
+          <Button variant="secondary" className="justify-start" onClick={() => { setShowMore(false); setShowGuide(true); }}>
+            Study Guide
           </Button>
           <Link to="/class/$id/assignments" params={{ id: classId }} onClick={() => setShowMore(false)}>
             <Button variant="secondary" className="w-full justify-start">
@@ -237,30 +257,55 @@ function ClassPage() {
         </div>
       )}
 
-      {showCombine && (
-        <Modal title="Combine for midterm / final" onClose={() => setShowCombine(false)}>
-          <p className="mb-4 text-xs text-muted">Select at least two chapters to merge into one study package.</p>
-          <div className="mb-4 max-h-60 space-y-2 overflow-y-auto">
+      {showGuide && (
+        <Modal title="Study Guide" onClose={() => setShowGuide(false)}>
+          <p className="mb-3 text-xs text-muted">
+            Select chapters and/or Assignment Assistant returns to merge into one study guide.
+          </p>
+          <p className="mb-1 text-xs font-semibold text-muted">Chapters</p>
+          <div className="mb-3 max-h-40 space-y-2 overflow-y-auto">
             {sets.map((s) => (
               <label key={s.id} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 py-2">
                 <input
                   type="checkbox"
                   checked={selected.includes(s.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelected([...selected, s.id]);
-                    else setSelected(selected.filter((id) => id !== s.id));
-                  }}
+                  onChange={(e) => setSelected(e.target.checked ? [...selected, s.id] : selected.filter((id) => id !== s.id))}
                 />
                 <span className="text-sm">{s.name}</span>
               </label>
             ))}
+            {sets.length === 0 && <p className="text-xs text-muted">No chapters yet.</p>}
           </div>
+          <p className="mb-1 text-xs font-semibold text-muted">Assignment Assistant</p>
+          <div className="mb-3 max-h-40 space-y-2 overflow-y-auto">
+            {assignments.map((a) => (
+              <label key={a.id} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={selectedWork.includes(a.id)}
+                  onChange={(e) =>
+                    setSelectedWork(e.target.checked ? [...selectedWork, a.id] : selectedWork.filter((id) => id !== a.id))
+                  }
+                />
+                <span className="text-sm">{a.title}</span>
+              </label>
+            ))}
+            {assignments.length === 0 && <p className="text-xs text-muted">No assignment returns yet.</p>}
+          </div>
+          <label className="mb-1 block text-xs font-semibold text-muted">Exclusions</label>
+          <textarea
+            value={exclusions}
+            onChange={(e) => setExclusions(e.target.value)}
+            rows={3}
+            placeholder="Enter any material that should be left out of this study guide."
+            className="mb-3 w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-teal"
+          />
           {status && <p className="mb-3 text-sm text-teal">{status}</p>}
           {error && <p className="mb-3 text-sm text-red">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowCombine(false)}>Cancel</Button>
-            <Button disabled={selected.length < 2 || busy} onClick={() => void handleCombine()}>
-              {busy ? "Generating…" : "Combine selected"}
+            <Button variant="secondary" onClick={() => setShowGuide(false)}>Cancel</Button>
+            <Button disabled={selected.length + selectedWork.length < 1 || busy} onClick={() => void handleStudyGuide()}>
+              {busy ? "Generating…" : "Build study guide"}
             </Button>
           </div>
         </Modal>
@@ -320,7 +365,7 @@ function ClassPage() {
             <li>Prefer clearer audio or a transcript for long lectures</li>
             <li>Generate once materials are in, then study in the mode that fits you</li>
           </ul>
-          <p className="font-medium text-fg">Combine for midterm / final</p>
+          <p className="font-medium text-fg">Study Guide</p>
           <p className="text-muted">
             Select multiple chapters and merge them into one review package so midterm and final study pull from the
             whole span of material.

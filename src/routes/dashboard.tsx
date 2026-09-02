@@ -273,7 +273,32 @@ function DashboardPage() {
                   </div>
                 )}
                 <div className="mt-3 text-[10px] text-muted">Last opened {timeAgo(c.lastAccessed)}</div>
-              </Link>
+                            </Link>
+              <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <Link to="/class/$id" params={{ id: c.id }} className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal">
+                  Chapters
+                </Link>
+                <Link to="/class/$id/assignments" params={{ id: c.id }} className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal">
+                  Assignment Assist
+                </Link>
+                <Link
+                  to="/class/$id"
+                  params={{ id: c.id }}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal"
+                  onClick={() => sessionStorage.setItem("studious-class-open", "focus")}
+                >
+                  Focus Mode
+                </Link>
+                <Link
+                  to="/class/$id"
+                  params={{ id: c.id }}
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal"
+                  onClick={() => sessionStorage.setItem("studious-class-open", "guide")}
+                >
+                  Study Guide
+                </Link>
+              </div>
+
             </div>
           ))}
         </div>
