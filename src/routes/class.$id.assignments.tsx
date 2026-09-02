@@ -13,7 +13,7 @@ import {
   listAssignments,
   updateAssignment,
 } from "@/lib/data";
-import { printFeedback, shareFeedbackPdf } from "@/lib/feedback-export";
+import { FeedbackActions } from "@/components/feedback-actions";
 import { uid } from "@/lib/utils";
 import type { AssignmentFeedback, AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
 
@@ -239,14 +239,7 @@ function ReportView({ report, assignmentTitle }: { report: AssignmentFeedback; a
     <section className="space-y-4 rounded-xl border border-border bg-card p-4 print:border-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold text-fg">Feedback</h3>
-        <div className="flex gap-2">
-          <Button variant="secondary" className="text-xs" onClick={() => printFeedback(assignmentTitle || "Assignment", report)}>
-            Print
-          </Button>
-          <Button variant="secondary" className="text-xs" onClick={() => void shareFeedbackPdf(assignmentTitle || "Assignment", report)}>
-            Share
-          </Button>
-        </div>
+        <FeedbackActions title={assignmentTitle || "Assignment"} report={report} />
       </div>
 
       <div className="rounded-xl border border-border bg-bg p-3">

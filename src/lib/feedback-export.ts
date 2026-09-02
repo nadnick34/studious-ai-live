@@ -169,12 +169,8 @@ export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob
         });
       });
     }
-    const contentH = prepared.reduce((h, ln) => h + (ln.text ? lineH : 0) + ln.gapAfter, 0);
-    const boxH = pad * 2 + 16 + contentH;
-    need(Math.min(boxH, pageH - margin * 2));
+    need(pad + 16 + lineH * 3);
     let top = y;
-    let avail = y - margin - 8;
-    // If box taller than rest of page, split by drawing open box pieces
     const drawHeader = () => {
       text(true, 10, margin + pad, y - pad - 10, sec.heading.toUpperCase());
       y -= pad + 16;
