@@ -243,10 +243,53 @@ function AssignmentDetailPage() {
   );
 }
 
+
+function reportShareText(report: AssignmentFeedback) {
+  const parts = [
+    "Studious AI — Assignment feedback",
+    "",
+    "1. Review of Assignment",
+    report.reviewOfAssignment || "",
+    "",
+    "2. Completed Work Assessment",
+    report.assignmentAssessment || "",
+    report.strengths?.length ? "Looks good:\n" + report.strengths.map((s) => "• " + s).join("\n") : "",
+    report.issues?.length ? "What to fix:\n" + report.issues.map((s) => "• " + s).join("\n") : "",
+    "",
+    "3. The Extra Mile",
+    report.extraMile || "",
+  ];
+  return parts.filter(Boolean).join("\n").slice(0, 1800);
+}
+
+async function shareReport(report: AssignmentFeedback) {
+  const text = reportShareText(report);
+  const title = "Assignment feedback";
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text });
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`;
+}
+
 function ReportView({ report }: { report: AssignmentFeedback }) {
   return (
-    <section className="space-y-4 rounded-xl border border-border bg-card p-4">
-      <h3 className="font-semibold text-fg">Feedback</h3>
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4 print:border-0">
+      <div className="print:hidden flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-semibold text-fg">Feedback</h3>
+        <div className="flex gap-2">
+          <Button variant="secondary" className="text-xs" onClick={() => window.print()}>
+            Print / save PDF
+          </Button>
+          <Button variant="secondary" className="text-xs" onClick={() => void shareReport(report)}>
+            Share
+          </Button>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-border bg-bg p-3">
         <h4 className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">1. Review of Assignment</h4>
