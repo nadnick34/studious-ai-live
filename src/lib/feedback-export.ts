@@ -1,42 +1,95 @@
 import type { AssignmentFeedback } from "@/lib/types";
 
-export function feedbackLines(title: string, report: AssignmentFeedback): string[] {
-  const lines: string[] = [title, ""];
-  lines.push("1. Review of Assignment");
-  if (report.reviewOfAssignment) lines.push(report.reviewOfAssignment);
-  for (const s of report.reviewSteps || []) lines.push("• " + s);
+type Block = { heading: string; paragraphs: string[] };
+
+function blocks(report: AssignmentFeedback): Block[] {
+  const review: string[] = [];
+  if (report.reviewOfAssignment) review.push(report.reviewOfAssignment);
+  for (const s of report.reviewSteps || []) review.push("• " + s);
   for (const pg of report.problemGuides || []) {
-    lines.push(`${pg.problem}`);
-    if (pg.howTo) lines.push("How to: " + pg.howTo);
-    if (pg.example) lines.push("Example: " + pg.example);
+    review.push(pg.problem);
+    if (pg.howTo) review.push("How to: " + pg.howTo);
+    if (pg.example) review.push("Example: " + pg.example);
   }
-  lines.push("", "2. Completed Work Assessment");
-  if (report.assignmentAssessment) lines.push(report.assignmentAssessment);
+  const assess: string[] = [];
+  if (report.assignmentAssessment) assess.push(report.assignmentAssessment);
   if (report.strengths?.length) {
-    lines.push("What looks good");
-    for (const s of report.strengths) lines.push("• " + s);
+    assess.push("What looks good");
+    for (const s of report.strengths) assess.push("• " + s);
   }
   if (report.issues?.length) {
-    lines.push("What to fix");
-    for (const s of report.issues) lines.push("• " + s);
+    assess.push("What to fix");
+    for (const s of report.issues) assess.push("• " + s);
   }
-  lines.push("", "3. The Extra Mile");
-  if (report.extraMile) lines.push(report.extraMile);
-  for (const s of report.extraMileTips || []) lines.push("• " + s);
-  return lines;
+  const extra: string[] = [];
+  if (report.extraMile) extra.push(report.extraMile);
+  for (const s of report.extraMileTips || []) extra.push("• " + s);
+  return [
+    { heading: "1. Review of Assignment", paragraphs: review.length ? review : ["TBD"] },
+    { heading: "2. Completed Work Assessment", paragraphs: assess.length ? assess : ["TBD"] },
+    { heading: "3. The Extra Mile", paragraphs: extra.length ? extra : ["N/A"] },
+  ];
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] || c);
+}
+
+export function printFeedback(title: string, report: AssignmentFeedback) {
+  const sections = blocks(report)
+    .map(
+      (b) => `<section class="box">
+        <h2>${escapeHtml(b.heading)}</h2>
+        ${b.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
+      </section>`,
+    )
+    .join("");
+  const html = `<!doctype html><html><head><title>${escapeHtml(title)}</title>
+<style>
+  @page { margin: 0.5in; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-sans-serif, system-ui, Segoe UI, Helvetica, Arial, sans-serif; color: #111827; }
+  header { margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 20px; font-weight: 700; text-align: left; }
+  .sub { margin-top: 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+  .box { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; }
+  h2 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #0f766e; }
+  p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+  p:last-child { margin-bottom: 0; }
+</style></head><body>
+<header>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="sub">Studious AI · Assignment feedback</div>
+</header>
+${sections}
+</body></html>`;
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  Object.assign(iframe.style, { position: "fixed", right: "0", bottom: "0", width: "0", height: "0", border: "0" });
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument;
+  if (!doc) return;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => iframe.remove(), 1500);
+  }, 250);
 }
 
 function pdfEscape(s: string) {
   return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-function wrap(text: string, width = 92): string[] {
+function wrap(text: string, width = 86): string[] {
   const out: string[] = [];
   for (const raw of text.split(/\n/)) {
     const words = raw.split(/\s+/);
     let line = "";
     for (const w of words) {
-      const next = line ? line + " " + w : w;
+      const next = line ? `${line} ${w}` : w;
       if (next.length > width) {
         if (line) out.push(line);
         line = w;
@@ -48,30 +101,72 @@ function wrap(text: string, width = 92): string[] {
 }
 
 export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob {
-  const wrapped = feedbackLines(title, report).flatMap((l) => wrap(l));
-  const perPage = 48;
-  const pages: string[][] = [];
-  for (let i = 0; i < wrapped.length; i += perPage) pages.push(wrapped.slice(i, i + perPage));
-  if (!pages.length) pages.push([title]);
+  const pageW = 612;
+  const pageH = 792;
+  const margin = 40;
+  const boxPad = 12;
+  const innerW = pageW - margin * 2;
+  const lineH = 14;
+  const titleSize = 16;
+  const headSize = 11;
+  const bodySize = 11;
+
+  type Draw = string;
+  const pages: Draw[][] = [[]];
+  let y = pageH - margin;
+  let page = 0;
+
+  function ensure(space: number) {
+    if (y - space < margin) {
+      page += 1;
+      pages[page] = [];
+      y = pageH - margin;
+    }
+  }
+
+  function text(font: "F1" | "F2", size: number, x: number, ty: number, s: string) {
+    pages[page].push(`BT /${font} ${size} Tf ${x.toFixed(1)} ${ty.toFixed(1)} Td (${pdfEscape(s)}) Tj ET`);
+  }
+
+  function rect(x: number, by: number, w: number, h: number) {
+    pages[page].push("0.72 0.76 0.78 RG 0.8 w");
+    pages[page].push(`${x.toFixed(1)} ${by.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S`);
+  }
+
+  text("F2", titleSize, margin, y - titleSize, title);
+  y -= titleSize + 6;
+  text("F1", 9, margin, y - 9, "STUDIOUS AI  ·  ASSIGNMENT FEEDBACK");
+  y -= 22;
+
+  for (const block of blocks(report)) {
+    const wrapped = block.paragraphs.flatMap((p) => wrap(p));
+    const headH = 16;
+    const bodyH = wrapped.length * lineH;
+    const boxH = boxPad * 2 + headH + bodyH + 4;
+    ensure(boxH + 10);
+    const top = y;
+    const bottom = y - boxH;
+    rect(margin, bottom, innerW, boxH);
+    text("F2", headSize, margin + boxPad, top - boxPad - headSize + 2, block.heading.toUpperCase());
+    let ty = top - boxPad - headH - 4;
+    for (const line of wrapped) {
+      text("F1", bodySize, margin + boxPad, ty - bodySize, line);
+      ty -= lineH;
+    }
+    y = bottom - 12;
+  }
 
   const objs: string[] = [];
   objs.push("<< /Type /Catalog /Pages 2 0 R >>");
   const kids = pages.map((_, i) => `${3 + i * 2} 0 R`).join(" ");
   objs.push(`<< /Type /Pages /Count ${pages.length} /Kids [${kids}] >>`);
-  pages.forEach((pageLines, i) => {
+  pages.forEach((ops, i) => {
     const pageId = 3 + i * 2;
     const contentId = pageId + 1;
-    objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents ${contentId} 0 R >>`);
-    const stream = [
-      "BT",
-      "/F1 14 Tf",
-      "50 748 Td",
-      `(${pdfEscape(i === 0 ? title : title + " (cont.)")}) Tj`,
-      "/F1 11 Tf",
-      "0 -22 Td",
-      ...pageLines.slice(i === 0 ? 1 : 0).map((line) => `(${pdfEscape(line)}) Tj 0 -14 Td`),
-      "ET",
-    ].join("\n");
+    objs.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents ${contentId} 0 R >>`,
+    );
+    const stream = ops.join("\n");
     objs.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   });
 
@@ -83,46 +178,9 @@ export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob
   });
   const xref = pdf.length;
   pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= objs.length; i++) {
-    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-  }
+  for (let i = 1; i <= objs.length; i++) pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
   pdf += `trailer << /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return new Blob([pdf], { type: "application/pdf" });
-}
-
-export function printFeedback(title: string, report: AssignmentFeedback) {
-  const html = `<!doctype html><html><head><title>${escapeHtml(title)}</title>
-<style>
-  @page { margin: 0.6in; }
-  body { font-family: Georgia, serif; color: #111; }
-  h1 { font-size: 16px; margin: 0 0 16px; text-align: left; }
-  h2 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; margin: 18px 0 6px; }
-  p, li { font-size: 13px; line-height: 1.45; }
-</style></head><body>
-<h1>${escapeHtml(title)}</h1>
-${section("1. Review of Assignment", report.reviewOfAssignment, report.reviewSteps)}
-${guides(report)}
-${section("2. Completed Work Assessment", report.assignmentAssessment)}
-${list("What looks good", report.strengths)}
-${list("What to fix", report.issues)}
-${section("3. The Extra Mile", report.extraMile, report.extraMileTips)}
-</body></html>`;
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  iframe.contentWindow?.focus();
-  iframe.contentWindow?.print();
-  setTimeout(() => iframe.remove(), 1000);
 }
 
 export async function shareFeedbackPdf(title: string, report: AssignmentFeedback) {
@@ -143,27 +201,4 @@ export async function shareFeedbackPdf(title: string, report: AssignmentFeedback
   a.download = `${safe}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] || c);
-}
-
-function section(h: string, body?: string, bullets?: string[]) {
-  return `<h2>${escapeHtml(h)}</h2><p>${escapeHtml(body || "")}</p>${list("", bullets)}`;
-}
-
-function list(h: string, items?: string[]) {
-  if (!items?.length) return "";
-  return `${h ? `<p><strong>${escapeHtml(h)}</strong></p>` : ""}<ul>${items.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>`;
-}
-
-function guides(report: AssignmentFeedback) {
-  if (!report.problemGuides?.length) return "";
-  return report.problemGuides
-    .map(
-      (pg) =>
-        `<p><strong>${escapeHtml(pg.problem)}</strong><br/>How to: ${escapeHtml(pg.howTo || "")}<br/>Example: ${escapeHtml(pg.example || "")}</p>`,
-    )
-    .join("");
 }
