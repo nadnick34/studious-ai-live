@@ -1,36 +1,50 @@
 import type { AssignmentFeedback } from "@/lib/types";
 
-type Block = { heading: string; paragraphs: string[] };
+type Line = { text: string; bold?: boolean; indent?: boolean; gapAfter?: number };
 
-function blocks(report: AssignmentFeedback): Block[] {
-  const review: string[] = [];
-  if (report.reviewOfAssignment) review.push(report.reviewOfAssignment);
-  for (const s of report.reviewSteps || []) review.push("• " + s);
-  report.problemGuides?.forEach((pg, i) => {
-    if (i > 0 || review.length) review.push("");
-    review.push(`Problem ${i + 1}. ${pg.problem}`);
-    if (pg.howTo) review.push("How to: " + pg.howTo);
-    if (pg.example) review.push("Example: " + pg.example);
-    review.push("");
+function ascii(s: string) {
+  return s
+    .replace(/[•●▪]/g, "-")
+    .replace(/[–—]/g, "-")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
+}
+
+function sectionLines(report: AssignmentFeedback): { heading: string; lines: Line[] }[] {
+  const review: Line[] = [];
+  if (report.reviewOfAssignment) review.push({ text: ascii(report.reviewOfAssignment), gapAfter: 8 });
+  for (const s of report.reviewSteps || []) review.push({ text: "- " + ascii(s), indent: true });
+  (report.problemGuides || []).forEach((pg, i) => {
+    if (review.length) review.push({ text: "", gapAfter: 10 });
+    review.push({ text: `Problem ${i + 1}`, bold: true, gapAfter: 2 });
+    review.push({ text: ascii(pg.problem), gapAfter: 4 });
+    if (pg.howTo) review.push({ text: "How to: " + ascii(pg.howTo), indent: true });
+    if (pg.example) review.push({ text: "Example: " + ascii(pg.example), indent: true, gapAfter: 8 });
   });
-  const assess: string[] = [];
-  if (report.assignmentAssessment) assess.push(report.assignmentAssessment);
+
+  const assess: Line[] = [];
+  if (report.assignmentAssessment) assess.push({ text: ascii(report.assignmentAssessment), gapAfter: 10 });
   if (report.strengths?.length) {
-    assess.push("What looks good");
-    for (const s of report.strengths) assess.push("• " + s);
+    assess.push({ text: "What looks good", bold: true, gapAfter: 4 });
+    for (const s of report.strengths) assess.push({ text: "- " + ascii(s), indent: true });
   }
   if (report.issues?.length) {
-    if (assess.length) assess.push("", "");
-    assess.push("What to fix");
-    for (const s of report.issues) assess.push("• " + s);
+    assess.push({ text: "", gapAfter: 12 });
+    assess.push({ text: "What to fix", bold: true, gapAfter: 4 });
+    for (const s of report.issues) assess.push({ text: "- " + ascii(s), indent: true });
   }
-  const extra: string[] = [];
-  if (report.extraMile) extra.push(report.extraMile);
-  for (const s of report.extraMileTips || []) extra.push("• " + s);
+
+  const extra: Line[] = [];
+  if (report.extraMile) extra.push({ text: ascii(report.extraMile), gapAfter: 6 });
+  for (const s of report.extraMileTips || []) extra.push({ text: "- " + ascii(s), indent: true });
+
   return [
-    { heading: "1. Review of Assignment", paragraphs: review.length ? review : ["TBD"] },
-    { heading: "2. Completed Work Assessment", paragraphs: assess.length ? assess : ["TBD"] },
-    { heading: "3. The Extra Mile", paragraphs: extra.length ? extra : ["N/A"] },
+    { heading: "1. Review of Assignment", lines: review.length ? review : [{ text: "TBD" }] },
+    { heading: "2. Completed Work Assessment", lines: assess.length ? assess : [{ text: "TBD" }] },
+    { heading: "3. The Extra Mile", lines: extra.length ? extra : [{ text: "N/A" }] },
   ];
 }
 
@@ -39,36 +53,37 @@ function escapeHtml(s: string) {
 }
 
 export function printFeedback(title: string, report: AssignmentFeedback) {
-  const sections = blocks(report)
-    .map(
-      (b) => `<section class="box">
-        <h2>${escapeHtml(b.heading)}</h2>
-        ${b.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}
-      </section>`,
-    )
+  const sections = sectionLines(report)
+    .map((b) => {
+      const body = b.lines
+        .map((ln) => {
+          if (!ln.text) return `<div class="gap"></div>`;
+          const cls = [ln.bold ? "bold" : "", ln.indent ? "indent" : ""].filter(Boolean).join(" ");
+          return `<p class="${cls}">${escapeHtml(ln.text)}</p>`;
+        })
+        .join("");
+      return `<section class="box"><h2>${escapeHtml(b.heading)}</h2>${body}</section>`;
+    })
     .join("");
   const html = `<!doctype html><html><head><title>${escapeHtml(title)}</title>
 <style>
-  @page { margin: 0.5in; }
+  @page { margin: 0.4in; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: ui-sans-serif, system-ui, Segoe UI, Helvetica, Arial, sans-serif; color: #111827; }
-  header { margin-bottom: 18px; }
-  h1 { margin: 0; font-size: 20px; font-weight: 700; text-align: left; }
-  .sub { margin-top: 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
-  .box { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px 16px; margin: 0 0 14px; }
-  h2 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #0f766e; }
-  p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
-  p:empty { height: 10px; margin: 0 0 12px; }
-  p:last-child { margin-bottom: 0; }
+  body { margin: 0; font-family: ui-sans-serif, system-ui, Segoe UI, Helvetica, Arial, sans-serif; color: #111; font-size: 11px; line-height: 1.35; }
+  header { margin-bottom: 10px; }
+  h1 { margin: 0; font-size: 15px; font-weight: 700; text-align: left; }
+  .sub { margin-top: 2px; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+  .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px 6px; margin: 0 0 8px; }
+  h2 { margin: 0 0 6px; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #0f766e; }
+  p { margin: 0 0 4px; }
+  p.bold { font-weight: 700; margin-top: 2px; }
+  p.indent { padding-left: 14px; }
+  .gap { height: 8px; }
 </style></head><body>
-<header>
-  <h1>${escapeHtml(title)}</h1>
-  <div class="sub">Studious AI · Assignment feedback</div>
-</header>
+<header><h1>${escapeHtml(title)}</h1><div class="sub">Studious AI · Assignment feedback</div></header>
 ${sections}
 </body></html>`;
   const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
   Object.assign(iframe.style, { position: "fixed", right: "0", bottom: "0", width: "0", height: "0", border: "0" });
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument;
@@ -84,96 +99,116 @@ ${sections}
 }
 
 function pdfEscape(s: string) {
-  return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  return ascii(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-function wrap(text: string, width = 86): string[] {
+function wrap(text: string, width: number): string[] {
+  if (!text) return [""];
+  const words = text.split(/\s+/);
   const out: string[] = [];
-  for (const raw of text.split(/\n/)) {
-    const words = raw.split(/\s+/);
-    let line = "";
-    for (const w of words) {
-      const next = line ? `${line} ${w}` : w;
-      if (next.length > width) {
-        if (line) out.push(line);
-        line = w;
-      } else line = next;
-    }
-    out.push(line);
+  let line = "";
+  for (const w of words) {
+    const next = line ? line + " " + w : w;
+    if (next.length > width) {
+      if (line) out.push(line);
+      line = w;
+    } else line = next;
   }
-  return out.length ? out : [""];
+  if (line) out.push(line);
+  return out;
 }
 
 export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob {
   const pageW = 612;
   const pageH = 792;
-  const margin = 40;
-  const boxPad = 12;
-  const innerW = pageW - margin * 2;
-  const lineH = 14;
-  const titleSize = 16;
-  const headSize = 11;
-  const bodySize = 11;
+  const margin = 36;
+  const pad = 10;
+  const inner = pageW - margin * 2;
+  const bodySize = 10;
+  const lineH = 13;
 
-  type Draw = string;
-  const pages: Draw[][] = [[]];
+  type Op = string;
+  const pages: Op[][] = [[]];
   let y = pageH - margin;
-  let page = 0;
+  let pi = 0;
 
-  function ensure(space: number) {
-    if (y - space < margin) {
-      page += 1;
-      pages[page] = [];
-      y = pageH - margin;
+  const push = (op: string) => pages[pi].push(op);
+  const newPage = () => {
+    pi += 1;
+    pages[pi] = [];
+    y = pageH - margin;
+  };
+  const need = (h: number) => {
+    if (y - h < margin) newPage();
+  };
+  const text = (bold: boolean, size: number, x: number, ty: number, s: string) => {
+    push(`BT /${bold ? "F2" : "F1"} ${size} Tf ${x.toFixed(1)} ${ty.toFixed(1)} Td (${pdfEscape(s)}) Tj ET`);
+  };
+  const box = (x: number, b: number, w: number, h: number) => {
+    push("0.7 0.75 0.78 RG 0.8 w");
+    push(`${x.toFixed(1)} ${b.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S`);
+  };
+
+  need(28);
+  text(true, 15, margin, y - 14, ascii(title));
+  y -= 18;
+  text(false, 8, margin, y - 8, "STUDIOUS AI  -  ASSIGNMENT FEEDBACK");
+  y -= 16;
+
+  for (const sec of sectionLines(report)) {
+    const prepared: { text: string; bold?: boolean; indent?: boolean; gapAfter: number }[] = [];
+    for (const ln of sec.lines) {
+      const width = ln.indent ? 86 : 90;
+      const wrapped = ln.text === "" ? [""] : wrap(ln.text, width);
+      wrapped.forEach((w, i) => {
+        prepared.push({
+          text: w,
+          bold: ln.bold && i === 0,
+          indent: ln.indent,
+          gapAfter: i === wrapped.length - 1 ? ln.gapAfter || 0 : 0,
+        });
+      });
     }
-  }
-
-  function text(font: "F1" | "F2", size: number, x: number, ty: number, s: string) {
-    pages[page].push(`BT /${font} ${size} Tf ${x.toFixed(1)} ${ty.toFixed(1)} Td (${pdfEscape(s)}) Tj ET`);
-  }
-
-  function rect(x: number, by: number, w: number, h: number) {
-    pages[page].push("0.72 0.76 0.78 RG 0.8 w");
-    pages[page].push(`${x.toFixed(1)} ${by.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)} re S`);
-  }
-
-  text("F2", titleSize, margin, y - titleSize, title);
-  y -= titleSize + 6;
-  text("F1", 9, margin, y - 9, "STUDIOUS AI  ·  ASSIGNMENT FEEDBACK");
-  y -= 22;
-
-  for (const block of blocks(report)) {
-    const wrapped = block.paragraphs.flatMap((p) => (p === "" ? [""] : wrap(p)));
-    const headH = 16;
-    const bodyH = wrapped.length * lineH;
-    const boxH = boxPad * 2 + headH + bodyH + 4;
-    ensure(boxH + 10);
-    const top = y;
-    const bottom = y - boxH;
-    rect(margin, bottom, innerW, boxH);
-    text("F2", headSize, margin + boxPad, top - boxPad - headSize + 2, block.heading.toUpperCase());
-    let ty = top - boxPad - headH - 4;
-    for (const line of wrapped) {
-      if (line) text("F1", bodySize, margin + boxPad, ty - bodySize, line);
-      ty -= line ? lineH : lineH + 6;
+    const contentH = prepared.reduce((h, ln) => h + (ln.text ? lineH : 0) + ln.gapAfter, 0);
+    const boxH = pad * 2 + 16 + contentH;
+    need(Math.min(boxH, pageH - margin * 2));
+    let top = y;
+    let avail = y - margin - 8;
+    // If box taller than rest of page, split by drawing open box pieces
+    const drawHeader = () => {
+      text(true, 10, margin + pad, y - pad - 10, sec.heading.toUpperCase());
+      y -= pad + 16;
+    };
+    drawHeader();
+    for (const ln of prepared) {
+      if (y - lineH - 8 < margin) {
+        box(margin, margin, inner, top - margin);
+        newPage();
+        top = y;
+        drawHeader();
+      }
+      if (ln.text) {
+        text(!!ln.bold, bodySize, margin + pad + (ln.indent ? 12 : 0), y - bodySize, ln.text);
+        y -= lineH;
+      }
+      y -= ln.gapAfter;
     }
-    y = bottom - 12;
+    y -= pad;
+    box(margin, y, inner, top - y);
+    y -= 10;
   }
 
   const objs: string[] = [];
   objs.push("<< /Type /Catalog /Pages 2 0 R >>");
-  const kids = pages.map((_, i) => `${3 + i * 2} 0 R`).join(" ");
-  objs.push(`<< /Type /Pages /Count ${pages.length} /Kids [${kids}] >>`);
+  objs.push(`<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, i) => `${3 + i * 2} 0 R`).join(" ")}] >>`);
   pages.forEach((ops, i) => {
     const pageId = 3 + i * 2;
-    const contentId = pageId + 1;
     objs.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents ${contentId} 0 R >>`,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> >> /Contents ${pageId + 1} 0 R >>`,
     );
     const stream = ops.join("\n");
     objs.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   });
-
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
   objs.forEach((body, i) => {
@@ -189,7 +224,7 @@ export function feedbackPdfBlob(title: string, report: AssignmentFeedback): Blob
 
 export async function shareFeedbackPdf(title: string, report: AssignmentFeedback) {
   const blob = feedbackPdfBlob(title, report);
-  const safe = title.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "assignment-feedback";
+  const safe = ascii(title).replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "assignment-feedback";
   const file = new File([blob], `${safe}.pdf`, { type: "application/pdf" });
   try {
     if (navigator.canShare?.({ files: [file] })) {
