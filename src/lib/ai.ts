@@ -2330,3 +2330,108 @@ Return ONLY JSON:
       return fallback;
     }
   });
+
+export const adviseFantasyPick = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      year: number;
+      teams: number;
+      snake: boolean;
+      mySlot: number;
+      overall: number;
+      scoring: string;
+      rules: string;
+      myTeam: string[];
+      taken: string[];
+      available: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const fallback = { picks: [] as { name: string; why: string }[], note: "" };
+    const key = apiKey();
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 700,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a fantasy football draft assistant. Synthesize consensus from ESPN, Yahoo, FantasyPros ADP, NFL.com, and PFF-style rankings. Return ONLY JSON {picks:[{name,why}],note}. Give exactly 3 available players. why is one short clause. Do not recommend taken players. Prefer positional need and the league's scoring.",
+          },
+          {
+            role: "user",
+            content: `Year ${data.year}. ${data.teams}-team ${data.snake ? "snake" : "linear"} draft. I pick slot ${data.mySlot}. Overall pick ${data.overall}.
+SCORING: ${data.scoring}
+RULES: ${data.rules.slice(0, 2500)}
+MY TEAM: ${data.myTeam.join(", ") || "(empty)"}
+TAKEN: ${data.taken.slice(0, 180).join(", ")}
+AVAILABLE (rank order): ${data.available.slice(0, 60).join(", ")}`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}"));
+    } catch {
+      return fallback;
+    }
+  });
+
+export const gradeFantasyTeam = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (input: {
+      year: number;
+      scoring: string;
+      myTeam: string[];
+      available: string[];
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const fallback = {
+      grade: "B",
+      summary: "Solid starter set. Revisit the bench after waivers.",
+      needs: [] as string[],
+      trades: [] as string[],
+      pickups: [] as string[],
+    };
+    const key = apiKey();
+    if (!key) return fallback;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.25,
+        max_tokens: 800,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Grade this fantasy football roster using ESPN/Yahoo/FantasyPros/PFF consensus. Return ONLY JSON {grade,summary,needs,trades,pickups}. grade is a letter. needs/trades/pickups are short string arrays.",
+          },
+          {
+            role: "user",
+            content: `Year ${data.year}. Scoring: ${data.scoring}
+TEAM: ${data.myTeam.join(", ")}
+STILL AVAILABLE: ${data.available.slice(0, 40).join(", ")}`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return fallback;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return { ...fallback, ...JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}")) };
+    } catch {
+      return fallback;
+    }
+  });
