@@ -151,18 +151,40 @@ export function needsWeights(myPos: FantasyPos[]) {
   } as Record<FantasyPos, number>;
 }
 
-export function localTop3(available: FantasyPlayer[], mine: FantasyPlayer[], scoring: Scoring) {
+export function rankAvailable(
+  available: FantasyPlayer[],
+  mine: FantasyPlayer[],
+  scoring: Scoring,
+  opts?: { scoringType?: string; draftType?: string; overall?: number; teams?: number; limit?: number },
+) {
   const w = needsWeights(mine.map((p) => p.pos));
-  const pprBoost = scoring.reception >= 1 ? 0.08 : scoring.reception > 0 ? 0.04 : 0;
+  const type = opts?.scoringType || "";
+  const draft = (opts?.draftType || "").toLowerCase();
+  const pprBoost = scoring.reception >= 1 ? 0.1 : scoring.reception > 0 ? 0.05 : 0;
+  const superflex = /superflex/i.test(type);
+  const tePrem = /TE Premium/i.test(type);
+  const idp = /^IDP$/i.test(type);
+  const death = /death|guillotine/i.test(type);
+  const dynasty = /dynasty|keeper/i.test(draft);
+  const bestBall = /best ball/i.test(draft);
+  const round = opts?.teams ? Math.ceil((opts.overall || 1) / opts.teams) : 1;
   const ranked = [...available].map((p) => {
-    let score = 200 - p.adp;
+    let score = 220 - p.adp;
     score *= w[p.pos] || 1;
     if (p.pos === "WR" || p.pos === "RB") score *= 1 + pprBoost;
-    if (p.pos === "TE" && scoring.reception >= 1) score *= 1.05;
+    if (p.pos === "TE" && (scoring.reception >= 1 || tePrem)) score *= tePrem ? 1.12 : 1.05;
+    if (p.pos === "QB") score *= superflex ? 1.22 : 1;
+    if ((p.pos === "K" || p.pos === "DST") && (idp || death || bestBall || round < 12)) score *= 0.55;
+    if (dynasty && p.adp <= 40) score *= 1.04;
+    if (death && (p.pos === "RB" || p.pos === "WR") && p.adp <= 24) score *= 1.08;
     return { player: p, score };
   });
   ranked.sort((a, b) => b.score - a.score);
-  return ranked.slice(0, 3).map((r) => r.player);
+  return ranked.slice(0, opts?.limit ?? 10).map((r) => r.player);
+}
+
+export function localTop3(available: FantasyPlayer[], mine: FantasyPlayer[], scoring: Scoring) {
+  return rankAvailable(available, mine, scoring, { limit: 3 });
 }
 
 export function whosePick(overall: number, teams: number, snake: boolean) {

@@ -2345,6 +2345,7 @@ export const adviseFantasyPick = createServerFn({ method: "POST" })
       myTeam: string[];
       taken: string[];
       available: string[];
+      limit?: number;
     }) => input,
   )
   .handler(async ({ data }) => {
@@ -2362,11 +2363,11 @@ export const adviseFantasyPick = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are a fantasy football draft assistant. Synthesize consensus from ESPN, Yahoo, FantasyPros ADP, NFL.com, and PFF-style rankings. Return ONLY JSON {picks:[{name,why}],note}. Give exactly 3 available players. why is one short clause. Do not recommend taken players. Prefer positional need and the league's scoring.",
+              "You are a fantasy football draft assistant. Synthesize consensus from ESPN, Yahoo, FantasyPros ADP, NFL.com, and PFF-style rankings. Return ONLY JSON {picks:[{name,why}],note}. Give exactly the requested number of available players (default 10). why is one short clause. Do not recommend taken players. Prefer positional need and the league's scoring.",
           },
           {
             role: "user",
-            content: `Year ${data.year}. ${data.teams}-team ${data.snake ? "snake" : "linear"} draft. I pick slot ${data.mySlot}. Overall pick ${data.overall}.
+            content: `Return ${data.limit || 10} picks. Year ${data.year}. ${data.teams}-team ${data.snake ? "snake" : "linear"} draft. I pick slot ${data.mySlot}. Overall pick ${data.overall}.
 SCORING: ${data.scoring}
 RULES: ${data.rules.slice(0, 2500)}
 MY TEAM: ${data.myTeam.join(", ") || "(empty)"}
@@ -2393,6 +2394,7 @@ export const gradeFantasyTeam = createServerFn({ method: "POST" })
       scoring: string;
       myTeam: string[];
       available: string[];
+      limit?: number;
     }) => input,
   )
   .handler(async ({ data }) => {
@@ -2433,5 +2435,54 @@ STILL AVAILABLE: ${data.available.slice(0, 40).join(", ")}`,
       return { ...fallback, ...JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}")) };
     } catch {
       return fallback;
+    }
+  });
+
+export const parseFantasyRules = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { text: string }) => input)
+  .handler(async ({ data }) => {
+    const empty = {
+      year: null as number | null,
+      draftType: null as string | null,
+      scoringType: null as string | null,
+      selection: null as "snake" | "linear" | null,
+      teams: null as number | null,
+      mySlot: null as number | null,
+      pickSeconds: null as number | null,
+      rounds: null as number | null,
+      scoring: null as Record<string, number> | null,
+      note: "",
+    };
+    const key = apiKey();
+    if (!key) return empty;
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0,
+        max_tokens: 600,
+        messages: [
+          {
+            role: "system",
+            content: `Extract fantasy football league/draft settings from league-rules text or OCR. Return ONLY JSON:
+{year,draftType,scoringType,selection,teams,mySlot,pickSeconds,rounds,scoring:{passYdsPerPoint,passTd,int,rushYdsPerPoint,rushTd,recYdsPerPoint,recTd,reception},note}
+draftType must be one of: Live Standard Draft, Live Salary Cap Draft, Offline Draft, Autopick Draft, Mock Draft, Redraft, Keeper, Dynasty, Best Ball.
+scoringType must be one of: Standard, Half-PPR, PPR, 0.5 PPR / 1.5 TE Premium, Superflex, IDP, Death / Guillotine, Head-to-Head Points, Head-to-Head Category.
+selection is snake or linear.
+passYdsPerPoint is yards needed for 1 point (Yahoo often 25). reception is 0, 0.5, or 1.
+Use null for anything not clearly stated. note is one short sentence of what you found.`,
+          },
+          { role: "user", content: data.text.slice(0, 12000) },
+        ],
+      }),
+    });
+    if (!res.ok) return empty;
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    try {
+      return { ...empty, ...JSON.parse(extractJsonObject(body.choices?.[0]?.message?.content || "{}")) };
+    } catch {
+      return empty;
     }
   });
