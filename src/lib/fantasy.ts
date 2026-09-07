@@ -151,13 +151,38 @@ export function needsWeights(myPos: FantasyPos[]) {
   } as Record<FantasyPos, number>;
 }
 
+export type PreferredTargets = {
+  QB?: string;
+  RB?: string;
+  WR?: string;
+  TE?: string;
+};
+
+function nameHit(q: string | undefined, player: FantasyPlayer) {
+  const n = (q || "").trim().toLowerCase();
+  if (!n) return false;
+  return n.split(",").some((part) => {
+    const s = part.trim();
+    return s && (player.name.toLowerCase() === s || player.name.toLowerCase().includes(s) || s.includes(player.name.toLowerCase()));
+  });
+}
+
 export function rankAvailable(
   available: FantasyPlayer[],
   mine: FantasyPlayer[],
   scoring: Scoring,
-  opts?: { scoringType?: string; draftType?: string; overall?: number; teams?: number; limit?: number },
+  opts?: {
+    scoringType?: string;
+    draftType?: string;
+    overall?: number;
+    teams?: number;
+    limit?: number;
+    preferred?: PreferredTargets;
+  },
 ) {
-  const w = needsWeights(mine.map((p) => p.pos));
+  const myPos = mine.map((p) => p.pos);
+  const count = (pos: FantasyPos) => myPos.filter((x) => x === pos).length;
+  const w = needsWeights(myPos);
   const type = opts?.scoringType || "";
   const draft = (opts?.draftType || "").toLowerCase();
   const pprBoost = scoring.reception >= 1 ? 0.1 : scoring.reception > 0 ? 0.05 : 0;
@@ -167,20 +192,53 @@ export function rankAvailable(
   const death = /death|guillotine/i.test(type);
   const dynasty = /dynasty|keeper/i.test(draft);
   const bestBall = /best ball/i.test(draft);
-  const round = opts?.teams ? Math.ceil((opts.overall || 1) / opts.teams) : 1;
+  const teams = opts?.teams || 12;
+  const overall = opts?.overall || 1;
+  const round = Math.ceil(overall / teams);
+  const rb = count("RB");
+  const wr = count("WR");
+  const qb = count("QB");
+  const te = count("TE");
+  const skillSet = (rb >= 2 && wr >= 1) || (wr >= 2 && rb >= 1);
+  const wantQbNow = qb === 0 && skillSet && round >= 4 && !superflex;
+  const wantTeNow = te === 0 && skillSet && round >= 5 && (scoring.reception >= 1 || tePrem);
+  const maxReach = Math.max(4, Math.round(teams * 0.75));
+  const pref = opts?.preferred || {};
+
   const ranked = [...available].map((p) => {
     let score = 220 - p.adp;
     score *= w[p.pos] || 1;
     if (p.pos === "WR" || p.pos === "RB") score *= 1 + pprBoost;
     if (p.pos === "TE" && (scoring.reception >= 1 || tePrem)) score *= tePrem ? 1.12 : 1.05;
-    if (p.pos === "QB") score *= superflex ? 1.22 : 1;
+    if (p.pos === "QB") score *= superflex ? 1.22 : wantQbNow ? 1.16 : 1;
     if ((p.pos === "K" || p.pos === "DST") && (idp || death || bestBall || round < 12)) score *= 0.55;
     if (dynasty && p.adp <= 40) score *= 1.04;
     if (death && (p.pos === "RB" || p.pos === "WR") && p.adp <= 24) score *= 1.08;
-    return { player: p, score };
+    if (wantTeNow && p.pos === "TE" && p.adp <= overall + teams) score *= 1.08;
+
+    const isPref = nameHit(pref[p.pos], p);
+    const picksEarly = p.adp - overall;
+    if (isPref && picksEarly <= maxReach) {
+      const mild = 1.1 + Math.max(0, (maxReach - Math.max(0, picksEarly)) / maxReach) * 0.12;
+      score *= mild;
+    } else if (isPref && picksEarly > maxReach) {
+      score *= 1.02;
+    }
+    return { player: p, score, isPref };
   });
   ranked.sort((a, b) => b.score - a.score);
-  return ranked.slice(0, opts?.limit ?? 10).map((r) => r.player);
+  const limit = opts?.limit ?? 10;
+  const top = ranked.slice(0, limit).map((r) => r.player);
+  if (limit >= 8) {
+    for (const pos of ["QB", "RB", "WR", "TE"] as FantasyPos[]) {
+      const target = available.find((p) => nameHit(pref[pos], p));
+      if (!target) continue;
+      if (target.adp - overall > maxReach) continue;
+      if (top.some((p) => p.id === target.id)) continue;
+      top.splice(Math.min(6, top.length), 0, target);
+    }
+  }
+  return top.slice(0, limit);
 }
 
 export function localTop3(available: FantasyPlayer[], mine: FantasyPlayer[], scoring: Scoring) {

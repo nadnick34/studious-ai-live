@@ -34,6 +34,7 @@ type DraftState = {
   draftTime: string;
   rounds: number;
   scoring: Scoring;
+  preferred: PreferredTargets;
   rulesText: string;
   phase: Phase;
   overall: number;
@@ -52,6 +53,7 @@ const empty: DraftState = {
   draftTime: "",
   rounds: 15,
   scoring: { ...DEFAULT_SCORING },
+  preferred: {},
   rulesText: "",
   phase: "setup",
   overall: 1,
@@ -94,14 +96,14 @@ function SportsPage() {
     () => STARTER_BOARD.filter((p) => d.mine.some((n) => n.toLowerCase() === p.name.toLowerCase())),
     [d.mine],
   );
-  const rankOpts = { scoringType: d.scoringType, draftType: d.draftType, overall: d.overall, teams: d.teams };
+  const rankOpts = { scoringType: d.scoringType, draftType: d.draftType, overall: d.overall, teams: d.teams, preferred: d.preferred };
   const preview20 = useMemo(
     () => rankAvailable(available, myPlayers, d.scoring, { ...rankOpts, limit: 20 }),
-    [available, myPlayers, d.scoring, d.scoringType, d.draftType, d.overall, d.teams],
+    [available, myPlayers, d.scoring, d.scoringType, d.draftType, d.overall, d.teams, d.preferred],
   );
   const live10 = useMemo(
     () => rankAvailable(available, myPlayers, d.scoring, { ...rankOpts, limit: 10 }),
-    [available, myPlayers, d.scoring, d.scoringType, d.draftType, d.overall, d.teams],
+    [available, myPlayers, d.scoring, d.scoringType, d.draftType, d.overall, d.teams, d.preferred],
   );
   const snake = d.selection === "snake";
   const mineNow = isMine(d.overall, d.teams, snake, d.mySlot);
@@ -217,7 +219,7 @@ function SportsPage() {
           mySlot: next.mySlot,
           overall: next.overall,
           scoring: scoringLine(next.scoring, next.scoringType),
-          rules: next.rulesText,
+          rules: `${next.rulesText}\nPREFERRED: QB ${next.preferred.QB || "-"} / RB ${next.preferred.RB || "-"} / WR ${next.preferred.WR || "-"} / TE ${next.preferred.TE || "-"}\nIf 2 RB and 1 WR or 2 WR and 1 RB by round 4, prefer a QB unless it costs a top skill player.`,
           myTeam: next.mine,
           taken: next.picks.map((p) => p.name),
           available: pool.map((p) => `${p.adp}. ${p.name} ${p.pos} ${p.team}`),
@@ -352,6 +354,10 @@ function SportsPage() {
               </label>
               <Field label="Teams" value={String(d.teams)} onChange={(v) => patch({ teams: Math.min(16, Math.max(4, Number(v) || 12)) })} />
               <Field label="My pick position" value={String(d.mySlot)} onChange={(v) => patch({ mySlot: Math.min(d.teams, Math.max(1, Number(v) || 1)) })} />
+              <Field label="Preferred QB" value={d.preferred.QB || ""} onChange={(v) => patch({ preferred: { ...d.preferred, QB: v } })} />
+              <Field label="Preferred RB" value={d.preferred.RB || ""} onChange={(v) => patch({ preferred: { ...d.preferred, RB: v } })} />
+              <Field label="Preferred WR" value={d.preferred.WR || ""} onChange={(v) => patch({ preferred: { ...d.preferred, WR: v } })} />
+              <Field label="Preferred TE" value={d.preferred.TE || ""} onChange={(v) => patch({ preferred: { ...d.preferred, TE: v } })} />
               <Field label="Seconds per pick" value={String(d.pickSeconds)} onChange={(v) => patch({ pickSeconds: Math.max(15, Number(v) || 90) })} />
               <Field label="Rounds" value={String(d.rounds)} onChange={(v) => patch({ rounds: Math.min(20, Math.max(8, Number(v) || 15)) })} />
               <label className="block text-xs text-white/60">
