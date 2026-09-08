@@ -89,9 +89,6 @@ type ProfileRow = {
   kids_mode?: boolean;
   education_approach?: string | null;
   state?: string | null;
-  education_level?: string | null;
-  college_class?: string | null;
-  student_grade?: string | null;
 };
 
 function emptyNotes(title: string): StudyNotes {
@@ -156,9 +153,6 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
       kidsMode: false,
       educationApproach: null,
       state: null,
-      educationLevel: null,
-      collegeClass: null,
-      studentGrade: null,
     };
   }
   const childAge = row.child_age == null ? null : Number(row.child_age);
@@ -185,9 +179,6 @@ function mapProfile(row: ProfileRow | undefined): UserProfile {
     kidsMode,
     educationApproach: (row.education_approach as UserProfile["educationApproach"]) || null,
     state: row.state || null,
-    educationLevel: (row.education_level as UserProfile["educationLevel"]) || null,
-    collegeClass: (row.college_class as UserProfile["collegeClass"]) || null,
-    studentGrade: (row.student_grade as UserProfile["studentGrade"]) || null,
   };
 }
 
@@ -213,9 +204,6 @@ export const saveProfile = createServerFn({ method: "POST" })
     try {
       await sql.query(`alter table profiles add column if not exists education_approach text`);
       await sql.query(`alter table profiles add column if not exists state text`);
-      await sql.query(`alter table profiles add column if not exists education_level text`);
-      await sql.query(`alter table profiles add column if not exists college_class text`);
-      await sql.query(`alter table profiles add column if not exists student_grade text`);
     } catch {
       /* ignore */
     }
@@ -223,13 +211,13 @@ export const saveProfile = createServerFn({ method: "POST" })
       insert into profiles (
         user_id, display_name, phone, sms_alerts, school_select, palette_id,
         custom_school_name, school_logo_url, avatar_data_url, role, edition, setup_complete,
-        for_child, child_age, child_gender, kids_mode, education_approach, state, education_level, college_class, student_grade, updated_at
+        for_child, child_age, child_gender, kids_mode, education_approach, state, updated_at
       ) values (
         ${context.userId}, ${data.displayName ?? null}, ${data.phone}, ${data.smsAlerts},
         ${data.schoolSelect}, ${data.paletteId ?? null}, ${data.customSchoolName ?? null},
         ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${data.role},
         ${data.edition}, ${data.setupComplete},
-        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, ${data.state ?? null}, ${data.educationLevel ?? null}, ${data.collegeClass ?? null}, ${data.studentGrade ?? null}, now()
+        ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, ${data.state ?? null}, now()
       )
       on conflict (user_id) do update set
         display_name = excluded.display_name,
@@ -249,9 +237,6 @@ export const saveProfile = createServerFn({ method: "POST" })
         kids_mode = excluded.kids_mode,
         education_approach = excluded.education_approach,
         state = excluded.state,
-        education_level = excluded.education_level,
-        college_class = excluded.college_class,
-        student_grade = excluded.student_grade,
         updated_at = now()
     `;
     return { ok: true as const };
@@ -1300,15 +1285,6 @@ async function ensureTeacherTables(sql: Awaited<ReturnType<typeof getSql>>) {
       results jsonb not null default '[]'::jsonb
     )`,
     `create index if not exists teacher_assessments_class_idx on teacher_assessments (user_id, class_id)`,
-    `create table if not exists teacher_tool_state (
-      user_id text primary key,
-      scriptorium_log jsonb not null default '[]'::jsonb,
-      testprep_cards jsonb not null default '{}'::jsonb,
-      student_testprep jsonb not null default '[]'::jsonb,
-      college_compare jsonb not null default 'null'::jsonb,
-      teacher_prep_tracks jsonb not null default '[]'::jsonb,
-      updated_at timestamptz not null default now()
-    )`,
   ];
   for (const stmt of statements) {
     try {
@@ -1743,76 +1719,4 @@ export const upsertTeacherAssessmentResult = createServerFn({ method: "POST" })
       where id = ${data.assessmentId} and user_id = ${context.userId}
     `;
     return { ...cur, results, classAverage };
-  });
-
-
-export const getTeacherToolState = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const sql = await getSql();
-    await ensureTeacherTables(sql);
-    try {
-      await sql.query(`alter table teacher_tool_state add column if not exists student_testprep jsonb not null default '[]'::jsonb`);
-      await sql.query(`alter table teacher_tool_state add column if not exists college_compare jsonb`);
-      await sql.query(`alter table teacher_tool_state add column if not exists teacher_prep_tracks jsonb not null default '[]'::jsonb`);
-    } catch {
-      /* ignore */
-    }
-    const rows = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown; college_compare: unknown }>`
-      select scriptorium_log, testprep_cards, student_testprep, college_compare, teacher_prep_tracks from teacher_tool_state where user_id = ${context.userId} limit 1
-    `;
-    const row = rows[0];
-    return {
-      scriptoriumLog: parseJson(row?.scriptorium_log, []),
-      testPrepCards: parseJson(row?.testprep_cards, {}),
-      studentTestPrep: parseJson(row?.student_testprep, []),
-      collegeCompare: parseJson(row?.college_compare, row?.college_compare ?? null),
-      teacherPrepTracks: parseJson(row?.teacher_prep_tracks, []),
-    };
-  });
-
-export const saveTeacherToolState = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator(
-    (input: {
-      scriptoriumLog?: unknown;
-      testPrepCards?: unknown;
-      studentTestPrep?: unknown;
-      collegeCompare?: unknown;
-      teacherPrepTracks?: unknown;
-    }) => input,
-  )
-  .handler(async ({ context, data }) => {
-    const sql = await getSql();
-    await ensureTeacherTables(sql);
-    const cur = await sql<{ scriptorium_log: unknown; testprep_cards: unknown; student_testprep: unknown }>`
-      select scriptorium_log, testprep_cards, student_testprep, college_compare, teacher_prep_tracks from teacher_tool_state where user_id = ${context.userId} limit 1
-    `;
-    const scriptoriumLog =
-      data.scriptoriumLog !== undefined ? data.scriptoriumLog : parseJson(cur[0]?.scriptorium_log, []);
-    const testPrepCards =
-      data.testPrepCards !== undefined ? data.testPrepCards : parseJson(cur[0]?.testprep_cards, {});
-    const studentTestPrep =
-      data.studentTestPrep !== undefined ? data.studentTestPrep : parseJson(cur[0]?.student_testprep, []);
-    const collegeCompare =
-      data.collegeCompare !== undefined ? data.collegeCompare : cur[0]?.college_compare ?? null;
-    const teacherPrepTracks =
-      data.teacherPrepTracks !== undefined ? data.teacherPrepTracks : parseJson(cur[0]?.teacher_prep_tracks, []);
-    try {
-      await sql.query(`alter table teacher_tool_state add column if not exists student_testprep jsonb not null default '[]'::jsonb`);
-      await sql.query(`alter table teacher_tool_state add column if not exists college_compare jsonb`);
-      await sql.query(`alter table teacher_tool_state add column if not exists teacher_prep_tracks jsonb not null default '[]'::jsonb`);
-    } catch { /* ignore */ }
-    await sql`
-      insert into teacher_tool_state (user_id, scriptorium_log, testprep_cards, student_testprep, college_compare, teacher_prep_tracks, updated_at)
-      values (${context.userId}, ${JSON.stringify(scriptoriumLog)}::jsonb, ${JSON.stringify(testPrepCards)}::jsonb, ${JSON.stringify(studentTestPrep)}::jsonb, ${JSON.stringify(collegeCompare)}::jsonb, ${JSON.stringify(teacherPrepTracks)}::jsonb, now())
-      on conflict (user_id) do update set
-        scriptorium_log = excluded.scriptorium_log,
-        testprep_cards = excluded.testprep_cards,
-        student_testprep = excluded.student_testprep,
-        college_compare = excluded.college_compare,
-        teacher_prep_tracks = excluded.teacher_prep_tracks,
-        updated_at = now()
-    `;
-    return { ok: true as const };
   });

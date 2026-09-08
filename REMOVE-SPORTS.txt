@@ -1,0 +1,4 @@
+Delete these files from the project if they exist:
+src/routes/sports.tsx
+src/lib/fantasy.ts
+public/field-bg.png
