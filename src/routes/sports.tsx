@@ -301,7 +301,7 @@ function SportsPage() {
         {d.phase === "setup" && (
           <section className="space-y-3 rounded-2xl border border-white/20 bg-black/70 p-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Year" value={String(d.year)} onChange={(v) => patch({ year: Number(v) || d.year })} />
+              <NumField label="Year" value={d.year} min={2020} max={2035} onCommit={(n) => patch({ year: n })} />
               <label className="block text-xs text-white/60">
                 Draft type
                 <select className="mt-1 w-full rounded-lg border border-white/25 bg-black/50 px-3 py-2 text-sm text-white" value={d.draftType} onChange={(e) => patch({ draftType: e.target.value, selection: e.target.value.includes("Salary") ? "linear" : d.selection })}>
@@ -352,14 +352,14 @@ function SportsPage() {
                   <option value="linear">Linear / salary cap clock</option>
                 </select>
               </label>
-              <Field label="Teams" value={String(d.teams)} onChange={(v) => patch({ teams: Math.min(16, Math.max(4, Number(v) || 12)) })} />
-              <Field label="My pick position" value={String(d.mySlot)} onChange={(v) => patch({ mySlot: Math.min(d.teams, Math.max(1, Number(v) || 1)) })} />
+              <NumField label="Teams" value={d.teams} min={2} max={32} onCommit={(n) => patch({ teams: n, mySlot: Math.min(d.mySlot, n) })} />
+              <NumField label="My pick position" value={d.mySlot} min={1} max={32} onCommit={(n) => patch({ mySlot: Math.min(Math.max(1, n), d.teams || n) })} />
               <Field label="Preferred QB" value={d.preferred.QB || ""} onChange={(v) => patch({ preferred: { ...d.preferred, QB: v } })} />
               <Field label="Preferred RB" value={d.preferred.RB || ""} onChange={(v) => patch({ preferred: { ...d.preferred, RB: v } })} />
               <Field label="Preferred WR" value={d.preferred.WR || ""} onChange={(v) => patch({ preferred: { ...d.preferred, WR: v } })} />
               <Field label="Preferred TE" value={d.preferred.TE || ""} onChange={(v) => patch({ preferred: { ...d.preferred, TE: v } })} />
-              <Field label="Seconds per pick" value={String(d.pickSeconds)} onChange={(v) => patch({ pickSeconds: Math.max(15, Number(v) || 90) })} />
-              <Field label="Rounds" value={String(d.rounds)} onChange={(v) => patch({ rounds: Math.min(20, Math.max(8, Number(v) || 15)) })} />
+              <NumField label="Seconds per pick" value={d.pickSeconds} min={5} max={600} onCommit={(n) => patch({ pickSeconds: n })} />
+              <NumField label="Rounds" value={d.rounds} min={1} max={30} onCommit={(n) => patch({ rounds: n })} />
               <label className="block text-xs text-white/60">
                 Draft time
                 <input type="datetime-local" className="mt-1 w-full rounded-lg border border-white/25 bg-black/50 px-3 py-2 text-sm text-white" value={d.draftTime} onChange={(e) => patch({ draftTime: e.target.value })} />
@@ -579,6 +579,50 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
     <label className="block text-xs text-white/60">
       {label}
       <input className="mt-1 w-full rounded-lg border border-white/25 bg-black/50 px-3 py-2 text-sm text-white text-white" value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+
+function NumField({
+  label,
+  value,
+  onCommit,
+  min,
+  max,
+}: {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+  min?: number;
+  max?: number;
+}) {
+  const [text, setText] = useState(String(value ?? ""));
+  useEffect(() => {
+    setText(String(value ?? ""));
+  }, [value]);
+  function commit() {
+    const raw = text.trim();
+    let n = raw === "" ? value : Number(raw);
+    if (Number.isNaN(n)) n = value;
+    if (typeof min === "number") n = Math.max(min, n);
+    if (typeof max === "number") n = Math.min(max, n);
+    onCommit(n);
+    setText(String(n));
+  }
+  return (
+    <label className="block text-xs text-white/60">
+      {label}
+      <input
+        inputMode="numeric"
+        className="mt-1 w-full rounded-lg border border-white/25 bg-black/50 px-3 py-2 text-sm text-white"
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/[^0-9.]/g, ""))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+        }}
+      />
     </label>
   );
 }
