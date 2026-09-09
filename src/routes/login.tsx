@@ -1,11 +1,13 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/data";
+import { recordActivity, resolveLoginEmail, seedAdminAccount } from "@/lib/admin";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 import { RoleHomeRedirect } from "@/components/role-home-redirect";
+import { playTheme } from "@/lib/theme-audio";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -17,9 +19,14 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    void seedAdminAccount().catch(() => {});
+  }, []);
+
   if (user) return <RoleHomeRedirect />;
 
   async function homeForRole(role?: string | null) {
+    if (role === "admin") return "/admin";
     if (role === "teacher") return "/teacher";
     if (role === "professional") return "/meetings";
     return "/dashboard";
@@ -29,7 +36,7 @@ function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error: err } = await authClient.signIn.email({ email: email.trim(), password });
+    const { error: err } = await authClient.signIn.email({ email: resolveLoginEmail(email), password });
     setLoading(false);
     if (err) {
       setError(err.message || "Invalid email or password.");
@@ -45,6 +52,12 @@ function Login() {
     } catch {
       hydrateBrand();
     }
+    try {
+      await recordActivity({ data: { action: "login" } });
+    } catch {
+      /* ignore */
+    }
+    playTheme({ loop: false, volume: 0.38 });
     await navigate({ to: dest as any });
   }
 

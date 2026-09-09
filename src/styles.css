@@ -218,3 +218,21 @@ html.professional-mode.dark {
 html.professional-mode aside {
   background: linear-gradient(180deg, #121417 0%, #1a1d22 100%);
 }
+
+@keyframes tut-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+}
+@keyframes tut-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.85; }
+}
+@keyframes tut-slide {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.tut-float { animation: tut-float 1.8s ease-in-out infinite; }
+.tut-float-delay { animation: tut-float 1.8s ease-in-out 0.4s infinite; }
+.tut-pulse { animation: tut-pulse 2s ease-in-out infinite; }
+.tut-pulse-delay { animation: tut-pulse 2s ease-in-out 0.35s infinite; }
+.tut-slide { animation: tut-slide 1.6s ease-in-out infinite; }

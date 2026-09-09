@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "@/lib/auth/client";
+import { recordActivity } from "@/lib/admin";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 
@@ -39,6 +40,11 @@ function SignUp() {
     }
     try {
       localStorage.setItem("studious-show-tutorial", "1");
+    } catch {
+      /* ignore */
+    }
+    try {
+      await recordActivity({ data: { action: "signup" } });
     } catch {
       /* ignore */
     }
