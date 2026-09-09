@@ -361,8 +361,8 @@ function DashboardPage() {
         </div>
       )}
 
+      <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
       {showClassInfo && (
-        <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
         <InfoModal title="Adding classes" onClose={() => setShowClassInfo(false)} footer={<TutorialButton kids={tutorial.kids} onClick={() => { setShowClassInfo(false); tutorial.start(); }} />}>
           <p>
             Classes are the top-level folders for your courses. Create one class per course so materials, chapters, and

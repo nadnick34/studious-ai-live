@@ -354,8 +354,8 @@ function ClassPage() {
         />
       )}
 
+      <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
       {showChapterInfo && (
-        <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
         <InfoModal title="Chapters & study modes" onClose={() => setShowChapterInfo(false)} footer={<TutorialButton kids={tutorial.kids} onClick={() => { setShowChapterInfo(false); tutorial.start(); }} />}>
           <p>
             A <strong>chapter</strong> (or study set) is one unit of work — for example Chapter 2, Lecture 5, or Weeks
