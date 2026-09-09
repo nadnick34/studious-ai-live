@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { InfoModal } from "@/components/info-modal";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { RoleHomeRedirect } from "@/components/role-home-redirect";
+import { isThemePlaying, playLandingTheme, stopTheme } from "@/lib/theme-audio";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
@@ -104,11 +105,35 @@ function Landing() {
   const { user } = useCurrentUserState();
   const [showOverview, setShowOverview] = useState(false);
   const [edition, setEdition] = useState<(typeof EDITIONS)[number] | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    if (user || muted) {
+      stopTheme();
+      return;
+    }
+    playLandingTheme();
+    const kick = () => {
+      if (!isThemePlaying()) playLandingTheme();
+    };
+    window.addEventListener("pointerdown", kick, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", kick);
+      stopTheme();
+    };
+  }, [user, muted]);
 
   if (user) return <RoleHomeRedirect />;
 
   return (
     <div className="relative min-h-dvh overflow-x-hidden bg-[#4a3a2a] text-[#f4ead6]">
+      <button
+        type="button"
+        onClick={() => setMuted((v) => !v)}
+        className="absolute right-3 top-3 z-20 rounded-full border border-[#f0e2b8]/40 bg-black/30 px-3 py-1 text-[11px] tracking-wide text-[#e8d7a8] hover:bg-black/45"
+      >
+        {muted ? "Sound off" : "Sound on"}
+      </button>
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-center brightness-125 contrast-105 saturate-110"
         style={{ backgroundImage: "url('/library-bg.jpg')" }}
