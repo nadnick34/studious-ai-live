@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import { authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/data";
@@ -58,24 +58,6 @@ function Login() {
           <p className="mt-1 text-xs text-muted">Your masterclass for every class.</p>
         </div>
         <h2 className="mb-5 text-center text-base font-semibold text-fg">Log in</h2>
-
-        {authEnabled && (
-          <div className="mb-4 space-y-2">
-            {GROK_PROVIDERS.map((p) => (
-              <button
-                key={p.providerId}
-                type="button"
-                onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
-                className="w-full rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-bg"
-              >
-                Continue with {p.label}
-              </button>
-            ))}
-            <div className="relative py-2 text-center text-[11px] text-muted">
-              <span className="bg-card px-2">or email</span>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />

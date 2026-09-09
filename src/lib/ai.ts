@@ -163,7 +163,7 @@ async function visionOcr(name: string, mime: string, base64: string): Promise<st
     body: JSON.stringify({
       model: "grok-4.5",
       temperature: 0.05,
-      max_tokens: 8000,
+      max_tokens: 1800,
       messages: [
         {
           role: "user",
@@ -256,10 +256,11 @@ export const extractMaterials = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const parts: string[] = [];
     const attachments: Attachment[] = [];
-    for (const file of data.files.slice(0, 20)) {
-      const processed = await processFile(file);
-      parts.push(processed.heading);
-      attachments.push(processed.attachment);
+    const files = data.files.slice(0, 20);
+    const processed = await Promise.all(files.map((file) => processFile(file)));
+    for (const item of processed) {
+      parts.push(item.heading);
+      attachments.push(item.attachment);
     }
     return {
       text: parts.join("\n").trim(),

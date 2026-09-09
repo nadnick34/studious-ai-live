@@ -26,10 +26,12 @@ export function InfoModal({
   title,
   onClose,
   children,
+  footer,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -42,6 +44,7 @@ export function InfoModal({
           </button>
         </div>
         <div className="space-y-3 text-sm leading-relaxed text-fg/90">{children}</div>
+        {footer}
       </div>
     </div>
   );

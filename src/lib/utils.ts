@@ -83,7 +83,7 @@ export async function compressDocumentImage(file: File): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const img = await loadImage(url);
-    const max = 2400;
+    const max = 1600;
     const scale = Math.min(1, max / Math.max(img.width, img.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -93,7 +93,7 @@ export async function compressDocumentImage(file: File): Promise<string> {
     ctx.filter = "contrast(1.12) brightness(1.04) saturate(0.92)";
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     ctx.filter = "none";
-    return canvas.toDataURL("image/jpeg", 0.92);
+    return canvas.toDataURL("image/jpeg", 0.8);
   } finally {
     URL.revokeObjectURL(url);
   }

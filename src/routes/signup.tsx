@@ -14,6 +14,7 @@ function SignUp() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   if (user) return <Navigate to="/dashboard" />;
 
@@ -21,6 +22,11 @@ function SignUp() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    if (!agreed) {
+      setError("Please acknowledge the beta testing agreement.");
+      setLoading(false);
+      return;
+    }
     const { error: err } = await authClient.signUp.email({
       email: email.trim(),
       password,
@@ -30,6 +36,11 @@ function SignUp() {
     if (err) {
       setError(err.message || "Could not create account.");
       return;
+    }
+    try {
+      localStorage.setItem("studious-show-tutorial", "1");
+    } catch {
+      /* ignore */
     }
     await navigate({ to: "/profile" });
   }
@@ -48,8 +59,16 @@ function SignUp() {
             <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
             <p className="mt-1 text-[10px] text-muted">At least 8 characters</p>
           </div>
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-bg px-3 py-2.5 text-[11px] leading-snug text-muted">
+            <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+            <span>
+              I understand Studious AI is a <strong className="text-fg">beta site for testing</strong>. Features may
+              change, and generated study tools are for learning support — not a substitute for your own work or official
+              school materials.
+            </span>
+          </label>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red">{error}</p>}
-          <Button type="submit" className="mt-2 w-full" disabled={loading || password.length < 8}>
+          <Button type="submit" className="mt-2 w-full" disabled={loading || password.length < 8 || !agreed}>
             {loading ? "Creating account…" : "Create account"}
           </Button>
         </form>

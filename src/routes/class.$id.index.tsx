@@ -4,6 +4,7 @@ import { BookOpen, ClipboardList, Headphones, Layers3, MoreHorizontal, Pencil, P
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
+import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
@@ -31,6 +32,7 @@ function ClassPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [sets, setSets] = useState<StudySet[]>([]);
   const [showChapterInfo, setShowChapterInfo] = useState(false);
+  const tutorial = useStudentTutorial();
   const [showGuide, setShowGuide] = useState(false);
   const [showFocus, setShowFocus] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -353,7 +355,8 @@ function ClassPage() {
       )}
 
       {showChapterInfo && (
-        <InfoModal title="Chapters & study modes" onClose={() => setShowChapterInfo(false)}>
+        <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
+        <InfoModal title="Chapters & study modes" onClose={() => setShowChapterInfo(false)} footer={<TutorialButton kids={tutorial.kids} onClick={() => { setShowChapterInfo(false); tutorial.start(); }} />}>
           <p>
             A <strong>chapter</strong> (or study set) is one unit of work — for example Chapter 2, Lecture 5, or Weeks
             1–3. Upload everything for that unit, then generate notes, audio, flash cards, and a quiz.

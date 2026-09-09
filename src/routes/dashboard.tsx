@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, Pencil, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
+import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { createClass, getProfile, listClasses, seedSampleClass, updateClass } from "@/lib/data";
@@ -45,6 +46,7 @@ function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showClassInfo, setShowClassInfo] = useState(false);
+  const tutorial = useStudentTutorial();
   const { kidsMode, name: mascotName } = useKidsMascot();
 
   async function refresh() {
@@ -360,7 +362,8 @@ function DashboardPage() {
       )}
 
       {showClassInfo && (
-        <InfoModal title="Adding classes" onClose={() => setShowClassInfo(false)}>
+        <StudentTutorial open={tutorial.open} kids={tutorial.kids} onClose={tutorial.close} />
+        <InfoModal title="Adding classes" onClose={() => setShowClassInfo(false)} footer={<TutorialButton kids={tutorial.kids} onClick={() => { setShowClassInfo(false); tutorial.start(); }} />}>
           <p>
             Classes are the top-level folders for your courses. Create one class per course so materials, chapters, and
             alerts stay organized.
