@@ -159,6 +159,29 @@ html.kids-mode.dark.kids-girl {
   --teal-hover: #ec4899;
 }
 
+html.kids-mode.kids-boy aside {
+  background: #1e3a8a !important;
+}
+html.kids-mode.kids-girl aside {
+  background: #9d174d !important;
+}
+html.kids-mode.dark.kids-boy aside {
+  background: #172554 !important;
+}
+html.kids-mode.dark.kids-girl aside {
+  background: #831843 !important;
+}
+html.kids-mode.kids-boy nav.fixed {
+  background: #1e3a8a !important;
+  border-color: #1e40af !important;
+  color: #fff;
+}
+html.kids-mode.kids-girl nav.fixed {
+  background: #9d174d !important;
+  border-color: #be185d !important;
+  color: #fff;
+}
+
 /* Professional edition — charcoal / cool grey / silver */
 html.professional-mode {
   --slate: #1a1d21;
