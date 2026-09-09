@@ -195,6 +195,19 @@ export const getProfile = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const sql = await getSql();
+    try {
+      const who = await sql<{ email: string }>`select email from "user" where id = ${context.userId} limit 1`;
+      if (who[0]?.email?.toLowerCase() === "admin@getstudious.ai") {
+        await sql.query(
+          `insert into profiles (user_id, display_name, role, edition, setup_complete, updated_at)
+           values ($1, 'Admin', 'admin', 'student', true, now())
+           on conflict (user_id) do update set role = 'admin', updated_at = now()`,
+          [context.userId],
+        );
+      }
+    } catch {
+      /* ignore */
+    }
     const rows = await sql<ProfileRow>`select * from profiles where user_id = ${context.userId} limit 1`;
     return mapProfile(rows[0]);
   });

@@ -154,6 +154,9 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // Vite 8.2 / Rolldown splits the SSR entry and re-exports a missing
+            // ssr_exports binding (TanStack/router#8031). Keep one server chunk.
+            inlineDynamicImports: true,
           }),
         ]
       : []),

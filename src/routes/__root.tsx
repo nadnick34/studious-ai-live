@@ -6,7 +6,20 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "Studious AI";
 
+function RootError() {
+  return (
+    <html lang="en">
+      <body style={{ fontFamily: "sans-serif", padding: 32 }}>
+        <h1>Studious is restarting</h1>
+        <p>Refresh in a moment. If this stays, open getstudious.ai/login directly.</p>
+        <p><a href="/login">Go to login</a></p>
+      </body>
+    </html>
+  );
+}
+
 export const Route = createRootRoute({
+  errorComponent: RootError,
   head: () => ({
     meta: [
       { charSet: "utf-8" },

@@ -19,10 +19,6 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void seedAdminAccount().catch(() => {});
-  }, []);
-
   if (user) return <RoleHomeRedirect />;
 
   async function homeForRole(role?: string | null) {
@@ -36,7 +32,17 @@ function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error: err } = await authClient.signIn.email({ email: resolveLoginEmail(email), password });
+    const loginEmail = resolveLoginEmail(email);
+    let { error: err } = await authClient.signIn.email({ email: loginEmail, password });
+    if (err && loginEmail === "admin@getstudious.ai" && password === "admin123") {
+      await authClient.signUp.email({ email: loginEmail, password, name: "Admin" }).catch(() => {});
+      await seedAdminAccount().catch(() => {});
+      const again = await authClient.signIn.email({ email: loginEmail, password });
+      err = again.error;
+      await seedAdminAccount().catch(() => {});
+    } else if (!err && loginEmail === "admin@getstudious.ai") {
+      await seedAdminAccount().catch(() => {});
+    }
     setLoading(false);
     if (err) {
       setError(err.message || "Invalid email or password.");

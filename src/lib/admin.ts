@@ -28,36 +28,23 @@ async function ensureLogTable() {
 }
 
 export const seedAdminAccount = createServerFn({ method: "POST" }).handler(async () => {
-  const sql = await ensureLogTable();
-  const existing = await sql<{ id: string }>`
-    select id from "user" where lower(email) = ${ADMIN_EMAIL} limit 1
-  `;
-  if (!existing[0]) {
-    try {
-      const { auth } = await import("@/lib/auth/server");
-      await auth.api.signUpEmail({
-        body: { name: "Admin", email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!/already|exists|unique/i.test(msg)) {
-        return { ok: false as const, error: msg };
-      }
-    }
-  }
-  const rows = await sql<{ id: string }>`
-    select id from "user" where lower(email) = ${ADMIN_EMAIL} limit 1
-  `;
-  const id = rows[0]?.id;
-  if (id) {
+  try {
+    const sql = await ensureLogTable();
+    const rows = await sql<{ id: string }>`
+      select id from "user" where lower(email) = ${ADMIN_EMAIL} limit 1
+    `;
+    const id = rows[0]?.id;
+    if (!id) return { ok: true as const, created: false };
     await sql.query(
       `insert into profiles (user_id, display_name, role, edition, setup_complete, updated_at)
        values ($1, 'Admin', 'admin', 'student', true, now())
-       on conflict (user_id) do update set role = 'admin', display_name = coalesce(profiles.display_name, 'Admin'), updated_at = now()`,
+       on conflict (user_id) do update set role = 'admin', updated_at = now()`,
       [id],
     );
+    return { ok: true as const, created: true };
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : "seed failed" };
   }
-  return { ok: true as const };
 });
 
 export const recordActivity = createServerFn({ method: "POST" })
