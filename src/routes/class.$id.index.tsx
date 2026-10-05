@@ -19,6 +19,7 @@ import {
   updateStudySet,
 } from "@/lib/data";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
+import { mergeStudyGuide } from "@/lib/combine";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
 import { uid } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils";
@@ -121,55 +122,24 @@ function ClassPage() {
     const chosen = sets.filter((s) => selected.includes(s.id));
     const work = assignments.filter((a) => selectedWork.includes(a.id));
     if (chosen.length + work.length < 1) return;
-    const perChapter = Math.max(6000, Math.floor(64000 / Math.max(chosen.length, 1)));
-    const chapterText = chosen
-      .map((s) => {
-        const secs = (s.notes?.sections || [])
-          .map((sec) => [sec.heading, sec.body || "", (sec.bullets || []).join("\n")].filter(Boolean).join("\n"))
-          .join("\n\n");
-        const block = `===== CHAPTER ${s.name} =====\n${s.notes?.title || ""}\n${secs}`;
-        return block.length > perChapter ? block.slice(0, perChapter) + "\n[chapter truncated for combine]" : block;
-      })
-      .join("\n\n");
-    const workText = work
-      .map((a) => {
-        const fb = a.submissions?.[0]?.feedback;
-        return `===== ASSIGNMENT ${a.title} =====\n${fb?.reviewOfAssignment || ""}\n${fb?.assignmentAssessment || ""}\n${(fb?.strengths || []).join("; ")}\n${(fb?.issues || []).join("; ")}\n${fb?.extraMile || ""}`;
-      })
-      .join("\n\n");
-    const extractedText = [chapterText, workText, exclusions.trim() ? `===== EXCLUSIONS — do not include =====\n${exclusions.trim()}` : ""]
-      .filter(Boolean)
-      .join("\n\n");
     const guideName = `Study Guide · ${[...chosen.map((s) => s.name), ...work.map((a) => a.title)].join(", ")}`.slice(0, 80);
+    const merged = mergeStudyGuide(chosen, work, exclusions);
     setBusy(true);
-    setStatus(`Building study guide from ${chosen.length + work.length} sources. Several chapters can take a few minutes.`);
+    setStatus(`Building study guide from ${chosen.length + work.length} sources.`);
     setError(null);
     try {
-      const profile = await getProfile();
-      const generated = await generateStudyPackage({
-        data: {
-          className: cls.name,
-          classCode: cls.code,
-          subject: cls.subject,
-          setName: guideName,
-          sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
-          extractedText,
-          focusPrompt: `Create one study guide from the selected chapters and assignment-assistant returns. Omit anything listed under EXCLUSIONS.${exclusions.trim() ? " Exclusions: " + exclusions.trim() : ""}`,
-          kidsMode: Boolean(profile.kidsMode),
-          childAge: profile.childAge,
-          combine: true,
-        },
-      });
       const set = await createStudySet({
         data: {
           classId,
           name: guideName,
-          generated,
+          generated: merged,
           sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
+          focusPrompt: exclusions.trim() ? `Exclusions: ${exclusions.trim()}` : undefined,
         },
       });
       setShowGuide(false);
       setSelected([]);
+      setSelectedWork([]);
       await navigate({ to: "/class/$id/set/$setId", params: { id: classId, setId: set.id } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Study guide failed");
