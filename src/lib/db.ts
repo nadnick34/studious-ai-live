@@ -83,6 +83,30 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
+
+/** Supabase session mode (port 5432) caps clients at pool_size, often 15.
+ * Serverless instances must use the transaction pooler and one connection. */
+export function serverlessPoolOptions(connectionString: string) {
+  let url = connectionString;
+  try {
+    const parsed = new URL(connectionString);
+    if (parsed.hostname.includes("pooler.supabase.com") && (parsed.port === "5432" || parsed.port === "")) {
+      parsed.port = "6543";
+      parsed.searchParams.set("pgbouncer", "true");
+      url = parsed.toString();
+    }
+  } catch {
+    url = connectionString.replace(":5432/", ":6543/").replace(":5432?", ":6543?");
+  }
+  return {
+    connectionString: url,
+    max: 1,
+    idleTimeoutMillis: 1000,
+    connectionTimeoutMillis: 10000,
+    allowExitOnIdle: true,
+  };
+}
+
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
@@ -91,7 +115,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool(serverlessPoolOptions(databaseUrl));
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
