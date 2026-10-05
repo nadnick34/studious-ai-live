@@ -129,43 +129,11 @@ function ClassPage() {
       return;
     }
     const guideName = `Study Guide · ${[...ready.map((s) => s.name), ...work.map((a) => a.title)].join(", ")}`.slice(0, 80);
-    const digest = ready
-      .map((s) => {
-        const secs = (s.notes?.sections || [])
-          .map((sec) => [sec.heading, sec.body || "", (sec.bullets || []).join("\\n")].filter(Boolean).join("\\n"))
-          .join("\\n\\n");
-        return `SOURCE ${s.name}\\n${secs}`;
-      })
-      .join("\\n\\n")
-      .slice(0, 28000);
     setBusy(true);
-    setStatus("Weaving the finished chapters into one study guide…");
+    setStatus("Copying the full chapter notes into one study guide…");
     setError(null);
     try {
-      const profile = await getProfile();
       let generated = mergeStudyGuide(ready, work, exclusions);
-      try {
-        const ai = await Promise.race([
-          generateStudyPackage({
-            data: {
-              className: cls.name,
-              classCode: cls.code,
-              subject: cls.subject,
-              setName: guideName,
-              sourceFiles: ready.map((s) => s.name),
-              extractedText: digest,
-              focusPrompt: "Write one continuous study guide. Do not split the document into chapter sections.",
-              kidsMode: Boolean(profile.kidsMode),
-              childAge: profile.childAge,
-              combine: true,
-            },
-          }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 50000)),
-        ]);
-        if (ai?.notes?.sections?.length) generated = ai;
-      } catch {
-        /* keep the local continuous guide */
-      }
       if (pending.length) {
         generated = {
           ...generated,
@@ -174,7 +142,7 @@ function ClassPage() {
             sections: [
               {
                 heading: "Still finishing",
-                body: `${pending.map((s) => s.name).join(", ")} was still generating, so it is not in this guide. Build the guide again after it finishes.`,
+                body: `${pending.map((s) => s.name).join(", ")} was still generating, so its notes are not in this guide. Build the guide again after it finishes.`,
                 bullets: [],
               },
               ...generated.notes.sections,
