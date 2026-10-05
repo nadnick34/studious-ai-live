@@ -567,11 +567,11 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
       focusPrompt: combine
         ? `${data.focusPrompt || ""}
 
-COMBINE MODE — this is a multi-chapter study guide, not a new lecture.
-- Keep every selected chapter. One numbered section per chapter, using that chapter's name as the heading.
-- Then one cross-chapter section: how the chapters connect, what to compare, and what is most testable.
-- Do not drop a chapter to make the JSON shorter. Shorten bullets instead.
-- Quiz: 12 questions covering all selected chapters. Flashcards: 16. Audio script: under 700 words, still covering every chapter.
+COMBINE MODE — write ONE continuous study guide, not a stack of chapter packets.
+- Do not use chapter names as section headings. Do not output "Chapter 2", "Chapter 4", or similar as the structure.
+- Weave the selected material into one unit: a short overview, core ideas, a definitions table, how the ideas connect, and a study checklist.
+- Mention a chapter only inside a bullet when the source of an example matters.
+- Quiz: 12 questions across the whole unit, no chapter labels in the question text. Flashcards: 16. Audio script: under 700 words, told as one lecture.
 - Finish the JSON. A complete shorter guide is better than a cut-off one.`
         : data.focusPrompt,
       kidsMode: data.kidsMode,
