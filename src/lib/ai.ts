@@ -356,10 +356,36 @@ function extractJsonObject(content: string): string {
   return cleaned;
 }
 
-function ensurePackage(parsed: GeneratedPackage): GeneratedPackage {
-  if (!parsed.notes || !parsed.audioScript || !Array.isArray(parsed.quiz)) {
-    throw new Error("Model response missing required fields");
+function repairJson(content: string): string {
+  let s = extractJsonObject(content);
+  try {
+    JSON.parse(s);
+    return s;
+  } catch {
+    /* truncated model output */
   }
+  s = s.replace(/,\s*"[^"\n]*"?\s*:?\s*$/, "");
+  const quotes = (s.match(/(?<!\\)"/g) || []).length;
+  if (quotes % 2) s += '"';
+  const openSquare = (s.match(/\[/g) || []).length - (s.match(/\]/g) || []).length;
+  const openCurly = (s.match(/{/g) || []).length - (s.match(/}/g) || []).length;
+  if (openSquare > 0) s += "]".repeat(openSquare);
+  if (openCurly > 0) s += "}".repeat(openCurly);
+  return s;
+}
+
+function ensurePackage(parsed: GeneratedPackage): GeneratedPackage {
+  if (!parsed.notes || !Array.isArray(parsed.notes.sections) || parsed.notes.sections.length === 0) {
+    throw new Error("Model response missing study notes");
+  }
+  if (!parsed.audioScript) {
+    const bits = parsed.notes.sections
+      .slice(0, 8)
+      .map((sec) => [sec.heading, ...(sec.bullets || []).slice(0, 4)].filter(Boolean).join(". "))
+      .filter(Boolean);
+    parsed.audioScript = `Study guide. ${parsed.notes.title || "Combined chapters"}. ${bits.join(" ")}`.slice(0, 4000);
+  }
+  if (!Array.isArray(parsed.quiz)) parsed.quiz = [];
   if (!Array.isArray(parsed.flashcards)) parsed.flashcards = [];
   parsed.slides = normalizeSlides(parsed.slides as Slide[] | undefined, parsed.notes);
   parsed.quiz = parsed.quiz.map((q, i) => ({
@@ -373,7 +399,12 @@ function ensurePackage(parsed: GeneratedPackage): GeneratedPackage {
 }
 
 function parseJsonContent(content: string): GeneratedPackage {
-  const parsed = JSON.parse(extractJsonObject(content)) as GeneratedPackage;
+  let parsed: GeneratedPackage;
+  try {
+    parsed = JSON.parse(extractJsonObject(content)) as GeneratedPackage;
+  } catch {
+    parsed = JSON.parse(repairJson(content)) as GeneratedPackage;
+  }
   return ensurePackage(parsed);
 }
 
@@ -518,17 +549,31 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
       kidsMode?: boolean;
       childAge?: number | null;
       childGender?: string | null;
+      combine?: boolean;
     }) => input,
   )
   .handler(async ({ data }) => {
+    const combine = Boolean(data.combine);
+    const source = combine
+      ? (data.extractedText || "").slice(0, 72000)
+      : data.extractedText;
     const { system, user } = buildGenerationPrompt({
       className: data.className || "Course",
       classCode: data.classCode || "",
       subject: data.subject || "General",
       setName: data.setName.trim(),
       sourceFiles: data.sourceFiles || [],
-      extractedText: data.extractedText,
-      focusPrompt: data.focusPrompt,
+      extractedText: source,
+      focusPrompt: combine
+        ? `${data.focusPrompt || ""}
+
+COMBINE MODE — this is a multi-chapter study guide, not a new lecture.
+- Keep every selected chapter. One numbered section per chapter, using that chapter's name as the heading.
+- Then one cross-chapter section: how the chapters connect, what to compare, and what is most testable.
+- Do not drop a chapter to make the JSON shorter. Shorten bullets instead.
+- Quiz: 12 questions covering all selected chapters. Flashcards: 16. Audio script: under 700 words, still covering every chapter.
+- Finish the JSON. A complete shorter guide is better than a cut-off one.`
+        : data.focusPrompt,
       kidsMode: data.kidsMode,
       childAge: data.childAge,
     });
@@ -544,10 +589,11 @@ export const generateStudyPackage = createServerFn({ method: "POST" })
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
         },
+        signal: AbortSignal.timeout(240000),
         body: JSON.stringify({
           model: "grok-4.5",
-          temperature: attempt === 0 ? 0.35 : 0.1,
-          max_tokens: 12000,
+          temperature: attempt === 0 ? 0.3 : 0.1,
+          max_tokens: combine ? 16000 : 12000,
           messages: [
             { role: "system", content: system },
             { role: "user", content: user },

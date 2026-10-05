@@ -157,6 +157,7 @@ export default defineConfig(({ command, isPreview }) => ({
             // Vite 8.2 / Rolldown splits the SSR entry and re-exports a missing
             // ssr_exports binding (TanStack/router#8031). Keep one server chunk.
             inlineDynamicImports: true,
+            vercel: { functions: { maxDuration: 300 } },
           }),
         ]
       : []),

@@ -121,12 +121,14 @@ function ClassPage() {
     const chosen = sets.filter((s) => selected.includes(s.id));
     const work = assignments.filter((a) => selectedWork.includes(a.id));
     if (chosen.length + work.length < 1) return;
+    const perChapter = Math.max(6000, Math.floor(64000 / Math.max(chosen.length, 1)));
     const chapterText = chosen
       .map((s) => {
         const secs = (s.notes?.sections || [])
           .map((sec) => [sec.heading, sec.body || "", (sec.bullets || []).join("\n")].filter(Boolean).join("\n"))
           .join("\n\n");
-        return `===== CHAPTER ${s.name} =====\n${s.notes?.title || ""}\n${secs}`;
+        const block = `===== CHAPTER ${s.name} =====\n${s.notes?.title || ""}\n${secs}`;
+        return block.length > perChapter ? block.slice(0, perChapter) + "\n[chapter truncated for combine]" : block;
       })
       .join("\n\n");
     const workText = work
@@ -138,8 +140,9 @@ function ClassPage() {
     const extractedText = [chapterText, workText, exclusions.trim() ? `===== EXCLUSIONS — do not include =====\n${exclusions.trim()}` : ""]
       .filter(Boolean)
       .join("\n\n");
+    const guideName = `Study Guide · ${[...chosen.map((s) => s.name), ...work.map((a) => a.title)].join(", ")}`.slice(0, 80);
     setBusy(true);
-    setStatus("Building study guide…");
+    setStatus(`Building study guide from ${chosen.length + work.length} sources. Several chapters can take a few minutes.`);
     setError(null);
     try {
       const profile = await getProfile();
@@ -148,18 +151,19 @@ function ClassPage() {
           className: cls.name,
           classCode: cls.code,
           subject: cls.subject,
-          setName: "Study Guide",
+          setName: guideName,
           sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
           extractedText,
           focusPrompt: `Create one study guide from the selected chapters and assignment-assistant returns. Omit anything listed under EXCLUSIONS.${exclusions.trim() ? " Exclusions: " + exclusions.trim() : ""}`,
           kidsMode: Boolean(profile.kidsMode),
           childAge: profile.childAge,
+          combine: true,
         },
       });
       const set = await createStudySet({
         data: {
           classId,
-          name: "Study Guide",
+          name: guideName,
           generated,
           sourceFiles: [...chosen.map((s) => s.name), ...work.map((a) => a.title)],
         },

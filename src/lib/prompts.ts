@@ -146,7 +146,7 @@ Source files: ${sourceFiles.join(", ") || "None named"}
 ${focusBlock}
 
 ${extractedText
-    ? `UPLOADED / EXTRACTED CONTENT (this is the only authority for the MAIN notes):\n---\n${extractedText.slice(0, 60000)}\n---`
+    ? `UPLOADED / EXTRACTED CONTENT (this is the only authority for the MAIN notes):\n---\n${extractedText.slice(0, 72000)}\n---`
     : "No file text was extracted. Do not invent a chapter. Say extraction was empty and capture only what can be known from the file names."}
 
 Return JSON:
