@@ -94,7 +94,7 @@ function extractPdfHeuristic(buf: Buffer): string {
 async function extractPdf(buf: Buffer): Promise<string> {
   try {
     const heuristic = extractPdfHeuristic(buf);
-    if (heuristic && heuristic.length > 20) return heuristic;
+    if (heuristic && heuristic.length > 20) return heuristic.replace(/\u0000/g, "");
   } catch {
     /* continue */
   }
@@ -103,7 +103,7 @@ async function extractPdf(buf: Buffer): Promise<string> {
     const pdf = await getDocumentProxy(new Uint8Array(buf));
     const result = await extractText(pdf, { mergePages: true });
     const text = Array.isArray(result.text) ? result.text.join("\n") : result.text;
-    if (text && String(text).trim()) return String(text);
+    if (text && String(text).trim()) return String(text).replace(/\u0000/g, "");
   } catch {
     /* continue */
   }
