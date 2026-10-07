@@ -32,7 +32,7 @@ function getNav(role?: string | null) {
   return [
     { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
     { to: "/assistant", label: "Assignment Assistant", shortLabel: "Check", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
-    { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: PenLine, match: (p: string) => p.startsWith("/paper-grade") },
+    { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
     { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
     { to: "/archived", label: "Archive", shortLabel: "Archive", icon: Archive, match: (p: string) => p.startsWith("/archived") },
     { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
