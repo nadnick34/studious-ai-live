@@ -7,8 +7,6 @@ import { isThemePlaying, playLandingTheme, stopTheme } from "@/lib/theme-audio";
 
 export const Route = createFileRoute("/")({ component: Landing });
 
-export const Route = createFileRoute("/")({ component: Landing });
-
 const glass =
   "border border-[#f0e2b8]/45 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-md";
 
