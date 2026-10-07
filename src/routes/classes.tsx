@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Archive, Pencil, Plus } from "lucide-react";
+import { Archive, ChevronRight, LogOut, Pencil, Plus, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
+import { signOut } from "@/lib/auth/client";
 import { createClass, getProfile, listClasses, seedSampleClass, updateClass } from "@/lib/data";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
 import { extractPdfText, formatShortDate, timeAgo } from "@/lib/utils";
@@ -171,7 +172,15 @@ function DashboardPage() {
     <AppShell
       title="Classes"
       right={
-        <InfoButton onClick={() => setShowClassInfo(true)} label="How classes work" />
+        <div className="flex items-center gap-1.5">
+          <InfoButton onClick={() => setShowClassInfo(true)} label="How classes work" />
+          <Link to="/profile" className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Profile">
+            <UserRound className="size-4" />
+          </Link>
+          <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
+            <LogOut className="size-4" />
+          </button>
+        </div>
       }
     >
       {loading ? (
@@ -209,23 +218,10 @@ function DashboardPage() {
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {classes.map((c) => (
             <div key={c.id} className="card-surface min-w-0 overflow-hidden rounded-xl p-4">
-              <div className="mb-2 flex items-start justify-end gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => openEdit(c, e)}
-                  className="inline-flex min-h-8 items-center gap-1 rounded-md border border-teal bg-card px-2 text-[11px] font-medium text-teal"
-                >
-                  <Pencil className="size-3" />
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => void handleArchive(c, e)}
-                  className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border bg-card px-2 text-[11px] text-muted"
-                >
-                  <Archive className="size-3" />
-                  Archive
-                </button>
+              <div className="mb-2 flex items-start justify-end">
+                <Link to="/class/$id" params={{ id: c.id }} className="grid size-9 place-items-center rounded-lg text-teal" aria-label="Open chapters">
+                  <ChevronRight className="size-5" />
+                </Link>
               </div>
               <Link to="/class/$id" params={{ id: c.id }} className="block min-w-0">
                 <div className="mb-1 break-words text-xs font-semibold text-teal">{c.code}</div>
@@ -274,29 +270,15 @@ function DashboardPage() {
                 )}
                 <div className="mt-3 text-[10px] text-muted">Last opened {timeAgo(c.lastAccessed)}</div>
                             </Link>
-              <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                <Link to="/class/$id" params={{ id: c.id }} className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal">
-                  Chapters
-                </Link>
-                <Link to="/class/$id/assignments" params={{ id: c.id }} className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal">
-                  Assignment Assist
-                </Link>
-                <Link
-                  to="/class/$id"
-                  params={{ id: c.id }}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal"
-                  onClick={() => sessionStorage.setItem("studious-class-open", "focus")}
-                >
-                  Focus Mode
-                </Link>
-                <Link
-                  to="/class/$id"
-                  params={{ id: c.id }}
-                  className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-1 text-center text-[11px] font-medium text-fg hover:border-teal"
-                  onClick={() => sessionStorage.setItem("studious-class-open", "guide")}
-                >
-                  Study Guide
-                </Link>
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" onClick={(e) => openEdit(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-teal px-2 text-[11px] font-medium text-teal">
+                  <Pencil className="size-3" />
+                  Edit
+                </button>
+                <button type="button" onClick={(e) => void handleArchive(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted">
+                  <Archive className="size-3" />
+                  Archive
+                </button>
               </div>
 
             </div>

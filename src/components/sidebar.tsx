@@ -128,17 +128,17 @@ export function BottomNav({ role }: { role?: string | null } = {}) {
       <Link to="/dashboard" className="grid size-11 place-items-center rounded-xl text-teal" aria-label="Home">
         <Home className="size-6" />
       </Link>
-      <div className="flex items-center gap-2">
+      <div className="grid flex-1 grid-cols-3 gap-2">
         {onClasses && (
-          <button type="button" className="min-h-11 rounded-xl bg-teal px-3 text-sm font-semibold text-white" onClick={() => window.dispatchEvent(new Event("studious-new-class"))}>
+          <button type="button" className="col-span-3 h-11 rounded-xl bg-teal text-sm font-semibold text-white" onClick={() => window.dispatchEvent(new Event("studious-new-class"))}>
             New class
           </button>
         )}
         {onClass && classMatch && (
           <>
-            <Link to="/class/$id/upload" params={{ id: classMatch[1] }} className="min-h-11 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold">New chapter</Link>
-            <button type="button" className="min-h-11 rounded-xl border border-border bg-card px-3 text-sm font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "focus" }))}>Custom focus</button>
-            <button type="button" className="min-h-11 rounded-xl border border-border bg-card px-3 text-sm font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "guide" }))}>Study Guide</button>
+            <Link to="/class/$id/upload" params={{ id: classMatch[1] }} className="grid h-11 place-items-center rounded-xl border border-border bg-card text-center text-xs font-semibold leading-tight">New chapter</Link>
+            <button type="button" className="h-11 rounded-xl border border-border bg-card text-xs font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "focus" }))}>Custom focus</button>
+            <button type="button" className="h-11 rounded-xl border border-border bg-card text-xs font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "guide" }))}>Study Guide</button>
           </>
         )}
       </div>

@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
+import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, LogOut, Pencil, Plus, UserRound, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
+import { signOut } from "@/lib/auth/client";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import {
   createStudySet,
@@ -192,13 +193,12 @@ function ClassPage() {
       right={
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowChapterInfo(true)} label="How chapters work" />
-          <Link to="/class/$id/upload" params={{ id: classId }}>
-            <Button className="min-h-10 px-3 text-xs sm:text-sm">
-              <Plus className="size-4" />
-              New chapter
-            </Button>
+          <Link to="/profile" className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Profile">
+            <UserRound className="size-4" />
           </Link>
-
+          <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
+            <LogOut className="size-4" />
+          </button>
         </div>
       }
     >
