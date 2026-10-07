@@ -202,6 +202,32 @@ function ClassPage() {
         </div>
       }
     >
+      <div className="mb-1 text-xs text-muted">Class</div>
+      <h2 className="mb-5 text-lg font-bold text-fg">{cls.code} – {cls.name}</h2>
+      <KidsOwlBanner message="Open a chapter or add a new one. I’ll help you study!" />
+      {sets.length === 0 ? (
+        <div className="card-surface rounded-xl px-4 py-12 text-center text-sm text-muted">
+          No chapters yet. Add materials, take a photo, or scan a page to start.
+        </div>
+      ) : (
+        <div className="space-y-3 pb-16">
+          {sets.map((s) => (
+            <ChapterCard
+              key={s.id}
+              classId={classId}
+              set={s}
+              cls={cls}
+              onEdit={() => setEditing(s)}
+              onDelete={async () => {
+                if (!confirm(`Delete “${s.name}”? This cannot be undone.`)) return;
+                await deleteStudySet({ data: s.id });
+                await refresh();
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {showGuide && (
         <Modal title="Study Guide" onClose={() => setShowGuide(false)}>
           <p className="mb-3 text-xs text-muted">
