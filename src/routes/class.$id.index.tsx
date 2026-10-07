@@ -191,70 +191,10 @@ function ClassPage() {
               New chapter
             </Button>
           </Link>
-          <button
-            type="button"
-            onClick={() => setShowMore((v) => !v)}
-            className="grid size-10 place-items-center rounded-lg border border-border bg-card text-fg"
-            aria-label="More actions"
-          >
-            <MoreHorizontal className="size-4" />
-          </button>
+
         </div>
       }
     >
-      {showMore && (
-        <div className="mb-4 grid gap-2 rounded-xl border border-border bg-card p-2 sm:flex sm:flex-wrap">
-          <Button variant="secondary" className="justify-start" onClick={() => { setShowMore(false); setShowFocus(true); }}>
-            <Sparkles className="size-4" />
-            Custom focus
-          </Button>
-          <Button variant="secondary" className="justify-start" onClick={() => { setShowMore(false); setShowGuide(true); }}>
-            Study Guide
-          </Button>
-          <Link to="/class/$id/assignments" params={{ id: classId }} onClick={() => setShowMore(false)}>
-            <Button variant="secondary" className="w-full justify-start">
-              <ClipboardList className="size-4" />
-              Assignment assistant
-            </Button>
-          </Link>
-        </div>
-      )}
-
-      <div className="mb-1 text-xs text-muted">Class</div>
-      <h2 className="mb-5 text-lg font-bold text-fg">
-        {cls.code} – {cls.name}
-      </h2>
-
-      <KidsOwlBanner message="Open a chapter or add a new one. I’ll help you study!" />
-
-      {sets.length === 0 ? (
-        <div className="card-surface rounded-xl px-4 py-12 text-center text-sm text-muted">
-          No chapters yet. Add materials, take a photo, or scan a page to start.
-          <div className="mt-4">
-            <Link to="/class/$id/upload" params={{ id: classId }}>
-              <Button>New chapter</Button>
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {sets.map((s) => (
-            <ChapterCard
-              key={s.id}
-              classId={classId}
-              set={s}
-              cls={cls}
-              onEdit={() => setEditing(s)}
-              onDelete={async () => {
-                if (!confirm(`Delete “${s.name}”? This cannot be undone.`)) return;
-                await deleteStudySet({ data: s.id });
-                await refresh();
-              }}
-            />
-          ))}
-        </div>
-      )}
-
       {showGuide && (
         <Modal title="Study Guide" onClose={() => setShowGuide(false)}>
           <p className="mb-3 text-xs text-muted">
@@ -381,6 +321,13 @@ function ClassPage() {
           </p>
         </InfoModal>
       )}
+          <div className="fixed bottom-20 right-3 z-20 flex flex-col items-end gap-2 sm:bottom-6">
+        <Button variant="secondary" className="min-h-11 shadow-md" onClick={() => setShowFocus(true)}>Custom focus</Button>
+        <Button variant="secondary" className="min-h-11 shadow-md" onClick={() => setShowGuide(true)}>Study Guide</Button>
+        <a href="/classes?new=1">
+          <Button className="min-h-11 shadow-md">New class</Button>
+        </a>
+      </div>
     </AppShell>
   );
 }

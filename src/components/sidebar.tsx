@@ -30,7 +30,7 @@ function getNav(role?: string | null) {
     ];
   }
   return [
-    { to: "/dashboard", label: "Classes", icon: BookOpen, match: (p: string) => p === "/dashboard" || p.startsWith("/class") },
+    { to: "/classes", label: "Classes", icon: BookOpen, match: (p: string) => p === "/classes" || p.startsWith("/class/") },
     { to: "/assistant", label: "Assignment Assistant", shortLabel: "Check", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
     { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
     { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
