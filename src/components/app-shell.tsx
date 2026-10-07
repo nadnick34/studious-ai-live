@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getProfile } from "@/lib/data";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
-import { accountTypeLabel, type UserProfile } from "@/lib/types";
+import { type UserProfile } from "@/lib/types";
 
 export function AppShell({
   title,
@@ -87,11 +87,6 @@ function AppShellInner({
             <Link to="/dashboard" className="shrink-0 sm:hidden">
               <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
             </Link>
-            <div className="min-w-0 sm:hidden">
-              <p className="truncate text-[10px] font-semibold tracking-wide text-muted uppercase">
-                {accountTypeLabel(profile)}
-              </p>
-            </div>
             <h1 className="hidden truncate text-[15px] font-semibold text-fg sm:block">{title || ""}</h1>
           </div>
           <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-2">
@@ -107,5 +102,18 @@ function AppShellInner({
       </div>
       <BottomNav role={profile?.role} />
     </div>
+  );
+}
+
+export function ProfileLink() {
+  const user = useCurrentUser();
+  const [avatar, setAvatar] = useState(user?.profileImageUrl || "");
+  useEffect(() => {
+    void getProfile().then((p) => setAvatar(p.avatarDataUrl || user?.profileImageUrl || ""));
+  }, [user?.profileImageUrl]);
+  return (
+    <Link to="/profile" className="grid size-10 place-items-center overflow-hidden rounded-full border border-border bg-card" aria-label="Profile">
+      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <UserRound className="size-4" />}
+    </Link>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, LogOut, Pencil, Plus, UserRound, Sparkles, Trash2, Shapes } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, ProfileLink } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
@@ -193,9 +193,7 @@ function ClassPage() {
       right={
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowChapterInfo(true)} label="How chapters work" />
-          <Link to="/profile" className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Profile">
-            <UserRound className="size-4" />
-          </Link>
+<ProfileLink />
           <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
             <LogOut className="size-4" />
           </button>

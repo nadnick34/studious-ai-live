@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Archive, BookOpen, ClipboardCheck, LogOut, NotebookPen, UserRound } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, ProfileLink } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { signOut } from "@/lib/auth/client";
 import { getProfile } from "@/lib/data";
@@ -31,9 +31,7 @@ function HomeMenu() {
       right={
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setInfo(true)} label="About Studious" />
-          <Link to="/profile" className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Profile">
-            <UserRound className="size-4" />
-          </Link>
+<ProfileLink />
           <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
             <LogOut className="size-4" />
           </button>

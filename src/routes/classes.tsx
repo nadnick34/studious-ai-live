@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Archive, ChevronRight, LogOut, Pencil, Plus, UserRound } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { AppShell, ProfileLink } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
@@ -174,9 +174,7 @@ function DashboardPage() {
       right={
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowClassInfo(true)} label="How classes work" />
-          <Link to="/profile" className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Profile">
-            <UserRound className="size-4" />
-          </Link>
+<ProfileLink />
           <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
             <LogOut className="size-4" />
           </button>
