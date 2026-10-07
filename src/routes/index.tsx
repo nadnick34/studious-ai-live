@@ -40,8 +40,7 @@ function Landing() {
         {muted ? "Sound off" : "Sound on"}
       </button>
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 py-10 text-center">
-        <img src="/logo.png" alt="Studious AI" className="h-16 w-auto" />
-        <p className="mt-3 text-sm font-semibold tracking-[0.18em] text-teal">STUDIOUS AI</p>
+        <img src="/logo.png" alt="Studious AI" className="h-28 w-auto" />
         <h1 className="mt-4 text-3xl font-bold leading-tight text-fg">Your masterclass for every class</h1>
         <p className="mt-3 text-lg text-muted">Get Studious!</p>
         <button type="button" onClick={() => setShowOverview(true)} className="mt-3 text-sm text-teal underline underline-offset-4">
