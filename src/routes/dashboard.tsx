@@ -176,6 +176,12 @@ function DashboardPage() {
         </div>
       }
     >
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Link to="/assistant" className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-fg">Assignment Assistant</Link>
+        <Link to="/paper-grade" className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-fg">Paper Grade</Link>
+        <Link to="/test-prep" className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-fg">Practicum & Prep</Link>
+        <Link to="/archived" className="rounded-xl border border-border bg-card px-3 py-3 text-sm font-semibold text-fg">Archive</Link>
+      </div>
       {loading ? (
         <p className="py-16 text-center text-sm text-muted">Loading classes…</p>
       ) : classes.length === 0 ? (

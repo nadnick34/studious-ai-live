@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, ClipboardList, Headphones, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
+import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
@@ -412,7 +412,7 @@ function ChapterCard({
       ]
     : [
         { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
-        { to: "/class/$id/set/$setId/audio" as const, label: "Audio", icon: Headphones },
+        { to: "/class/$id/set/$setId/terms" as const, label: "Key Terms", icon: KeyRound },
         { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
         { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
       ];

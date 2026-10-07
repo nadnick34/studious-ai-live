@@ -2377,3 +2377,40 @@ Return ONLY JSON:
       return fallback;
     }
   });
+
+
+export const gradePaper = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { mode: "guide" | "check"; instructions: string; paperText: string }) => input)
+  .handler(async ({ data }) => {
+    const key = apiKey();
+    const fallback = data.mode === "guide"
+      ? { mode: "guide" as const, sections: [{ heading: "How to structure it", bullets: ["State the claim in the first paragraph.", "Give each requirement its own section.", "End by answering the prompt in one sentence."] }] }
+      : { mode: "check" as const, band: "70-80", sections: [{ heading: "Strengths", bullets: ["A draft was submitted."] }, { heading: "What would raise it", bullets: ["Match each paragraph to the instructions."] }] };
+    if (!key) return fallback;
+    const system = data.mode === "guide"
+      ? "You help a student plan a paper. Return JSON only: {\"mode\":\"guide\",\"sections\":[{\"heading\":string,\"bullets\":string[]}]}. Sections: What the prompt asks, Structure, How to organize the argument. Do not write the paper."
+      : "You check a student paper against its instructions. Return JSON only: {\"mode\":\"check\",\"band\":\"<60\"|\"60-70\"|\"70-80\"|\"80-90\"|\"90-95\"|\">95\",\"sections\":[{\"heading\":string,\"bullets\":string[]}]}. Required headings: Strengths, Weaknesses, Spelling and grammar, What would raise it. If the band is below 90, the last section must say what to do to get higher. Do not rewrite the paper.";
+    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "grok-4.5",
+        temperature: 0.2,
+        max_tokens: 2500,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: `Instructions:\n${data.instructions || "None uploaded."}\n\nPaper:\n${(data.paperText || "").slice(0, 18000) || "Not uploaded yet."}` },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`Paper grade failed (${res.status})`);
+    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = body.choices?.[0]?.message?.content || "";
+    const parsed = JSON.parse(extractJsonObject(content)) as { mode?: "guide" | "check"; band?: string; sections?: { heading: string; bullets: string[] }[] };
+    return {
+      mode: data.mode,
+      band: parsed.band,
+      sections: parsed.sections?.length ? parsed.sections : fallback.sections,
+    };
+  });

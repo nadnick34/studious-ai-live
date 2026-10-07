@@ -49,7 +49,7 @@ html.dark {
   --color-amber: var(--amber);
   --color-red: var(--red);
   --color-cream: var(--cream);
-  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
