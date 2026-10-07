@@ -58,6 +58,9 @@ function DashboardPage() {
   useEffect(() => {
     void refresh();
     if (new URLSearchParams(window.location.search).get("new") === "1") setShowForm(true);
+    const open = () => setShowForm(true);
+    window.addEventListener("studious-new-class", open);
+    return () => window.removeEventListener("studious-new-class", open);
   }, []);
 
   function setField(key: keyof typeof emptyForm, value: string) {
@@ -377,13 +380,7 @@ function DashboardPage() {
           </p>
         </InfoModal>
       )}
-      <div className="fixed bottom-20 right-3 z-20 flex flex-col items-end gap-2 sm:bottom-6">
-        <Button onClick={openCreate} className="min-h-11 shadow-md">
-          <Plus className="size-4" />
-          New class
-        </Button>
-      </div>
-    </AppShell>
+      </AppShell>
   );
 }
 

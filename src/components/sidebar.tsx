@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, LayoutDashboard, LogOut, Moon, NotebookPen, ScrollText, Shield, Sun, UserRound } from "lucide-react";
+import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, Home, LayoutDashboard, LogOut, Moon, NotebookPen, ScrollText, Shield, Sun, UserRound } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
@@ -117,36 +117,31 @@ export function Sidebar({
 
 export function BottomNav({ role }: { role?: string | null } = {}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const items = getNav(role);
-  const cols = items.length >= 5 ? "grid-cols-6" : "grid-cols-5";
+  if (pathname === "/dashboard" || role === "teacher" || role === "professional" || role === "admin") {
+    if (pathname === "/dashboard") return null;
+  }
+  const classMatch = pathname.match(/^\/class\/([^/]+)/);
+  const onClasses = pathname === "/classes";
+  const onClass = Boolean(classMatch && !pathname.includes("/upload") && !pathname.includes("/assignments"));
   return (
-    <nav className={`fixed inset-x-0 bottom-0 z-30 grid ${cols} border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden`}>
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active = item.match(pathname);
-        return (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={cn(
-              "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-              active ? "text-teal" : "text-muted",
-            )}
-          >
-            <Icon className="size-5" />
-            {"shortLabel" in item && item.shortLabel ? item.shortLabel : item.label}
-          </Link>
-        );
-      })}
-      <button
-        type="button"
-        onClick={() => void signOut("/")}
-        className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted"
-        aria-label="Sign out"
-      >
-        <LogOut className="size-5" />
-        Sign out
-      </button>
+    <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-border bg-card px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <Link to="/dashboard" className="grid size-11 place-items-center rounded-xl text-teal" aria-label="Home">
+        <Home className="size-6" />
+      </Link>
+      <div className="flex items-center gap-2">
+        {onClasses && (
+          <button type="button" className="min-h-11 rounded-xl bg-teal px-3 text-sm font-semibold text-white" onClick={() => window.dispatchEvent(new Event("studious-new-class"))}>
+            New class
+          </button>
+        )}
+        {onClass && classMatch && (
+          <>
+            <Link to="/class/$id/upload" params={{ id: classMatch[1] }} className="min-h-11 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold">New chapter</Link>
+            <button type="button" className="min-h-11 rounded-xl border border-border bg-card px-3 text-sm font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "focus" }))}>Custom focus</button>
+            <button type="button" className="min-h-11 rounded-xl border border-border bg-card px-3 text-sm font-semibold" onClick={() => window.dispatchEvent(new CustomEvent("studious-open", { detail: "guide" }))}>Study Guide</button>
+          </>
+        )}
+      </div>
     </nav>
   );
 }

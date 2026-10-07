@@ -66,6 +66,13 @@ function ClassPage() {
     if (open === "guide") setShowGuide(true);
     if (open === "focus") setShowFocus(true);
     if (open) sessionStorage.removeItem("studious-class-open");
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail === "guide") setShowGuide(true);
+      if (detail === "focus") setShowFocus(true);
+    };
+    window.addEventListener("studious-open", onOpen);
+    return () => window.removeEventListener("studious-open", onOpen);
   }, [classId]);
 
   useEffect(() => {
@@ -321,14 +328,7 @@ function ClassPage() {
           </p>
         </InfoModal>
       )}
-          <div className="fixed bottom-20 right-3 z-20 flex flex-col items-end gap-2 sm:bottom-6">
-        <Button variant="secondary" className="min-h-11 shadow-md" onClick={() => setShowFocus(true)}>Custom focus</Button>
-        <Button variant="secondary" className="min-h-11 shadow-md" onClick={() => setShowGuide(true)}>Study Guide</Button>
-        <a href="/classes?new=1">
-          <Button className="min-h-11 shadow-md">New class</Button>
-        </a>
-      </div>
-    </AppShell>
+          </AppShell>
   );
 }
 

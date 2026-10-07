@@ -40,12 +40,12 @@ function HomeMenu() {
         </div>
       }
     >
-      <div className="mx-auto grid max-w-lg gap-2">
+      <div className="grid h-[calc(100dvh-8.5rem)] grid-rows-5 gap-3">
         {items.map((item) => {
           const Icon = item.icon;
           return (
-            <Link key={item.to} to={item.to} className="flex min-h-14 items-center gap-3 rounded-xl border border-border bg-card px-4 text-base font-semibold text-fg">
-              <Icon className="size-5 text-teal" />
+            <Link key={item.to} to={item.to} className="flex items-center gap-4 rounded-2xl border border-border bg-card px-5 text-xl font-bold text-fg">
+              <Icon className="size-7 text-teal" />
               {item.label}
             </Link>
           );

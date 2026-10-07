@@ -1,21 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, gradePaper } from "@/lib/ai";
 
 export const Route = createFileRoute("/paper-grade")({ component: PaperGradePage });
 
-type Result = {
-  mode: "guide" | "check";
-  band?: string;
-  sections: { heading: string; bullets: string[] }[];
-};
+type Result = { mode: "guide" | "check"; band?: string; sections: { heading: string; bullets: string[] }[] };
 
 function PaperGradePage() {
   const [instructions, setInstructions] = useState("");
-  const [paperText, setPaperText] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [captured, setCaptured] = useState<CapturedFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -24,21 +20,16 @@ function PaperGradePage() {
     setBusy(true);
     setError(null);
     try {
-      let extracted = paperText;
-      if (files.length) {
-        const payload = await Promise.all(
-          files.map(async (file) => ({
-            name: file.name,
-            type: file.type || "application/octet-stream",
-            size: file.size,
-            base64: await fileToBase64(file),
-          })),
-        );
-        const out = await extractMaterials({ data: { files: payload } });
-        extracted = [paperText, out.text].filter(Boolean).join("\n\n");
+      let text = instructions.trim();
+      if (captured.length) {
+        const extracted = await extractMaterials({ data: { files: await capturedToPayloads(captured) } });
+        text = [text, extracted.text].filter(Boolean).join("\n\n");
       }
-      const graded = await gradePaper({ data: { mode, instructions, paperText: extracted } });
-      setResult(graded);
+      if (!text.trim()) {
+        setError("Add the prompt or the paper first.");
+        return;
+      }
+      setResult(await gradePaper({ data: { mode, instructions: text, paperText: text } }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Paper grade failed");
     } finally {
@@ -48,24 +39,23 @@ function PaperGradePage() {
 
   return (
     <AppShell title="Paper Grade">
-      <p className="text-sm text-muted">Add the instructions, then a writing guide. After the paper is written, upload it for a check.</p>
-      <label className="mt-4 block text-xs font-semibold text-muted">Instructions</label>
-      <textarea className="mt-1 min-h-24 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Prompt, rubric, or what the paper has to do" />
-      <label className="mt-3 block text-xs font-semibold text-muted">Paper, if written</label>
-      <textarea className="mt-1 min-h-24 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={paperText} onChange={(e) => setPaperText(e.target.value)} placeholder="Paste the draft, or upload it below" />
-      <input className="mt-3 block w-full text-sm" type="file" multiple accept="application/pdf,image/*,.txt,.doc,.docx" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button disabled={busy} onClick={() => void run("guide")}>{busy ? "Working…" : "Writing guide"}</Button>
-        <Button disabled={busy} variant="secondary" onClick={() => void run("check")}>Check paper</Button>
-      </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <h2 className="font-semibold">Paper material</h2>
+        <p className="text-xs text-muted">Add the instructions, a photo, a scan, or the draft. Use Writing guide before you write. Use Check paper after.</p>
+        <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
+        <textarea className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm" placeholder="Paste the prompt or the paper" value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <Button disabled={busy} onClick={() => void run("guide")}>{busy ? "Working…" : "Writing guide"}</Button>
+          <Button disabled={busy} variant="secondary" onClick={() => void run("check")}>Check paper</Button>
+        </div>
+      </section>
       {result && (
-        <div className="mt-5 space-y-3">
+        <section className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">{result.mode === "guide" ? "Writing guide" : "Paper check"}</h2>
-            <Button variant="secondary" onClick={() => window.print()}>Print</Button>
+            {result.band && <span className="rounded-lg border border-teal px-3 py-1 font-bold text-teal">{result.band}</span>}
           </div>
-          {result.band && <p className="inline-flex rounded-lg border border-teal px-3 py-2 text-lg font-bold text-teal">{result.band}</p>}
           {result.sections.map((sec) => (
             <article key={sec.heading} className="rounded-xl border border-border bg-card px-4 py-3">
               <h3 className="font-bold">{sec.heading}</h3>
@@ -74,17 +64,8 @@ function PaperGradePage() {
               </ul>
             </article>
           ))}
-        </div>
+        </section>
       )}
     </AppShell>
   );
-}
-
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }

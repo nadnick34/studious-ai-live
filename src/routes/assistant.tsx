@@ -1,20 +1,33 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { listClasses, listStudySets } from "@/lib/data";
-import type { ClassRecord, StudySet } from "@/lib/types";
+import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
+import { Button } from "@/components/ui/button";
+import { analyzeAssignment, extractMaterials } from "@/lib/ai";
+import { createAssignment, listClasses, listStudySets, updateAssignment } from "@/lib/data";
+import { uid } from "@/lib/utils";
+import type { AssignmentFeedback, ClassRecord, StudySet } from "@/lib/types";
 
 export const Route = createFileRoute("/assistant")({ component: AssistantHome });
 
 function AssistantHome() {
+  const [title, setTitle] = useState("");
+  const [paste, setPaste] = useState("");
+  const [captured, setCaptured] = useState<CapturedFile[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<AssignmentFeedback | null>(null);
+  const [material, setMaterial] = useState("");
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [classId, setClassId] = useState("");
   const [chapters, setChapters] = useState<StudySet[]>([]);
+  const [chapterId, setChapterId] = useState("");
+  const [filed, setFiled] = useState("");
 
   useEffect(() => {
     void listClasses({ data: false }).then(setClasses);
   }, []);
-
   useEffect(() => {
     if (!classId) {
       setChapters([]);
@@ -23,30 +36,116 @@ function AssistantHome() {
     void listStudySets({ data: classId }).then(setChapters);
   }, [classId]);
 
+  async function analyze() {
+    setBusy(true);
+    setError(null);
+    setFiled("");
+    setStatus("Reading uploads…");
+    try {
+      let text = paste.trim();
+      if (captured.length) {
+        const extracted = await extractMaterials({ data: { files: await capturedToPayloads(captured) } });
+        text = [text, extracted.text].filter(Boolean).join("\n\n");
+      }
+      if (!text.trim()) {
+        setError("Add the assignment, a photo, a scan, or paste the text.");
+        return;
+      }
+      setStatus("Checking…");
+      const feedback = await analyzeAssignment({
+        data: {
+          className: "Assignment",
+          classCode: "",
+          subject: "",
+          title: title.trim() || "Assignment",
+          instructionsText: text.slice(0, 55000),
+          workText: text.slice(0, 55000),
+          singleMaterial: true,
+        },
+      });
+      setMaterial(text);
+      setReport(feedback);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Check failed");
+    } finally {
+      setBusy(false);
+      setStatus("");
+    }
+  }
+
+  async function fileIt() {
+    if (!classId || !report) return;
+    const chosen = classes.find((c) => c.id === classId);
+    const chapter = chapters.find((s) => s.id === chapterId);
+    const asg = await createAssignment({
+      data: {
+        classId,
+        title: title.trim() || "Assignment",
+        instructionsText: material.slice(0, 60000),
+        sourceFiles: chapter ? [chapter.name] : [],
+        guidance: null,
+      },
+    });
+    await updateAssignment({
+      data: {
+        id: asg.id,
+        patch: {
+          submissions: [{
+            id: uid("sub"),
+            submittedAt: new Date().toISOString(),
+            fileNames: [],
+            workText: material.slice(0, 20000),
+            feedback: report,
+          }],
+        },
+      },
+    });
+    setFiled(chapter ? `${chosen?.name} · ${chapter.name}` : chosen?.name || "Saved");
+  }
+
   return (
     <AppShell title="Assignment Assistant">
-      <p className="text-sm text-muted">Check a sheet without opening a chapter. File it to a class, then a chapter.</p>
-      <label className="mt-4 block text-xs font-semibold text-muted">Class</label>
-      <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-3 text-sm" value={classId} onChange={(e) => setClassId(e.target.value)}>
-        <option value="">Choose a class</option>
-        {classes.map((c) => (
-          <option key={c.id} value={c.id}>{c.name}</option>
-        ))}
-      </select>
-      <label className="mt-3 block text-xs font-semibold text-muted">Chapter</label>
-      <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-3 text-sm" disabled={!classId}>
-        <option value="">File after the check</option>
-        {chapters.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
-      {classId ? (
-        <Link to="/class/$id/assignments" params={{ id: classId }} className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg bg-teal font-semibold text-white">
-          Check work
-        </Link>
-      ) : (
-        <p className="mt-4 text-sm text-muted">Choose a class to start. The chapter list is where the check can be filed.</p>
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <h2 className="font-semibold">Assignment material</h2>
+        <p className="text-xs text-muted">Add the sheet, a photo, a scan, or the finished work. Class and chapter come after the check.</p>
+        <input className="w-full rounded-lg border border-border px-3 py-2 text-sm" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <CaptureBar items={captured} onChange={setCaptured} disabled={busy} />
+        <textarea className="min-h-28 w-full rounded-lg border border-border px-3 py-2 text-sm" placeholder="Or paste the assignment" value={paste} onChange={(e) => setPaste(e.target.value)} />
+        {status && <p className="text-xs text-teal">{status}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <Button disabled={busy} onClick={() => void analyze()}>{busy ? "Working…" : "Check"}</Button>
+      </section>
+      {report && (
+        <section className="mt-4 space-y-3">
+          <Report heading="Review of Assignment" text={report.reviewOfAssignment} />
+          <Report heading="Completed Work" text={report.assignmentAssessment} />
+          <Report heading="Extra Mile" text={report.extraMile} />
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="font-semibold">File it</h3>
+            <label className="mt-3 block text-xs text-muted">Class</label>
+            <select className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm" value={classId} onChange={(e) => setClassId(e.target.value)}>
+              <option value="">Choose a class</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <label className="mt-3 block text-xs text-muted">Chapter</label>
+            <select className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm" value={chapterId} onChange={(e) => setChapterId(e.target.value)} disabled={!classId}>
+              <option value="">Choose a chapter</option>
+              {chapters.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <Button className="mt-3" disabled={!classId} onClick={() => void fileIt()}>File it</Button>
+            {filed && <p className="mt-2 text-sm text-teal">Filed to {filed}.</p>}
+          </div>
+        </section>
       )}
     </AppShell>
+  );
+}
+
+function Report({ heading, text }: { heading: string; text?: string }) {
+  return (
+    <article className="rounded-xl border border-border bg-card px-4 py-3">
+      <h3 className="font-bold">{heading}</h3>
+      <p className="mt-1 whitespace-pre-wrap text-sm">{text || "TBD"}</p>
+    </article>
   );
 }
