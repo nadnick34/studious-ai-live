@@ -412,7 +412,7 @@ export const listStudySets = createServerFn({ method: "GET" })
     const sql = await getSql();
     const rows = await sql<SetRow>`
       select * from study_sets
-      where user_id = ${context.userId} and class_id = ${classId}
+      where user_id = ${context.userId} and class_id = ${classId} and archived = false
       order by created_at desc
     `;
     return rows.map(mapSet);
@@ -572,6 +572,7 @@ type AssignmentRow = {
   source_files: unknown;
   guidance: unknown;
   submissions: unknown;
+  archived?: boolean;
 };
 
 function mapAssignment(row: AssignmentRow): AssignmentRecord {
@@ -584,6 +585,7 @@ function mapAssignment(row: AssignmentRow): AssignmentRecord {
     sourceFiles: parseJson<string[]>(row.source_files, []),
     guidance: (row.guidance as AssignmentGuidance | null) || null,
     submissions: parseJson<AssignmentSubmission[]>(row.submissions, []),
+    archived: Boolean(row.archived),
   };
 }
 
@@ -594,7 +596,7 @@ export const listAssignments = createServerFn({ method: "GET" })
     const sql = await getSql();
     const rows = await sql<AssignmentRow>`
       select * from assignments
-      where user_id = ${context.userId} and class_id = ${classId}
+      where user_id = ${context.userId} and class_id = ${classId} and archived = false
       order by created_at desc
     `;
     return rows.map(mapAssignment);
@@ -695,6 +697,80 @@ export const deleteAssignment = createServerFn({ method: "POST" })
   .handler(async ({ context, data: id }) => {
     const sql = await getSql();
     await sql`delete from assignments where id = ${id} and user_id = ${context.userId}`;
+    return { ok: true as const };
+  });
+
+export const listArchivedAssignments = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const rows = await sql<AssignmentRow>`
+      select * from assignments
+      where user_id = ${context.userId} and archived = true
+      order by created_at desc
+    `;
+    return rows.map(mapAssignment);
+  });
+
+export const setAssignmentArchived = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: string; archived: boolean }) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await sql`
+      update assignments set archived = ${data.archived}
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
+    return { ok: true as const };
+  });
+
+export const listPaperChecks = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((archived: boolean) => Boolean(archived))
+  .handler(async ({ context, data: archived }) => {
+    const sql = await getSql();
+    const rows = await sql<{ id: string; title: string; mode: string; band: string | null; sections: unknown; created_at: string; archived: boolean }>`
+      select id, title, mode, band, sections, created_at, archived
+      from paper_checks
+      where user_id = ${context.userId} and archived = ${archived}
+      order by created_at desc
+    `;
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      mode: row.mode,
+      band: row.band || "",
+      sections: parseJson<{ heading: string; bullets: string[] }[]>(row.sections, []),
+      createdAt: row.created_at,
+      archived: Boolean(row.archived),
+    }));
+  });
+
+export const createPaperCheck = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { title: string; mode: string; band?: string; sections: { heading: string; bullets: string[] }[]; sourceText: string }) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    const id = uid("paper");
+    await sql`
+      insert into paper_checks (id, user_id, title, mode, band, sections, source_text)
+      values (
+        ${id}, ${context.userId}, ${data.title || "Paper"}, ${data.mode}, ${data.band || ""},
+        ${JSON.stringify(data.sections || [])}::jsonb, ${data.sourceText.slice(0, 20000)}
+      )
+    `;
+    return { id };
+  });
+
+export const setPaperCheckArchived = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { id: string; archived: boolean }) => input)
+  .handler(async ({ context, data }) => {
+    const sql = await getSql();
+    await sql`
+      update paper_checks set archived = ${data.archived}
+      where id = ${data.id} and user_id = ${context.userId}
+    `;
     return { ok: true as const };
   });
 
@@ -1501,7 +1577,7 @@ export const getTeacherClassStats = createServerFn({ method: "GET" })
     `;
     const assessments = await sql<TeacherAssessmentRow>`
       select * from teacher_assessments
-      where user_id = ${context.userId} and class_id = ${classId}
+      where user_id = ${context.userId} and class_id = ${classId} and archived = false
       order by created_at desc
     `;
     const mapped = assessments.map(mapTeacherAssessment);
@@ -1574,7 +1650,7 @@ export const listTeacherAssessments = createServerFn({ method: "GET" })
     const sql = await getSql();
     const rows = await sql<TeacherAssessmentRow>`
       select * from teacher_assessments
-      where user_id = ${context.userId} and class_id = ${classId}
+      where user_id = ${context.userId} and class_id = ${classId} and archived = false
       order by created_at desc
     `;
     return rows.map(mapTeacherAssessment);

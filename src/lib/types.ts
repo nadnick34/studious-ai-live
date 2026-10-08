@@ -300,6 +300,7 @@ export interface AssignmentRecord {
   sourceFiles: string[];
   guidance?: AssignmentGuidance | null;
   submissions: AssignmentSubmission[];
+  archived?: boolean;
   /** Latest unified report (assistant + checker) */
   latestReport?: AssignmentFeedback | null;
 }

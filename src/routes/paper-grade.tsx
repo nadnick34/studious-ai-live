@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, gradePaper } from "@/lib/ai";
+import { createPaperCheck, setPaperCheckArchived } from "@/lib/data";
 
 export const Route = createFileRoute("/paper-grade")({ component: PaperGradePage });
 
@@ -15,6 +16,8 @@ function PaperGradePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [savedId, setSavedId] = useState("");
+  const [archivedNote, setArchivedNote] = useState("");
 
   async function run(mode: "guide" | "check") {
     setBusy(true);
@@ -29,7 +32,13 @@ function PaperGradePage() {
         setError("Add the prompt or the paper first.");
         return;
       }
-      setResult(await gradePaper({ data: { mode, instructions: text, paperText: text } }));
+      const graded = await gradePaper({ data: { mode, instructions: text, paperText: text } });
+      setResult(graded);
+      const saved = await createPaperCheck({
+        data: { title: mode === "guide" ? "Writing guide" : "Paper check", mode, band: graded.band, sections: graded.sections, sourceText: text },
+      });
+      setSavedId(saved.id);
+      setArchivedNote("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Paper grade failed");
     } finally {
@@ -52,10 +61,12 @@ function PaperGradePage() {
       </section>
       {result && (
         <section className="mt-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-bold">{result.mode === "guide" ? "Writing guide" : "Paper check"}</h2>
-            {result.band && <span className="rounded-lg border border-teal px-3 py-1 font-bold text-teal">{result.band}</span>}
+            <Button variant="secondary" disabled={!savedId} onClick={() => void setPaperCheckArchived({ data: { id: savedId, archived: true } }).then(() => setArchivedNote("Archived"))}>Archive</Button>
           </div>
+          {result.band && <span className="inline-flex rounded-lg border border-teal px-3 py-1 font-bold text-teal">{result.band}</span>}
+          {archivedNote && <p className="text-sm text-muted">{archivedNote}. Find it in Archive.</p>}
           {result.sections.map((sec) => (
             <article key={sec.heading} className="rounded-xl border border-border bg-card px-4 py-3">
               <h3 className="font-bold">{sec.heading}</h3>

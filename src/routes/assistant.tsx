@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { analyzeAssignment, extractMaterials } from "@/lib/ai";
-import { createAssignment, listClasses, listStudySets, updateAssignment } from "@/lib/data";
+import { createAssignment, listClasses, listStudySets, setAssignmentArchived, updateAssignment } from "@/lib/data";
 import { uid } from "@/lib/utils";
 import type { AssignmentFeedback, ClassRecord, StudySet } from "@/lib/types";
 
@@ -24,6 +24,8 @@ function AssistantHome() {
   const [chapters, setChapters] = useState<StudySet[]>([]);
   const [chapterId, setChapterId] = useState("");
   const [filed, setFiled] = useState("");
+  const [savedId, setSavedId] = useState("");
+  const [archivedNote, setArchivedNote] = useState("");
 
   useEffect(() => {
     void listClasses({ data: false }).then(setClasses);
@@ -65,6 +67,30 @@ function AssistantHome() {
       });
       setMaterial(text);
       setReport(feedback);
+      const asg = await createAssignment({
+        data: {
+          classId: "unfiled",
+          title: title.trim() || "Assignment",
+          instructionsText: text.slice(0, 60000),
+          sourceFiles: [],
+          guidance: null,
+        },
+      });
+      await updateAssignment({
+        data: {
+          id: asg.id,
+          patch: {
+            submissions: [{
+              id: uid("sub"),
+              submittedAt: new Date().toISOString(),
+              fileNames: [],
+              workText: text.slice(0, 20000),
+              feedback,
+            }],
+          },
+        },
+      });
+      setSavedId(asg.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Check failed");
     } finally {
@@ -132,8 +158,12 @@ function AssistantHome() {
               <option value="">Choose a chapter</option>
               {chapters.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <Button className="mt-3" disabled={!classId} onClick={() => void fileIt()}>File it</Button>
+            <div className="mt-3 flex gap-2">
+              <Button disabled={!classId} onClick={() => void fileIt()}>File it</Button>
+              <Button variant="secondary" disabled={!savedId} onClick={() => void setAssignmentArchived({ data: { id: savedId, archived: true } }).then(() => setArchivedNote("Archived"))}>Archive</Button>
+            </div>
             {filed && <p className="mt-2 text-sm text-teal">Filed to {filed}.</p>}
+            {archivedNote && <p className="mt-2 text-sm text-muted">{archivedNote}. Find it in Archive.</p>}
           </div>
         </section>
       )}
