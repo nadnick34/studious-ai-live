@@ -95,7 +95,7 @@ function MeetingHome() {
                 <Link
                   to="/meeting/$id/session/$sessionId"
                   params={{ id, sessionId: s.id }}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[11px] font-medium hover:text-teal"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[13px] font-medium hover:text-teal"
                 >
                   <FileText className="size-4" />
                   Notes
@@ -103,7 +103,7 @@ function MeetingHome() {
                 <Link
                   to="/meeting/$id/session/$sessionId"
                   params={{ id, sessionId: s.id }}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[11px] font-medium hover:text-teal"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[13px] font-medium hover:text-teal"
                 >
                   <Target className="size-4" />
                   Focus
@@ -111,7 +111,7 @@ function MeetingHome() {
                 <Link
                   to="/meeting/$id/session/$sessionId"
                   params={{ id, sessionId: s.id }}
-                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[11px] font-medium hover:text-teal"
+                  className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[13px] font-medium hover:text-teal"
                 >
                   <ListChecks className="size-4" />
                   Actions

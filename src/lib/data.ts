@@ -281,6 +281,33 @@ export const listClasses = createServerFn({ method: "GET" })
     return rows.map(mapClass);
   });
 
+export const getRecentStudy = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const classes = await sql<{ id: string; name: string; code: string }>`
+      select id, name, code from classes
+      where user_id = ${context.userId} and archived = false
+      order by last_accessed desc
+      limit 1
+    `;
+    const current = classes[0];
+    if (!current) return null;
+    const sets = await sql<{ id: string; name: string }>`
+      select id, name from study_sets
+      where user_id = ${context.userId} and class_id = ${current.id} and archived = false
+      order by created_at desc
+      limit 1
+    `;
+    return {
+      classId: current.id,
+      className: current.name,
+      classCode: current.code,
+      setId: sets[0]?.id ?? null,
+      setName: sets[0]?.name ?? null,
+    };
+  });
+
 export const getClassById = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator((id: string) => id)
@@ -1562,6 +1589,14 @@ export const updateTeacherClass = createServerFn({ method: "POST" })
   });
 
 
+function rosterStatus(scoreCount: number, average: number) {
+  if (scoreCount === 0 && average <= 0) return "No grades yet";
+  if (average >= 90) return "Strong";
+  if (average >= 75) return "On Track";
+  if (average >= 60) return "Needs Support";
+  return "At Risk";
+}
+
 export const getTeacherClassStats = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .validator((classId: string) => classId)
@@ -1594,11 +1629,7 @@ export const getTeacherClassStats = createServerFn({ method: "GET" })
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
         : Math.round(Number(s.average) || 0);
       const lastQuiz = scores.length ? Math.round(scores[0]) : null;
-      let status: string = "On Track";
-      if (avg >= 90) status = "Strong";
-      else if (avg >= 75) status = "On Track";
-      else if (avg >= 60) status = "Needs Support";
-      else status = "At Risk";
+      const status = rosterStatus(scores.length, avg);
       return {
         id: s.id,
         name: s.name,
@@ -1613,11 +1644,7 @@ export const getTeacherClassStats = createServerFn({ method: "GET" })
       for (const [name, scores] of byStudent) {
         const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
         const lastQuiz = Math.round(scores[0]);
-        let status = "On Track";
-        if (avg >= 90) status = "Strong";
-        else if (avg >= 75) status = "On Track";
-        else if (avg >= 60) status = "Needs Support";
-        else status = "At Risk";
+        const status = rosterStatus(scores.length, avg);
         roster.push({ id: name, name, average: avg, lastQuiz, testCount: scores.length, status });
       }
       roster.sort((a, b) => a.name.localeCompare(b.name));

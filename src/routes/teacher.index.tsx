@@ -5,7 +5,8 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, parseTeacherClassDocument } from "@/lib/ai";
-import { createTeacherClass, getProfile, getTeacherClassStats, listTeacherClasses, updateTeacherClass } from "@/lib/data";
+import { createTeacherClass, getTeacherClassStats, listTeacherClasses, updateTeacherClass } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import {
   COURSE_LEVELS,
   SCHOOL_TYPES,
@@ -59,7 +60,7 @@ function TeacherDashboard() {
   }
 
   useEffect(() => {
-    void getProfile().then((p) => {
+    void fetchProfileShared().then((p) => {
       if (p.role !== "teacher") void navigate({ to: "/dashboard" });
     });
     void refresh();

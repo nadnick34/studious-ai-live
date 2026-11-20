@@ -4,7 +4,8 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { generateCollegeComparison, generateReadingComprehensionQuiz, generateStudentTestPrepLesson, generateStudentTestPrepPlan, gradeReadingComprehensionQuiz } from "@/lib/ai";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { STUDENT_TEST_GROUPS } from "@/lib/types";
 
 export const Route = createFileRoute("/test-prep")({
@@ -126,7 +127,7 @@ function StudentTestPrepPage() {
       return;
     }
     const uid = user.id;
-    void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
+    void Promise.all([fetchProfileShared(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
       setLevel(profile.educationLevel || "");
       setKlass(profile.collegeClass || "");
       setGrade(profile.studentGrade || "");
@@ -422,7 +423,7 @@ function StudentTestPrepPage() {
                 </Button>
               </div>
               <h3 className="text-base font-semibold text-fg">{comparison?.title}</h3>
-              {comparison?.disclaimer && <p className="text-[11px] text-muted">{comparison.disclaimer}</p>}
+              {comparison?.disclaimer && <p className="text-[13px] text-muted">{comparison.disclaimer}</p>}
               <table className="mt-2 w-full min-w-[980px] border-collapse text-left text-[12px] leading-snug">
                 <thead>
                   <tr className="border-b border-border bg-bg/70">
@@ -438,7 +439,7 @@ function StudentTestPrepPage() {
                     <tr key={r.name} className="border-b border-border align-top">
                       <td className="px-2 py-2 font-medium">
                         {r.name}
-                        {r.location ? <div className="text-[11px] font-normal text-muted">{r.location}</div> : null}
+                        {r.location ? <div className="text-[13px] font-normal text-muted">{r.location}</div> : null}
                       </td>
                       <td className="px-2 py-2">{r.admissionsAid}</td>
                       <td className="px-2 py-2">{r.acceptRate}</td>
@@ -813,7 +814,7 @@ function StudentTestPrepPage() {
       <div className="mx-auto max-w-4xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Student</p>
+            <p className="text-[13px] font-semibold tracking-wide text-muted uppercase">Student</p>
             <h2 className="text-xl font-semibold text-fg">Practicum & Prep</h2>
             <p className="mt-1 text-sm text-muted">
               Add Real World life skills or an exam you are preparing for. Pace uses your education level
@@ -898,12 +899,12 @@ function StudentTestPrepPage() {
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
                   <div className="h-full bg-teal" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="mt-1 text-[11px] text-muted">
+                <p className="mt-1 text-[13px] text-muted">
                   {topics.length ? `${done}/${topics.length} covered` : "No plan yet"}
                   {track.log.length ? ` · ${track.log.length} lesson(s)` : ""}
                 </p>
                 <div className="mt-3 flex items-end justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                  <p className="flex items-center gap-1 text-[11px] text-muted">
+                  <p className="flex items-center gap-1 text-[13px] text-muted">
                     {stale && <span title="Plan older than 30 days">⚠️</span>}
                     {track.lastRefreshed ? `Refreshed ${new Date(track.lastRefreshed).toLocaleDateString()}` : "Never refreshed"}
                   </p>

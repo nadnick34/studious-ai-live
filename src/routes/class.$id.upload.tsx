@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { createStudySet, getClassById } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
 import { uid } from "@/lib/utils";
@@ -90,8 +91,7 @@ function UploadPage() {
       });
       void (async () => {
         try {
-          const { getProfile } = await import("@/lib/data");
-          const profile = await getProfile();
+          const profile = await fetchProfileShared();
           const generated = await generateStudyPackage({
             data: {
               className: cls.name,

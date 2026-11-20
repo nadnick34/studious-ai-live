@@ -30,7 +30,7 @@ function AdminPage() {
     <AppShell title="Admin">
       <div className="space-y-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Admin</p>
+          <p className="text-[13px] font-semibold uppercase tracking-wide text-muted">Admin</p>
           <h2 className="text-xl font-semibold text-fg">Users and activity</h2>
           <p className="text-sm text-muted">Accounts, last session, and usage timestamps.</p>
         </div>
@@ -41,7 +41,7 @@ function AdminPage() {
           <>
             <section className="overflow-x-auto rounded-2xl border border-border bg-card">
               <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-border text-[11px] uppercase tracking-wide text-muted">
+                <thead className="border-b border-border text-[13px] uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-3 py-2">User</th>
                     <th className="px-3 py-2">Email</th>

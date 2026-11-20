@@ -5,7 +5,7 @@ import { BottomNav, Sidebar } from "@/components/sidebar";
 import { RequireAuth } from "@/components/require-auth";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { getProfile } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 import { type UserProfile } from "@/lib/types";
 
@@ -47,7 +47,7 @@ function AppShellInner({
     setDark(preferDark);
     document.documentElement.classList.toggle("dark", preferDark);
     hydrateBrand();
-    void getProfile()
+    void fetchProfileShared()
       .then((p) => {
         setProfile(p);
         const brand = brandFromProfile(p);
@@ -98,9 +98,9 @@ function AppShellInner({
             <h1 className="text-base font-semibold text-fg">{title}</h1>
           </div>
         )}
-        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-24 sm:p-6 sm:pb-6">{children}</main>
+        <BottomNav role={profile?.role} />
       </div>
-      <BottomNav role={profile?.role} />
     </div>
   );
 }
@@ -109,7 +109,7 @@ export function ProfileLink() {
   const user = useCurrentUser();
   const [avatar, setAvatar] = useState(user?.profileImageUrl || "");
   useEffect(() => {
-    void getProfile().then((p) => setAvatar(p.avatarDataUrl || user?.profileImageUrl || ""));
+    void fetchProfileShared().then((p) => setAvatar(p.avatarDataUrl || user?.profileImageUrl || ""));
   }, [user?.profileImageUrl]);
   return (
     <Link to="/profile" className="grid size-10 place-items-center overflow-hidden rounded-full border border-border bg-card" aria-label="Profile">

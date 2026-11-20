@@ -76,7 +76,7 @@ function ClassicalPage() {
           <div className="flex min-w-0 items-center gap-3">
             <img src="/classical-wreath.jpg" alt="" className="h-9 w-auto shrink-0" />
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-[0.18em] text-amber-800 uppercase dark:text-amber-200">
+              <p className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase dark:text-amber-200">
                 Classical Education
               </p>
               <h1 className="truncate font-serif text-xl text-fg">{set.name}</h1>
@@ -336,7 +336,7 @@ function ConspectusView({
             ] as const
           ).map(([label, value]) => (
             <div key={label} className="rounded-lg border border-border border-l-2 border-l-amber-400 bg-bg p-3">
-              <div className="text-[11px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{label}</div>
+              <div className="text-[13px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{label}</div>
               <p className="mt-1 text-sm">{value || "—"}</p>
             </div>
           ))}
@@ -400,7 +400,7 @@ function ConspectusView({
           <div className="grid gap-2 sm:grid-cols-2">
             {classical.conspectus.lociMap.map((row, i) => (
               <div key={i} className="rounded-lg border border-border bg-bg px-3 py-2 text-sm">
-                <div className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">{row.locus}</div>
+                <div className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">{row.locus}</div>
                 <div>{row.item}</div>
               </div>
             ))}
@@ -637,7 +637,7 @@ function SocraticView({ classical, chapterName }: { classical: ClassicalPackage;
         <div className="space-y-2">
           {cards.map((c, i) => (
             <div key={c.id || i} className="rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-3 text-sm">
-              <div className="text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{c.type}</div>
+              <div className="text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{c.type}</div>
               <div className="mt-1 font-medium">{c.front}</div>
               <div className="mt-1 text-muted">{c.back}</div>
               {c.locus && <div className="mt-1 text-xs text-muted">Locus: {c.locus}</div>}
@@ -655,10 +655,10 @@ function SocraticView({ classical, chapterName }: { classical: ClassicalPackage;
             onClick={() => setFlipped((v) => !v)}
             className="flex min-h-48 w-full flex-col items-center justify-center rounded-xl border border-border border-l-4 border-l-amber-500 bg-card p-6 text-center"
           >
-            <div className="mb-2 text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{typeLabel}</div>
+            <div className="mb-2 text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">{typeLabel}</div>
             <p className="text-base font-medium">{flipped ? back : front}</p>
             {card.locus && <p className="mt-3 text-xs text-muted">Locus: {card.locus}</p>}
-            <p className="mt-4 text-[11px] text-muted">{flipped ? "Answer side" : "Tap to flip"}</p>
+            <p className="mt-4 text-[13px] text-muted">{flipped ? "Answer side" : "Tap to flip"}</p>
           </button>
           <div className="mt-3 flex justify-between gap-2">
             <Button
@@ -697,7 +697,7 @@ function CommonplaceView({ classical, chapterName }: { classical: ClassicalPacka
         <ul className="space-y-2">
           {classical.commonplace.map((item) => (
             <li key={item.id} className="rounded-lg border border-border bg-bg px-3 py-2 text-sm">
-              <span className="mr-2 text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">
+              <span className="mr-2 text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">
                 {item.kind}
               </span>
               {item.text}
@@ -717,7 +717,7 @@ function CommonplaceView({ classical, chapterName }: { classical: ClassicalPacka
                 onChange={() => setRecited((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
               />
               <div>
-                <div className="text-[10px] font-semibold text-muted uppercase">{item.kind}</div>
+                <div className="text-xs font-semibold text-muted uppercase">{item.kind}</div>
                 <div className="text-sm">{item.text}</div>
               </div>
             </li>

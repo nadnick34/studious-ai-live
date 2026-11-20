@@ -1,4 +1,4 @@
-import { getProfile } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { useEffect, useState } from "react";
 import type { ChildGender } from "@/lib/types";
 
@@ -6,7 +6,7 @@ export function useKidsMascot() {
   const [gender, setGender] = useState<ChildGender | null>(null);
   const [kidsMode, setKidsMode] = useState(false);
   useEffect(() => {
-    void getProfile().then((p) => {
+    void fetchProfileShared().then((p) => {
       setKidsMode(Boolean(p.kidsMode));
       setGender(p.childGender || null);
     });

@@ -475,7 +475,7 @@ function GanttChart({
           </Button>
         </div>
       </div>
-      <div className="mb-3 flex flex-wrap gap-3 text-[11px] text-muted">
+      <div className="mb-3 flex flex-wrap gap-3 text-[13px] text-muted">
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-emerald-600" /> Completed</span>
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-amber-400" /> Incomplete</span>
         <span className="inline-flex items-center gap-1"><span className="size-2.5 rounded-sm bg-orange-500" /> Medium risk</span>
@@ -497,7 +497,7 @@ function GanttChart({
                 </div>
                 <div className="relative h-8 rounded bg-bg">
                   <div
-                    className={`absolute top-1.5 h-5 rounded ${barColor(t)} text-[10px] leading-5 text-white shadow-sm`}
+                    className={`absolute top-1.5 h-5 rounded ${barColor(t)} text-xs leading-5 text-white shadow-sm`}
                     style={{ left: `${left}%`, width: `${width}%` }}
                     title={tip}
                   >
@@ -505,7 +505,7 @@ function GanttChart({
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <label className="flex items-center gap-1 text-[10px] text-muted">
+                  <label className="flex items-center gap-1 text-xs text-muted">
                     <input
                       type="checkbox"
                       checked={Boolean(t.completed)}
@@ -514,7 +514,7 @@ function GanttChart({
                     Done
                   </label>
                   <select
-                    className="rounded border border-border bg-bg px-1 py-0.5 text-[10px]"
+                    className="rounded border border-border bg-bg px-1 py-0.5 text-xs"
                     value={t.completed ? "none" : t.risk || "none"}
                     disabled={Boolean(t.completed)}
                     onChange={(e) =>
@@ -532,7 +532,7 @@ function GanttChart({
           })}
         </div>
       </div>
-      <p className="mt-2 text-[11px] text-muted">Hover a bar for dates (MM/DD/YY). Mark Done or set Medium/High risk for deadline slip.</p>
+      <p className="mt-2 text-[13px] text-muted">Hover a bar for dates (MM/DD/YY). Mark Done or set Medium/High risk for deadline slip.</p>
     </div>
   );
 }

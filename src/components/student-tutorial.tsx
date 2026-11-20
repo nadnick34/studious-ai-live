@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { getProfile } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { playTheme, stopTheme } from "@/lib/theme-audio";
 
 type Slide = {
@@ -298,7 +298,8 @@ function keyFor(id: string) {
   return `studious-tutorial-${id}`;
 }
 
-export function useStudentTutorial() {
+export function useStudentTutorial(options?: { autoOpen?: boolean }) {
+  const autoOpen = options?.autoOpen !== false;
   const user = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [kids, setKids] = useState(false);
@@ -306,11 +307,12 @@ export function useStudentTutorial() {
   useEffect(() => {
     if (!user?.id) return;
     let live = true;
-    void getProfile()
+    void fetchProfileShared()
       .then((p) => {
         if (!live) return;
         if (p.role && p.role !== "student") return;
         setKids(Boolean(p.kidsMode || p.forChild || (p.childAge != null && p.childAge <= 9)));
+        if (!autoOpen) return;
         const seen = localStorage.getItem(keyFor(user.id));
         const fresh = localStorage.getItem("studious-show-tutorial") === "1";
         if (!seen || fresh) {
@@ -326,7 +328,7 @@ export function useStudentTutorial() {
     return () => {
       live = false;
     };
-  }, [user?.id]);
+  }, [user?.id, autoOpen]);
 
   function close() {
     if (user?.id) {
@@ -348,8 +350,8 @@ function Motion({ kind }: { kind: Slide["motion"] }) {
       <div className="relative mx-auto h-28 w-44">
         <div className="absolute bottom-2 left-1/2 h-16 w-28 -translate-x-1/2 rounded-xl border-2 border-dashed border-teal/50 bg-teal/5" />
         <FileUp className="absolute bottom-6 left-1/2 size-7 -translate-x-1/2 text-teal" />
-        <div className="tut-float absolute left-6 top-1 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-slate shadow">PDF</div>
-        <div className="tut-float-delay absolute right-4 top-3 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-slate shadow">JPG</div>
+        <div className="tut-float absolute left-6 top-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate shadow">PDF</div>
+        <div className="tut-float-delay absolute right-4 top-3 rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate shadow">JPG</div>
         <Camera className="tut-float absolute right-8 top-10 size-4 text-teal" />
       </div>
     );
@@ -357,9 +359,9 @@ function Motion({ kind }: { kind: Slide["motion"] }) {
   if (kind === "study") {
     return (
       <div className="flex h-28 items-center justify-center gap-3">
-        <div className="tut-pulse rounded-xl border border-border bg-white px-3 py-2 text-center text-[11px] font-semibold text-fg shadow-sm">Notes</div>
-        <div className="tut-pulse-delay rounded-xl border border-border bg-white px-3 py-2 text-center text-[11px] font-semibold text-fg shadow-sm">Audio</div>
-        <div className="tut-pulse rounded-xl border border-border bg-white px-3 py-2 text-center text-[11px] font-semibold text-fg shadow-sm">Quiz</div>
+        <div className="tut-pulse rounded-xl border border-border bg-white px-3 py-2 text-center text-[13px] font-semibold text-fg shadow-sm">Notes</div>
+        <div className="tut-pulse-delay rounded-xl border border-border bg-white px-3 py-2 text-center text-[13px] font-semibold text-fg shadow-sm">Audio</div>
+        <div className="tut-pulse rounded-xl border border-border bg-white px-3 py-2 text-center text-[13px] font-semibold text-fg shadow-sm">Quiz</div>
       </div>
     );
   }
@@ -422,7 +424,7 @@ export function StudentTutorial({
             <span className="grid size-8 place-items-center rounded-full bg-teal/15 text-teal">
               <Icon className="size-4" />
             </span>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{slide.kicker}</p>
+            <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-teal">{slide.kicker}</p>
           </div>
           <h2 className="mt-2 font-serif text-[1.45rem] leading-tight text-fg">{slide.title}</h2>
           <p className="mt-2 text-sm leading-relaxed text-fg/80">{slide.why}</p>
@@ -477,7 +479,7 @@ export function StudentTutorial({
           <div className="relative z-10 max-h-[88dvh] w-full max-w-xl overflow-y-auto rounded-3xl border border-border bg-white p-6 shadow-2xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal">{slide.kicker}</p>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-teal">{slide.kicker}</p>
                 <h3 className="font-serif text-xl text-fg">{slide.diveTitle}</h3>
               </div>
               <button type="button" className="text-sm text-muted hover:text-fg" onClick={() => setDive(false)}>

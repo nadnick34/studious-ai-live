@@ -78,6 +78,7 @@ type MissingRow = {
 };
 
 function statusStyle(status: string) {
+  if (status === "No grades yet") return "bg-slate-100 text-slate-700";
   if (status === "Strong") return "bg-emerald-50 text-emerald-700";
   if (status === "On Track") return "bg-teal-50 text-teal-700";
   if (status === "Needs Support") return "bg-amber-50 text-amber-700";
@@ -492,7 +493,7 @@ function TeacherClassPage() {
         </button>
 
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
+          <div className="mb-1 text-[13px] font-semibold tracking-wide text-muted uppercase">
             Upload assessment batch
           </div>
           <p className="mb-3 text-xs text-muted">
@@ -1095,7 +1096,7 @@ function TeacherClassPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+                    <tr className="border-b border-border bg-bg/60 text-[13px] tracking-wide text-muted uppercase">
                       <th className="px-4 py-2.5">#</th>
                       <th className="px-4 py-2.5">Question</th>
                       <th className="px-4 py-2.5">Correct</th>
@@ -1124,7 +1125,7 @@ function TeacherClassPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+                  <tr className="border-b border-border bg-bg/60 text-[13px] tracking-wide text-muted uppercase">
                     <th className="px-4 py-2.5">Student Name</th>
                     <th className="px-4 py-2.5">Score</th>
                     <th className="px-4 py-2.5">Missed</th>
@@ -1182,7 +1183,7 @@ function TeacherClassPage() {
         ← Dashboard
       </Link>
 
-      <div className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">Class overview</div>
+      <div className="mb-1 text-[13px] font-semibold tracking-wide text-muted uppercase">Class overview</div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-xl font-semibold text-fg">
           {cls.name}
@@ -1245,7 +1246,7 @@ function TeacherClassPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+                <tr className="border-b border-border bg-bg/60 text-[13px] tracking-wide text-muted uppercase">
                   <th className="px-4 py-2.5 font-semibold">Student</th>
                   <th className="px-4 py-2.5 font-semibold">Avg</th>
                   <th className="px-4 py-2.5 font-semibold">Tests</th>
@@ -1265,7 +1266,7 @@ function TeacherClassPage() {
                     }}
                   >
                     <td className="px-4 py-3 font-medium text-teal">{s.name}</td>
-                    <td className="px-4 py-3">{s.average}%</td>
+                    <td className="px-4 py-3">{s.status === "No grades yet" ? "—" : `${s.average}%`}</td>
                     <td className="px-4 py-3">
                       <span className={(s.testCount || 0) < stats.assessmentCount ? "font-semibold text-amber-700" : ""}>
                         {s.testCount || 0}/{stats.assessmentCount}
@@ -1328,9 +1329,9 @@ function StatCard({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className={`mt-1 text-2xl font-bold text-fg ${valueClass || ""}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-muted">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[13px] text-muted">{sub}</div>}
     </div>
   );
 }
@@ -1338,7 +1339,7 @@ function StatCard({
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className="mt-1 text-lg font-bold text-fg">{value}</div>
     </div>
   );

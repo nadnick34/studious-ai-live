@@ -76,7 +76,7 @@ export function FeedbackActions({ title, report }: { title: string; report: Assi
           >
             Download PDF
           </button>
-          {note && <p className="px-3 py-1 text-[11px] text-muted">{note}</p>}
+          {note && <p className="px-3 py-1 text-[13px] text-muted">{note}</p>}
         </div>
       )}
     </div>

@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Archive, ChevronRight, LogOut, Pencil, Plus, UserRound } from "lucide-react";
+import { Archive, ChevronRight, Pencil, Plus } from "lucide-react";
 import { AppShell, ProfileLink } from "@/components/app-shell";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { signOut } from "@/lib/auth/client";
-import { createClass, getProfile, listClasses, seedSampleClass, updateClass } from "@/lib/data";
+import { createClass, listClasses, seedSampleClass, updateClass } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { lookupProfessor, parseClassCalendar } from "@/lib/ai";
 import { extractPdfText, formatShortDate, timeAgo } from "@/lib/utils";
 import type { ClassRecord } from "@/lib/types";
@@ -34,7 +34,7 @@ const emptyForm = {
 function DashboardPage() {
   const navigate = useNavigate();
   useEffect(() => {
-    void getProfile().then((p) => {
+    void fetchProfileShared().then((p) => {
       if (p.role === "professional") void navigate({ to: "/meetings" });
       if (p.role === "teacher") void navigate({ to: "/teacher" });
     });
@@ -175,9 +175,6 @@ function DashboardPage() {
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowClassInfo(true)} label="How classes work" />
 <ProfileLink />
-          <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
-            <LogOut className="size-4" />
-          </button>
         </div>
       }
     >
@@ -242,7 +239,7 @@ function DashboardPage() {
                   return alerts.length > 0 ? (
                   <div className="mt-3 space-y-1">
                     {alerts.slice(0, 3).map((a) => (
-                      <div key={a.id} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+                      <div key={a.id} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[13px] leading-snug text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
                         {a.message}
                       </div>
                     ))}
@@ -251,10 +248,10 @@ function DashboardPage() {
                 })()}
                 {c.upcoming && c.upcoming.length > 0 && (
                   <div className="mt-3">
-                    <div className="mb-1 text-[10px] font-semibold tracking-wide text-teal uppercase">Upcoming</div>
+                    <div className="mb-1 text-xs font-semibold tracking-wide text-teal uppercase">Upcoming</div>
                     <ul className="space-y-1">
                       {c.upcoming.slice(0, 4).map((u) => (
-                        <li key={u.id} className="flex min-w-0 items-start justify-between gap-2 text-[11px] text-fg">
+                        <li key={u.id} className="flex min-w-0 items-start justify-between gap-2 text-[13px] text-fg">
                           <span className="min-w-0 break-words">
                             <span className="text-muted capitalize">{u.type}</span>
                             {" · "}
@@ -266,14 +263,14 @@ function DashboardPage() {
                     </ul>
                   </div>
                 )}
-                <div className="mt-3 text-[10px] text-muted">Last opened {timeAgo(c.lastAccessed)}</div>
+                <div className="mt-3 text-xs text-muted">Last opened {timeAgo(c.lastAccessed)}</div>
                             </Link>
               <div className="mt-3 flex justify-end gap-2">
-                <button type="button" onClick={(e) => openEdit(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-teal px-2 text-[11px] font-medium text-teal">
+                <button type="button" onClick={(e) => openEdit(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-teal px-2 text-[13px] font-medium text-teal">
                   <Pencil className="size-3" />
                   Edit
                 </button>
-                <button type="button" onClick={(e) => void handleArchive(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted">
+                <button type="button" onClick={(e) => void handleArchive(c, e)} className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-2 text-[13px] text-muted">
                   <Archive className="size-3" />
                   Archive
                 </button>
@@ -308,7 +305,7 @@ function DashboardPage() {
                     {insightLoading ? "Looking up insight…" : "Get professor insight"}
                   </button>
                   {form.professorInsight && (
-                    <p className="mt-2 rounded-lg border border-border bg-bg px-2.5 py-2 text-[11px] leading-relaxed text-muted">
+                    <p className="mt-2 rounded-lg border border-border bg-bg px-2.5 py-2 text-[13px] leading-relaxed text-muted">
                       {form.professorInsight}
                     </p>
                   )}
