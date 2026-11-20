@@ -1,8 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, Home, LayoutDashboard, LogOut, Moon, NotebookPen, ScrollText, Shield, Sun, UserRound } from "lucide-react";
-import { signOut } from "@/lib/auth/client";
+import { Archive, BookOpen, Briefcase, ClipboardCheck, FolderKanban, GraduationCap, Home, LayoutDashboard, Moon, NotebookPen, ScrollText, Shield, Sun, Target, UserRound } from "lucide-react";
 import { cn, initialsFromName } from "@/lib/utils";
-import { accountTypeLabel, type UserProfile } from "@/lib/types";
+import type { UserProfile } from "@/lib/types";
 
 function getNav(role?: string | null, isAdmin?: boolean) {
   const adminItem = { to: "/admin", label: "Users", icon: Shield, match: (p: string) => p.startsWith("/admin") };
@@ -30,12 +29,12 @@ function getNav(role?: string | null, isAdmin?: boolean) {
     ];
   } else {
     items = [
+      { to: "/dashboard", label: "Home", icon: Home, match: (p: string) => p === "/dashboard" },
       { to: "/classes", label: "Classes", icon: BookOpen, match: (p: string) => p === "/classes" || p.startsWith("/class/") },
-      { to: "/assistant", label: "Assignment Assistant", shortLabel: "Check", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
-      { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
-      { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
-      { to: "/archived", label: "Archive", shortLabel: "Archive", icon: Archive, match: (p: string) => p.startsWith("/archived") },
-      { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
+      { to: "/assistant", label: "Assignment Assistant", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
+      { to: "/paper-grade", label: "Paper Grade", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
+      { to: "/test-prep", label: "Practicum & Prep", icon: Target, match: (p: string) => p.startsWith("/test-prep") },
+      { to: "/archived", label: "Archive", icon: Archive, match: (p: string) => p.startsWith("/archived") },
     ];
   }
   if (isAdmin && !items.some((item) => item.to === "/admin")) {
@@ -67,9 +66,6 @@ export function Sidebar({
             <img src="/logo.png" alt="Studious AI" className="h-7 w-auto" />
           </span>
         </Link>
-        <p className="mt-2 text-[11px] font-semibold tracking-wide text-white/70 uppercase">
-          {accountTypeLabel(profile)}
-        </p>
       </div>
 
       <nav className="flex-1 space-y-1 px-2.5">
@@ -86,7 +82,7 @@ export function Sidebar({
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {"shortLabel" in item && item.shortLabel ? item.shortLabel : item.label}
+              {item.label}
             </Link>
           );
         })}
@@ -103,18 +99,9 @@ export function Sidebar({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{userName}</span>
-            <span className="block text-[11px] capitalize text-white/55">{profile?.role || "student"}</span>
           </span>
         </Link>
-        <button
-          type="button"
-          onClick={() => void signOut("/")}
-          className="flex min-h-11 items-center gap-2 text-sm text-white/60 hover:text-white"
-        >
-          <LogOut className="size-4" />
-          Sign out
-        </button>
-        <p className="text-[10px] tracking-wide text-white/35">Nickersonian Institute</p>
+        <p className="text-xs text-white/75">Nickersonian Institute</p>
       </div>
     </aside>
   );
@@ -129,7 +116,7 @@ export function BottomNav({ role }: { role?: string | null } = {}) {
   const onClasses = pathname === "/classes";
   const onClass = Boolean(classMatch && !pathname.includes("/upload") && !pathname.includes("/assignments"));
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-border bg-card px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <nav className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-border bg-card px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:inset-auto sm:z-auto sm:px-4">
       <Link to="/dashboard" className="grid size-11 place-items-center rounded-xl text-teal" aria-label="Home">
         <Home className="size-6" />
       </Link>

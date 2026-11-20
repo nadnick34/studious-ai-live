@@ -52,12 +52,12 @@ function NotesPage() {
 
       <div className="notes-sheet mx-auto max-w-3xl rounded-xl border border-border bg-card p-5 shadow-sm sm:p-8">
         <div className="mb-1 flex items-start justify-between gap-4">
-          <span className="text-[10px] font-semibold tracking-wider text-muted uppercase">Comprehensive Study Notes</span>
-          <span className="shrink-0 text-[10px] text-muted">Studious AI</span>
+          <span className="text-xs font-semibold tracking-wider text-muted uppercase">Comprehensive Study Notes</span>
+          <span className="shrink-0 text-xs text-muted">Studious AI</span>
         </div>
         <h1 className="mt-2 text-xl leading-tight font-bold text-fg sm:text-2xl">{set.notes.title}</h1>
         <p className="mt-1 mb-2 text-sm text-muted">{set.notes.subtitle}</p>
-        <p className="mb-6 text-[11px] text-muted">
+        <p className="mb-6 text-[13px] text-muted">
           {cls.code} · {set.name}
           {set.sourceFiles?.length ? ` · Sources: ${set.sourceFiles.join(", ")}` : ""}
         </p>
@@ -100,7 +100,7 @@ function NotesPage() {
         </div>
         <div className="mt-10 flex flex-col items-center gap-2 border-t border-border pt-6">
           <img src="/logo.png" alt="Studious AI" className="h-8 w-auto" />
-          <p className="text-[10px] text-muted">Your masterclass for every class</p>
+          <p className="text-xs text-muted">Your masterclass for every class</p>
         </div>
       </div>
     </AppShell>
@@ -173,7 +173,7 @@ function SectionBlock({ section, index }: { section: NotesSection; index: number
           ))}
         </ul>
       )}
-      {section.reference && <p className="mt-2 text-[11px] text-muted italic">Source: {section.reference}</p>}
+      {section.reference && <p className="mt-2 text-[13px] text-muted italic">Source: {section.reference}</p>}
     </div>
   );
 }

@@ -1,13 +1,13 @@
 import { Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getProfile } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 
 /** After login/session restore, send the user to the home for their saved role. */
 export function RoleHomeRedirect() {
   const [to, setTo] = useState<string | null>(null);
 
   useEffect(() => {
-    void getProfile()
+    void fetchProfileShared()
       .then((p) => {
         if (p.isAdmin) setTo("/admin");
         else if (p.role === "teacher") setTo("/teacher");

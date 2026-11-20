@@ -1,10 +1,11 @@
-import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useId, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
-import { getProfile } from "@/lib/data";
 import { recordActivity } from "@/lib/admin";
+import { clearProfileCache, fetchProfileShared } from "@/lib/profile-cache";
+import { passwordResetAvailable } from "@/lib/password-reset";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 import { RoleHomeRedirect } from "@/components/role-home-redirect";
 import { playTheme } from "@/lib/theme-audio";
@@ -18,6 +19,14 @@ function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [canReset, setCanReset] = useState(false);
+
+  useEffect(() => {
+    void passwordResetAvailable()
+      .then((ok) => setCanReset(Boolean(ok)))
+      .catch(() => setCanReset(false));
+  }, []);
 
   if (user) return <RoleHomeRedirect />;
 
@@ -41,7 +50,8 @@ function Login() {
     }
     let dest = "/dashboard";
     try {
-      const p = await getProfile();
+      clearProfileCache();
+      const p = await fetchProfileShared(true);
       const brand = brandFromProfile(p);
       if (brand) persistBrand(brand);
       else hydrateBrand();
@@ -71,7 +81,25 @@ function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
-          <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="current-password" />
+          <Field
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            trailing={
+              <button type="button" className="text-xs font-medium text-teal" onClick={() => setShowPassword((v) => !v)}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            }
+          />
+          {canReset && (
+            <p className="text-right">
+              <Link to="/forgot-password" className="text-xs font-medium text-teal hover:underline">
+                Forgot password?
+              </Link>
+            </p>
+          )}
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red">{error}</p>}
           <Button type="submit" className="mt-2 w-full" disabled={loading}>
             {loading ? "Signing in…" : "Log in"}
@@ -100,17 +128,26 @@ function Field({
   value,
   onChange,
   autoComplete,
+  trailing,
 }: {
   label: string;
   type: string;
   value: string;
   onChange: (v: string) => void;
   autoComplete?: string;
+  trailing?: React.ReactNode;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label htmlFor={id} className="block text-xs font-medium text-muted">
+          {label}
+        </label>
+        {trailing}
+      </div>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

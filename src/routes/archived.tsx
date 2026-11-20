@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { listArchivedAssignments, listClasses, listPaperChecks, setAssignmentArchived, setPaperCheckArchived, updateClass } from "@/lib/data";
-import type { AssignmentRecord, ClassRecord } from "@/lib/types";
+import { listArchivedAssignments, listArchivedMeetings, listClasses, listPaperChecks, setAssignmentArchived, setPaperCheckArchived, updateClass, updateMeeting } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
+import type { AssignmentRecord, ClassRecord, MeetingRecord } from "@/lib/types";
 
 export const Route = createFileRoute("/archived")({ component: ArchivedPage });
 
@@ -11,8 +12,20 @@ function ArchivedPage() {
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [checks, setChecks] = useState<AssignmentRecord[]>([]);
   const [papers, setPapers] = useState<{ id: string; title: string; mode: string; band: string; createdAt: string }[]>([]);
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
+  const [professional, setProfessional] = useState(false);
 
   async function refresh() {
+    const profile = await fetchProfileShared();
+    if (profile.role === "professional") {
+      setProfessional(true);
+      setMeetings(await listArchivedMeetings());
+      setClasses([]);
+      setChecks([]);
+      setPapers([]);
+      return;
+    }
+    setProfessional(false);
     const [c, a, p] = await Promise.all([
       listClasses({ data: true }),
       listArchivedAssignments(),
@@ -27,23 +40,34 @@ function ArchivedPage() {
 
   return (
     <AppShell title="Archive">
-      <Section title="Classes" empty="No archived classes.">
-        {classes.map((c) => (
-          <Row key={c.id} title={c.name} meta={c.code} onRestore={async () => { await updateClass({ data: { id: c.id, patch: { archived: false } } }); await refresh(); }}>
-            <Link to="/class/$id" params={{ id: c.id }}><Button variant="secondary" className="text-xs">Open</Button></Link>
-          </Row>
-        ))}
-      </Section>
-      <Section title="Assignment Assistant" empty="No archived checks.">
-        {checks.map((c) => (
-          <Row key={c.id} title={c.title} meta={new Date(c.createdAt).toLocaleDateString()} onRestore={async () => { await setAssignmentArchived({ data: { id: c.id, archived: false } }); await refresh(); }} />
-        ))}
-      </Section>
-      <Section title="Paper Grade" empty="No archived paper checks.">
-        {papers.map((c) => (
-          <Row key={c.id} title={c.title} meta={[c.mode, c.band].filter(Boolean).join(" · ")} onRestore={async () => { await setPaperCheckArchived({ data: { id: c.id, archived: false } }); await refresh(); }} />
-        ))}
-      </Section>
+      {professional ? (
+        <Section title="Meetings" empty="No archived meetings.">
+          {meetings.map((m) => (
+            <Row key={m.id} title={m.name} meta={m.category} onRestore={async () => { await updateMeeting({ data: { id: m.id, patch: { archived: false } } }); await refresh(); }} />
+          ))}
+        </Section>
+      ) : null}
+      {!professional && (
+        <>
+          <Section title="Classes" empty="No archived classes.">
+            {classes.map((c) => (
+              <Row key={c.id} title={c.name} meta={c.code} onRestore={async () => { await updateClass({ data: { id: c.id, patch: { archived: false } } }); await refresh(); }}>
+                <Link to="/class/$id" params={{ id: c.id }}><Button variant="secondary" className="text-xs">Open</Button></Link>
+              </Row>
+            ))}
+          </Section>
+          <Section title="Assignment Assistant" empty="No archived checks.">
+            {checks.map((c) => (
+              <Row key={c.id} title={c.title} meta={new Date(c.createdAt).toLocaleDateString()} onRestore={async () => { await setAssignmentArchived({ data: { id: c.id, archived: false } }); await refresh(); }} />
+            ))}
+          </Section>
+          <Section title="Paper Grade" empty="No archived paper checks.">
+            {papers.map((c) => (
+              <Row key={c.id} title={c.title} meta={[c.mode, c.band].filter(Boolean).join(" · ")} onRestore={async () => { await setPaperCheckArchived({ data: { id: c.id, archived: false } }); await refresh(); }} />
+            ))}
+          </Section>
+        </>
+      )}
     </AppShell>
   );
 }

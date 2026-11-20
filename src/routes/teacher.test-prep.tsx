@@ -4,7 +4,8 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { generateTestPrepLesson, generateTestPrepPlan } from "@/lib/ai";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { PREP_SUBJECTS, STUDENT_TEST_GROUPS } from "@/lib/types";
 
 export const Route = createFileRoute("/teacher/test-prep")({
@@ -95,7 +96,7 @@ function TeacherPrepPage() {
       setTracks([]);
       return;
     }
-    void Promise.all([getProfile(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
+    void Promise.all([fetchProfileShared(), getTeacherToolState().catch(() => null)]).then(([profile, tools]) => {
       setStateName(profile.state || "");
       setSchoolType(profile.educationApproach || "");
       const remote = Array.isArray(tools?.teacherPrepTracks) ? (tools!.teacherPrepTracks as Track[]) : [];
@@ -323,7 +324,7 @@ function TeacherPrepPage() {
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Teacher edition</p>
+            <p className="text-[13px] font-semibold tracking-wide text-muted uppercase">Teacher edition</p>
             <h2 className="text-xl font-semibold text-fg">Prep</h2>
             <p className="mt-1 text-sm text-muted">
               Add a subject and an exam. Cards are not tied to a class. Generate still includes the Teacher’s Guide.
@@ -421,12 +422,12 @@ function TeacherPrepPage() {
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg">
                   <div className="h-full bg-teal" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="mt-1 text-[11px] text-muted">
+                <p className="mt-1 text-[13px] text-muted">
                   {topics.length ? `${done}/${topics.length} covered` : "No plan yet"}
                   {track.log.length ? ` · ${track.log.length} lesson(s)` : ""}
                 </p>
                 <div className="mt-3 flex items-end justify-between gap-2" onClick={(e) => e.stopPropagation()}>
-                  <p className="flex items-center gap-1 text-[11px] text-muted">
+                  <p className="flex items-center gap-1 text-[13px] text-muted">
                     {stale && <span title="Plan older than 30 days">⚠️</span>}
                     {track.lastRefreshed ? `Refreshed ${new Date(track.lastRefreshed).toLocaleDateString()}` : "Never refreshed"}
                   </p>
@@ -487,7 +488,7 @@ function LessonDocs({
       </div>
       {(printTarget === "teacher" || printTarget === "both") && lesson.teacherGuide && (
         <article className="rounded-2xl border border-border bg-card p-6 print:border-0">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Teacher’s Guide</p>
+          <p className="text-[13px] font-semibold tracking-wide text-muted uppercase">Teacher’s Guide</p>
           <h3 className="mt-1 text-xl font-semibold text-fg">{lesson.teacherGuide.title}</h3>
           <p className="text-sm text-muted">{lesson.teacherGuide.minutes || "5–10"} minutes</p>
           {lesson.teacherGuide.narrative && <p className="mt-3 text-sm leading-relaxed">{lesson.teacherGuide.narrative}</p>}
@@ -534,7 +535,7 @@ function LessonDocs({
       )}
       {(printTarget === "student" || printTarget === "both") && lesson.studentSummary && (
         <article className="rounded-2xl border border-border bg-card p-6 print:border-0">
-          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Student Test Prep Summary</p>
+          <p className="text-[13px] font-semibold tracking-wide text-muted uppercase">Student Test Prep Summary</p>
           <h3 className="mt-1 text-xl font-semibold text-fg">{lesson.studentSummary.title}</h3>
           {lesson.studentSummary.narrative && <p className="mt-3 text-sm leading-relaxed">{lesson.studentSummary.narrative}</p>}
           {!!lesson.studentSummary.keyIdeas?.length && (

@@ -93,7 +93,7 @@ export function CaptureBar({
           Scan
         </button>
       </div>
-      <p className="text-[11px] leading-relaxed text-muted">
+      <p className="text-[13px] leading-relaxed text-muted">
         Files, photo, or scan. For worksheets, fill the frame with the page, good light, and avoid blur — photos are read for text the same way scans are.
       </p>
 
@@ -141,13 +141,13 @@ export function CaptureBar({
               {item.preview ? (
                 <img src={item.preview} alt="" className="size-10 rounded-md object-cover" />
               ) : (
-                <span className="grid size-10 place-items-center rounded-md bg-bg text-[10px] font-semibold uppercase text-muted">
+                <span className="grid size-10 place-items-center rounded-md bg-bg text-xs font-semibold uppercase text-muted">
                   {item.file.name.split(".").pop()}
                 </span>
               )}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{item.file.name}</div>
-                <div className="text-[11px] capitalize text-muted">
+                <div className="text-[13px] capitalize text-muted">
                   {item.mode === "scan" ? "Scan" : item.mode === "photo" ? "Photo" : "File"} ·{" "}
                   {Math.max(1, Math.round(item.file.size / 1024))} KB
                 </div>

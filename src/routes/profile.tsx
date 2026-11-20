@@ -3,9 +3,10 @@ import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth/client";
+import { authClient, signOut } from "@/lib/auth/client";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { getProfile, saveProfile } from "@/lib/data";
+import { saveProfile } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { DEFAULT_BRAND, FALLBACK_PALETTES, allStock, getStockById, persistBrand } from "@/lib/schools";
 import { compressImageFile, initialsFromName } from "@/lib/utils";
 import type { ChildGender, EducationApproach, UserProfile, UserRole } from "@/lib/types";
@@ -58,7 +59,7 @@ function ProfilePage() {
 
 
   useEffect(() => {
-    void getProfile().then((p) => {
+    void fetchProfileShared().then((p) => {
       setPhone(p.phone);
       setSmsAlerts(p.smsAlerts);
       setSchoolSelect(p.schoolSelect);
@@ -105,6 +106,7 @@ function ProfilePage() {
       kidsMode,
     };
     await saveProfile({ data: next });
+    await fetchProfileShared(true);
     if (schoolSelect === "custom") {
       const pal = FALLBACK_PALETTES.find((p) => p.id === paletteId) || FALLBACK_PALETTES[0];
       persistBrand({ ...DEFAULT_BRAND, id: "custom", name: customName || "Custom", primary: pal.primary, accent: pal.accent, initials: initialsFromName(customName || "CS"), kind: "custom" });
@@ -185,7 +187,7 @@ function ProfilePage() {
                 }}
               />
               {avatar && (
-                <button type="button" className="mt-1 block text-[11px] text-muted" onClick={() => setAvatar("")}>
+                <button type="button" className="mt-1 block text-[13px] text-muted" onClick={() => setAvatar("")}>
                   Remove photo
                 </button>
               )}
@@ -212,9 +214,9 @@ function ProfilePage() {
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
               <option value="professional">Professional</option>
-              <option value="theologian">Theologian</option>
+              {role === "theologian" && <option value="theologian">Theologian</option>}
             </select>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[13px] text-muted">
               Teacher Edition includes school-type setup, classes, scanned-test grading, and analytics. Professional has Meetings & Projects.
             </p>
           </div>
@@ -300,7 +302,7 @@ function ProfilePage() {
               <option value="custom">Custom</option>
             </select>
             {role === "professional" && (
-              <p className="mt-1 text-[11px] text-muted">School branding is not used for Professional accounts.</p>
+              <p className="mt-1 text-[13px] text-muted">School branding is not used for Professional accounts.</p>
             )}
           </div>
           <div>
@@ -317,7 +319,7 @@ function ProfilePage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[13px] text-muted">
               Used by Teacher Scriptorium and class materials so wording and structure match the school’s approach.
             </p>
           </div>
@@ -335,7 +337,7 @@ function ProfilePage() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-[13px] text-muted">
               Used for Teacher Test Prep (LEAP, state summatives, and other required exams).
             </p>
           </div>
@@ -369,7 +371,7 @@ function ProfilePage() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-muted">Used by Practicum for pace and Real World tasks.</p>
+              <p className="mt-1 text-[13px] text-muted">Used by Practicum for pace and Real World tasks.</p>
             </div>
           )}
           {educationLevel === "College/Undergraduate" && (
@@ -387,7 +389,7 @@ function ProfilePage() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-[11px] text-muted">
+              <p className="mt-1 text-[13px] text-muted">
                 Sets Test Prep pace and how advanced the generated material is.
               </p>
             </div>
@@ -417,9 +419,14 @@ function ProfilePage() {
             <input type="checkbox" checked={smsAlerts} onChange={(e) => setSmsAlerts(e.target.checked)} />
             Send me text alerts for upcoming assignments and tests
           </label>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Saving…" : "Save profile"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save profile"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => void signOut("/")}>
+              Sign out
+            </Button>
+          </div>
         </form>
 
         <form onSubmit={handlePassword} className="card-surface space-y-3 rounded-xl p-5 sm:p-6">

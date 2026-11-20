@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { KidsMascot, useKidsMascot } from "@/components/kids-mascot";
-import { getClassById, getProfile, getStudySetById, updateStudySet } from "@/lib/data";
+import { getClassById, getStudySetById, updateStudySet } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { generateSpatialImages } from "@/lib/ai";
 import type { ClassRecord, SpatialPanel, SpatialStory, StudySet } from "@/lib/types";
 
@@ -50,7 +51,7 @@ function SpatialPage() {
       setImgBusy(true);
       setMediaError(null);
       try {
-        const profile = await getProfile();
+        const profile = await fetchProfileShared();
         const result = await generateSpatialImages({
           data: { story, childGender: profile.childGender || gender },
         });

@@ -143,7 +143,7 @@ function GradePage() {
       </Link>
 
       <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-3 text-[11px] font-semibold tracking-wide text-muted uppercase">Upload assessment batch</div>
+        <div className="mb-3 text-[13px] font-semibold tracking-wide text-muted uppercase">Upload assessment batch</div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs text-muted">
             Assessment Name

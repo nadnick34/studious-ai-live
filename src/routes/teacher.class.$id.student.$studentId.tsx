@@ -114,13 +114,16 @@ function StudentDetailPage() {
         <div>
           <h2 className="text-xl font-semibold text-fg">{name}</h2>
           <p className="text-sm text-muted">
-            Grade {cls.gradeLevel || "—"} · Overall Average: {student?.average ?? "—"}%
+            Grade {cls.gradeLevel || "—"} · Overall Average:{" "}
+            {student?.status === "No grades yet" ? "No grades yet" : `${student?.average ?? "—"}%`}
           </p>
         </div>
         {student && (
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              student.status === "Needs Support"
+              student.status === "No grades yet"
+                ? "bg-slate-100 text-slate-700"
+                : student.status === "Needs Support"
                 ? "bg-amber-100 text-amber-800"
                 : student.status === "At Risk"
                   ? "bg-red-100 text-red-800"
@@ -200,7 +203,7 @@ function StudentDetailPage() {
 function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className="mt-1 text-lg font-bold text-fg">{value}</div>
       {sub && <div className="text-xs text-muted">{sub}</div>}
     </div>

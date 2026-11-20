@@ -15,7 +15,7 @@ function ComingSoon() {
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
         <img src="/hero-mark.png" alt="" className="mb-2 h-24 w-auto" />
         <p className="font-serif text-2xl font-semibold">Studious AI</p>
-        <span className="mt-2 rounded-full border border-teal-700/40 bg-teal-950/40 px-3 py-1 text-[11px] font-semibold tracking-wide text-teal uppercase">
+        <span className="mt-2 rounded-full border border-teal-700/40 bg-teal-950/40 px-3 py-1 text-[13px] font-semibold tracking-wide text-teal uppercase">
           Teacher Edition
         </span>
         <h1 className="mt-5 max-w-lg font-serif text-3xl font-semibold sm:text-4xl">Coming Soon!</h1>

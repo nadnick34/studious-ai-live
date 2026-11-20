@@ -551,7 +551,7 @@ export type AssessmentType =
   | "Final"
   | "Lab / Practical";
 
-export type StudentStatus = "Strong" | "On Track" | "Needs Support" | "At Risk";
+export type StudentStatus = "Strong" | "On Track" | "Needs Support" | "At Risk" | "No grades yet";
 
 export const SCHOOL_TYPES: SchoolType[] = [
   "Classical",

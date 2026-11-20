@@ -5,7 +5,8 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
-import { createClass, createStudySet, getProfile, listClasses, listStudySets, updateStudySet } from "@/lib/data";
+import { createClass, createStudySet, listClasses, listStudySets, updateStudySet } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
 import { uid } from "@/lib/utils";
 import type { Attachment, ClassRecord, StudySet } from "@/lib/types";
@@ -234,7 +235,7 @@ function NotesPage() {
       // Continue AI generation without blocking the UI
       void (async () => {
         try {
-          const profile = await getProfile();
+          const profile = await fetchProfileShared();
           const generated = await generateStudyPackage({
             data: {
               className: opts.className,
@@ -294,7 +295,7 @@ function NotesPage() {
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-fg">Live notes</h2>
-            <span className="text-[11px] text-muted">{text.length.toLocaleString()} chars</span>
+            <span className="text-[13px] text-muted">{text.length.toLocaleString()} chars</span>
           </div>
           <textarea
             className="min-h-48 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm leading-relaxed text-fg"
@@ -573,7 +574,7 @@ function CompleteModal({
               />
             )}
             {modeChapter === "existing" && (
-              <p className="mt-1 text-[11px] text-muted">
+              <p className="mt-1 text-[13px] text-muted">
                 Generates a new study package using this chapter’s name (does not overwrite old materials).
               </p>
             )}

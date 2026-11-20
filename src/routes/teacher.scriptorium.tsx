@@ -4,7 +4,8 @@ import { AppShell } from "@/components/app-shell";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, generateScriptoriumPacket } from "@/lib/ai";
-import { getProfile, getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { getTeacherToolState, saveTeacherToolState } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { brandFromProfile } from "@/lib/schools";
 import { EDUCATION_APPROACHES, type EducationApproach } from "@/lib/types";
 
@@ -98,7 +99,7 @@ function ScriptoriumPage() {
         }
       })
       .catch(() => {});
-    void getProfile()
+    void fetchProfileShared()
       .then((p) => {
         const brand = brandFromProfile(p);
         const name = brand?.name || p.customSchoolName || "";
@@ -131,7 +132,7 @@ function ScriptoriumPage() {
         const extracted = await extractMaterials({ data: { files: payloads } });
         extractedText = extracted.text || "";
       }
-      const profile = await getProfile().catch(() => null);
+      const profile = await fetchProfileShared().catch(() => null);
       setStatus("Composing the packet…");
       const result = (await generateScriptoriumPacket({
         data: {
@@ -212,7 +213,7 @@ function ScriptoriumPage() {
         {!formHidden && (
           <div className="print:hidden space-y-5">
             <div>
-              <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">Teacher workshop</p>
+              <p className="text-[13px] font-semibold tracking-wide text-muted uppercase">Teacher workshop</p>
               <h2 className="text-xl font-semibold text-fg">Scriptorium</h2>
               <p className="mt-1 text-sm text-muted">
                 Upload textbook pages, scans, photos, or notes. Add focus comments. Generate a study guide, quiz, test,
@@ -466,7 +467,7 @@ function PacketView({
           <h4 className="mb-2 text-sm font-semibold text-fg">Key Terms and Vocabulary</h4>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
+              <tr className="border-b border-border text-[13px] tracking-wide text-muted uppercase">
                 <th className="py-2 pr-3">Term</th>
                 <th className="py-2">Definition</th>
               </tr>
@@ -540,7 +541,7 @@ function PacketView({
           <h4 className="mb-2 text-sm font-semibold text-fg">Key Dates</h4>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] tracking-wide text-muted uppercase">
+              <tr className="border-b border-border text-[13px] tracking-wide text-muted uppercase">
                 <th className="py-2 pr-3">Date</th>
                 <th className="py-2">Event</th>
               </tr>

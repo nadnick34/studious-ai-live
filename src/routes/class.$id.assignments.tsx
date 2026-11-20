@@ -5,14 +5,8 @@ import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/
 import { KidsOwlBanner, useKidsMascot } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
 import { analyzeAssignment, extractMaterials } from "@/lib/ai";
-import {
-  createAssignment,
-  deleteAssignment,
-  getClassById,
-  getProfile,
-  listAssignments,
-  updateAssignment,
-} from "@/lib/data";
+import { createAssignment, deleteAssignment, getClassById, listAssignments, updateAssignment } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { FeedbackActions } from "@/components/feedback-actions";
 import { uid } from "@/lib/utils";
 import type { AssignmentFeedback, AssignmentRecord, AssignmentSubmission, ClassRecord } from "@/lib/types";
@@ -77,7 +71,7 @@ function AssignmentsPage() {
       }
 
       setStatus("Analyzing…");
-      const profile = await getProfile();
+      const profile = await fetchProfileShared();
       const feedback = await analyzeAssignment({
         data: {
           className: cls.name,

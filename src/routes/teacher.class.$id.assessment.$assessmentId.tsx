@@ -190,7 +190,7 @@ function AssessmentAnalyticsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-border bg-bg/60 text-[11px] tracking-wide text-muted uppercase">
+              <tr className="border-b border-border bg-bg/60 text-[13px] tracking-wide text-muted uppercase">
                 <th className="px-4 py-2.5">Student</th>
                 <th className="px-4 py-2.5">Score</th>
                 <th className="px-4 py-2.5">Status</th>
@@ -235,9 +235,9 @@ function Stat({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[13px] text-muted">{label}</div>
       <div className={`mt-1 text-xl font-bold text-fg ${valueClass || ""}`}>{value}</div>
-      {sub && <div className="text-[11px] text-muted">{sub}</div>}
+      {sub && <div className="text-[13px] text-muted">{sub}</div>}
     </div>
   );
 }

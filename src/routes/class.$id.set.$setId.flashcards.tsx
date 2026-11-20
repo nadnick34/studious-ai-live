@@ -116,7 +116,7 @@ function FlashCardsPage() {
                   {card.emoji}
                 </div>
               )}
-              <div className="mb-2 text-[10px] tracking-wide text-muted uppercase">{flipped ? backLabel : frontLabel}</div>
+              <div className="mb-2 text-xs tracking-wide text-muted uppercase">{flipped ? backLabel : frontLabel}</div>
               <div className={`leading-relaxed font-semibold text-fg ${kidsMode ? "text-xl" : "text-lg"}`}>
                 {flipped ? backText : frontText}
               </div>

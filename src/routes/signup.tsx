@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 import { recordActivity } from "@/lib/admin";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -48,7 +48,7 @@ function SignUp() {
     } catch {
       /* ignore */
     }
-    await navigate({ to: "/profile" });
+    await navigate({ to: "/welcome" });
   }
 
   return (
@@ -63,9 +63,9 @@ function SignUp() {
           <Field label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
           <div>
             <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
-            <p className="mt-1 text-[10px] text-muted">At least 8 characters</p>
+            <p className="mt-1 text-xs text-muted">At least 8 characters</p>
           </div>
-          <label className="flex items-start gap-2 rounded-lg border border-border bg-bg px-3 py-2.5 text-[11px] leading-snug text-muted">
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-bg px-3 py-2.5 text-xs leading-snug text-muted">
             <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
             <span>
               I understand Studious AI is a <strong className="text-fg">beta site for testing</strong>. Features may
@@ -102,10 +102,14 @@ function Field({
   onChange: (v: string) => void;
   autoComplete?: string;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-muted">
+        {label}
+      </label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

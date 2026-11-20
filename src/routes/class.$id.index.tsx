@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, LogOut, Pencil, Plus, UserRound, Sparkles, Trash2, Shapes } from "lucide-react";
+import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, Pencil, Plus, UserRound, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell, ProfileLink } from "@/components/app-shell";
 import { ClassLoadError } from "@/components/class-load-error";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
@@ -8,18 +8,9 @@ import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
 import { KidsOwlBanner } from "@/components/kids-mascot";
 import { Button } from "@/components/ui/button";
-import { signOut } from "@/lib/auth/client";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
-import {
-  createStudySet,
-  deleteStudySet,
-  getClassById,
-  getProfile,
-  listAssignments,
-  listStudySets,
-  touchClass,
-  updateStudySet,
-} from "@/lib/data";
+import { createStudySet, deleteStudySet, getClassById, listAssignments, listStudySets, touchClass, updateStudySet } from "@/lib/data";
+import { fetchProfileShared } from "@/lib/profile-cache";
 import { extractMaterials, generateStudyPackage } from "@/lib/ai";
 import { chapterStillWorking, mergeStudyGuide } from "@/lib/combine";
 import { fileIsAudio, transcribeLectureFile } from "@/lib/transcribe-client";
@@ -35,7 +26,7 @@ function ClassPage() {
   const [cls, setCls] = useState<ClassRecord | null>(null);
   const [sets, setSets] = useState<StudySet[]>([]);
   const [showChapterInfo, setShowChapterInfo] = useState(false);
-  const tutorial = useStudentTutorial();
+  const tutorial = useStudentTutorial({ autoOpen: false });
   const [showGuide, setShowGuide] = useState(false);
   const [showFocus, setShowFocus] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -103,7 +94,7 @@ function ClassPage() {
     setBusy(true);
     const setName = focusName.trim() || `Focus: ${focusText.trim().slice(0, 40)}`;
     try {
-      const profile = await getProfile();
+      const profile = await fetchProfileShared();
       const generated = await generateStudyPackage({
         data: {
           className: cls.name,
@@ -213,14 +204,23 @@ function ClassPage() {
         <div className="flex items-center gap-1.5">
           <InfoButton onClick={() => setShowChapterInfo(true)} label="How chapters work" />
 <ProfileLink />
-          <button type="button" onClick={() => void signOut("/")} className="grid size-10 place-items-center rounded-lg border border-border bg-card" aria-label="Sign out">
-            <LogOut className="size-4" />
-          </button>
         </div>
       }
     >
       <div className="mb-1 text-xs text-muted">Class</div>
-      <h2 className="mb-5 text-lg font-bold text-fg">{cls.code} – {cls.name}</h2>
+      <h2 className="text-lg font-bold text-fg">{cls.code} – {cls.name}</h2>
+      {(cls.professorName || cls.scheduleDays || cls.scheduleTime) && (
+        <p className="mt-1 text-sm text-muted">
+          {[cls.professorName, [cls.scheduleDays, cls.scheduleTime].filter(Boolean).join(" · ")].filter(Boolean).join(" · ")}
+        </p>
+      )}
+      {cls.upcoming?.[0] && (
+        <div className="mt-3 rounded-xl border border-teal/30 bg-teal/5 px-4 py-3 text-sm">
+          <p className="text-xs font-semibold tracking-wide text-teal uppercase">Up next</p>
+          <p className="font-medium text-fg">{cls.upcoming[0].title}</p>
+        </div>
+      )}
+      <div className="mb-5" />
       <KidsOwlBanner message="Open a chapter or add a new one. I’ll help you study!" />
       {sets.length === 0 ? (
         <div className="card-surface rounded-xl px-4 py-12 text-center text-sm text-muted">
@@ -391,21 +391,17 @@ function ChapterCard({
   const [classicalOpen, setClassicalOpen] = useState(false);
   const [kidsMode, setKidsMode] = useState(false);
   useEffect(() => {
-    void getProfile().then((p) => setKidsMode(Boolean(p.kidsMode)));
+    void fetchProfileShared().then((p) => setKidsMode(Boolean(p.kidsMode)));
   }, []);
-  const actions = kidsMode
-    ? [
-        { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
-        { to: "/class/$id/set/$setId/spatial" as const, label: "Spatial", icon: Shapes },
-        { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
-        { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
-      ]
-    : [
-        { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
-        { to: "/class/$id/set/$setId/terms" as const, label: "Key Terms", icon: KeyRound },
-        { to: "/class/$id/set/$setId/flashcards" as const, label: "Cards", icon: Layers3, extra: set.flashcards?.length },
-        { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles },
-      ];
+  const actions = [
+    { to: "/class/$id/set/$setId" as const, label: "Notes", icon: BookOpen },
+    { to: "/class/$id/set/$setId/audio" as const, label: "Listen", icon: Headphones },
+    { to: "/class/$id/set/$setId/flashcards" as const, label: "Flash cards", icon: Layers3, extra: set.flashcards?.length },
+    { to: "/class/$id/set/$setId/quiz" as const, label: "Quiz", icon: Sparkles, extra: set.quiz?.length },
+    kidsMode
+      ? { to: "/class/$id/set/$setId/spatial" as const, label: "Spatial", icon: Shapes }
+      : { to: "/class/$id/set/$setId/terms" as const, label: "Key terms", icon: KeyRound },
+  ];
   return (
     <article className="card-surface rounded-xl p-4">
       <div className="flex items-start justify-between gap-3">
@@ -413,14 +409,14 @@ function ChapterCard({
           <div className="truncate font-semibold text-fg">
             {set.name}
             {set.focusPrompt && (
-              <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-200">
+              <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-900/40 dark:text-amber-200">
                 Focus
               </span>
             )}
           </div>
           <div className="mt-0.5 text-xs text-muted">{formatDateTime(set.createdAt)}</div>
           {set.sourceFiles?.length > 0 && (
-            <div className="mt-1 truncate text-[11px] text-muted">
+            <div className="mt-1 truncate text-[13px] text-muted">
               {set.attachments?.length || set.sourceFiles.length} attachment
               {(set.attachments?.length || set.sourceFiles.length) === 1 ? "" : "s"}
               {" · "}
@@ -449,7 +445,7 @@ function ChapterCard({
       {classicalOpen && (
         <ClassicalModeModal cls={cls} set={set} onClose={() => setClassicalOpen(false)} />
       )}
-      <div className="mt-3 grid grid-cols-4 gap-1">
+      <div className="mt-3 grid grid-cols-3 gap-1 sm:grid-cols-6">
         {actions.map((a) => {
           const Icon = a.icon;
           return (
@@ -457,14 +453,22 @@ function ChapterCard({
               key={a.label}
               to={a.to}
               params={{ id: classId, setId: set.id }}
-              className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg bg-bg text-[11px] font-medium text-fg hover:bg-teal/10 hover:text-teal"
+              className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-bg px-1 text-xs font-medium text-fg hover:bg-teal/10 hover:text-teal"
             >
               <Icon className="size-4" />
               {a.label}
-              {a.extra ? <span className="text-[10px] text-muted">({a.extra})</span> : null}
+              {"extra" in a && a.extra ? <span className="text-xs text-muted">{a.extra}</span> : null}
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setClassicalOpen(true)}
+          className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg bg-bg px-1 text-xs font-medium text-fg hover:bg-amber-50"
+        >
+          <ClassicalModeIcon className="size-4" />
+          Classical
+        </button>
       </div>
     </article>
   );
@@ -522,7 +526,7 @@ function EditChapterModal({
       const sourceFiles = nextAttachments.map((a) => a.name);
       if (rebuild) {
         const existingText = nextAttachments.map((a) => a.extractedText || a.name).join("\n\n");
-        const profile = await getProfile();
+        const profile = await fetchProfileShared();
         const generated = await generateStudyPackage({
           data: {
             className: cls.name,

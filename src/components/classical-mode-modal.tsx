@@ -90,7 +90,7 @@ export function ClassicalModeModal({ cls, set, onClose }: Props) {
               className="mb-4 h-32 w-32 rounded-full object-cover shadow-[0_0_0_2px_rgba(212,175,55,0.55)] sm:h-36 sm:w-36"
             />
             <img src="/classical-wreath.jpg" alt="" className="mb-3 h-10 w-auto opacity-90" />
-            <p className="mb-1 text-[10px] font-semibold tracking-[0.22em] text-amber-800 uppercase dark:text-amber-200">
+            <p className="mb-1 text-xs font-semibold tracking-[0.22em] text-amber-800 uppercase dark:text-amber-200">
               Classical Education
             </p>
             <h2 className="mb-1 font-serif text-2xl font-semibold text-fg">Returning to antiquity…</h2>
