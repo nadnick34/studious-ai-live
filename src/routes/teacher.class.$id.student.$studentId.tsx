@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ClassLoadError } from "@/components/class-load-error";
 import { getTeacherClassById, getTeacherClassStats, listTeacherAssessments } from "@/lib/data";
 import type { TeacherAssessment, TeacherClass } from "@/lib/types";
 
@@ -10,21 +11,31 @@ export const Route = createFileRoute("/teacher/class/$id/student/$studentId")({
 
 function StudentDetailPage() {
   const { id, studentId } = Route.useParams();
+  const navigate = useNavigate();
   const name = decodeURIComponent(studentId);
   const [cls, setCls] = useState<TeacherClass | null>(null);
   const [assessments, setAssessments] = useState<TeacherAssessment[]>([]);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getTeacherClassStats>> | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => {
-    void Promise.all([
-      getTeacherClassById({ data: id }),
-      listTeacherAssessments({ data: id }),
-      getTeacherClassStats({ data: id }),
-    ]).then(([c, a, s]) => {
+  async function reload() {
+    try {
+      const [c, a, s] = await Promise.all([
+        getTeacherClassById({ data: id }),
+        listTeacherAssessments({ data: id }),
+        getTeacherClassStats({ data: id }),
+      ]);
       setCls(c);
       setAssessments(a);
       setStats(s);
-    });
+      setLoadFailed(!c);
+    } catch {
+      setLoadFailed(true);
+    }
+  }
+
+  useEffect(() => {
+    void reload();
   }, [id]);
 
   const student = stats?.students.find((s) => s.name === name);
@@ -68,6 +79,14 @@ function StudentDetailPage() {
 
   const strongest = assessments[0]?.topicScores?.slice().sort((a, b) => b.average - a.average)[0];
   const weakest = assessments[0]?.topicScores?.slice().sort((a, b) => a.average - b.average)[0];
+
+  if (loadFailed) {
+    return (
+      <AppShell title="Student">
+        <ClassLoadError onRetry={() => reload()} onBack={() => void navigate({ to: "/teacher" })} />
+      </AppShell>
+    );
+  }
 
   if (!cls) {
     return (

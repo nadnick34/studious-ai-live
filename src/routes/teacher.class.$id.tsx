@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ClassLoadError } from "@/components/class-load-error";
 import { CaptureBar, capturedToPayloads, type CapturedFile } from "@/components/capture-bar";
 import { Button } from "@/components/ui/button";
 import { extractMaterials, gradeTeacherAssessment } from "@/lib/ai";
@@ -101,7 +102,7 @@ function TeacherClassPage() {
     students: RosterRow[];
     assessments: TeacherAssessment[];
   } | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Grade form state
   const [gName, setGName] = useState("");
@@ -123,18 +124,23 @@ function TeacherClassPage() {
   } | null>(null);
 
   async function reload() {
-    const [c, s, a] = await Promise.all([
-      getTeacherClassById({ data: id }),
-      getTeacherClassStats({ data: id }),
-      listTeacherAssessments({ data: id }),
-    ]);
-    setCls(c);
-    setStats(s);
-    setAssessments(a);
+    try {
+      const [c, s, a] = await Promise.all([
+        getTeacherClassById({ data: id }),
+        getTeacherClassStats({ data: id }),
+        listTeacherAssessments({ data: id }),
+      ]);
+      setCls(c);
+      setStats(s);
+      setAssessments(a);
+      setLoadFailed(!c);
+    } catch {
+      setLoadFailed(true);
+    }
   }
 
   useEffect(() => {
-    void reload().catch((err) => setLoadError(err instanceof Error ? err.message : "Could not load class"));
+    void reload();
   }, [id]);
 
   function namesLikelySame(a: string, b: string) {
@@ -445,13 +451,10 @@ function TeacherClassPage() {
     }
   }
 
-  if (loadError) {
+  if (loadFailed) {
     return (
       <AppShell title="Class">
-        <p className="text-sm text-red">{loadError}</p>
-        <Link to="/teacher" className="mt-3 inline-block text-sm text-teal">
-          ← Dashboard
-        </Link>
+        <ClassLoadError onRetry={() => reload()} onBack={() => void navigate({ to: "/teacher" })} />
       </AppShell>
     );
   }

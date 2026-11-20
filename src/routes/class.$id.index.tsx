@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BookOpen, ClipboardList, Headphones, KeyRound, Layers3, MoreHorizontal, LogOut, Pencil, Plus, UserRound, Sparkles, Trash2, Shapes } from "lucide-react";
 import { AppShell, ProfileLink } from "@/components/app-shell";
+import { ClassLoadError } from "@/components/class-load-error";
 import { ClassicalModeIcon, ClassicalModeModal } from "@/components/classical-mode-modal";
 import { InfoButton, InfoModal } from "@/components/info-modal";
 import { StudentTutorial, TutorialButton, useStudentTutorial } from "@/components/student-tutorial";
@@ -47,17 +48,27 @@ function ClassPage() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [editing, setEditing] = useState<StudySet | null>(null);
 
   async function refresh() {
-    const [c, s, a] = await Promise.all([getClassById({ data: classId }), listStudySets({ data: classId }), listAssignments({ data: classId }).catch(() => [])]);
-    if (!c) {
-      void navigate({ to: "/dashboard" });
-      return;
+    try {
+      const [c, s, a] = await Promise.all([
+        getClassById({ data: classId }),
+        listStudySets({ data: classId }),
+        listAssignments({ data: classId }).catch(() => []),
+      ]);
+      if (!c) {
+        void navigate({ to: "/dashboard" });
+        return;
+      }
+      setCls(c);
+      setSets(s);
+      setAssignments(a as AssignmentRecord[]);
+      setLoadFailed(false);
+    } catch {
+      setLoadFailed(true);
     }
-    setCls(c);
-    setSets(s);
-    setAssignments(a as AssignmentRecord[]);
   }
 
   useEffect(() => {
@@ -177,6 +188,14 @@ function ClassPage() {
       setBusy(false);
       setStatus("");
     }
+  }
+
+  if (loadFailed) {
+    return (
+      <AppShell title="Class">
+        <ClassLoadError onRetry={() => refresh()} onBack={() => void navigate({ to: "/classes" })} />
+      </AppShell>
+    );
   }
 
   if (!cls) {
