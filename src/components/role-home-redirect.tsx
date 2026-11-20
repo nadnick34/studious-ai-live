@@ -9,7 +9,7 @@ export function RoleHomeRedirect() {
   useEffect(() => {
     void getProfile()
       .then((p) => {
-        if (p.role === "admin") setTo("/admin");
+        if (p.isAdmin) setTo("/admin");
         else if (p.role === "teacher") setTo("/teacher");
         else if (p.role === "professional") setTo("/meetings");
         else setTo("/dashboard");

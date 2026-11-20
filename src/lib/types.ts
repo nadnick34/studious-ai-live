@@ -231,6 +231,11 @@ export interface UserProfile {
   childGender?: ChildGender | null;
   /** Derived / explicit kids skin */
   kidsMode?: boolean;
+  /**
+   * Server-computed. True only when this account's email is on the
+   * server-only `ADMIN_EMAILS` allowlist. Clients cannot set this.
+   */
+  isAdmin?: boolean;
 }
 
 export interface FilePayload {

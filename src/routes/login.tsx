@@ -4,7 +4,7 @@ import { authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import { getProfile } from "@/lib/data";
-import { recordActivity, resolveLoginEmail, seedAdminAccount } from "@/lib/admin";
+import { recordActivity } from "@/lib/admin";
 import { brandFromProfile, hydrateBrand, persistBrand } from "@/lib/schools";
 import { RoleHomeRedirect } from "@/components/role-home-redirect";
 import { playTheme } from "@/lib/theme-audio";
@@ -21,10 +21,10 @@ function Login() {
 
   if (user) return <RoleHomeRedirect />;
 
-  async function homeForRole(role?: string | null) {
-    if (role === "admin") return "/admin";
-    if (role === "teacher") return "/teacher";
-    if (role === "professional") return "/meetings";
+  async function homeForRole(profile: { role?: string | null; isAdmin?: boolean }) {
+    if (profile.isAdmin) return "/admin";
+    if (profile.role === "teacher") return "/teacher";
+    if (profile.role === "professional") return "/meetings";
     return "/dashboard";
   }
 
@@ -32,17 +32,8 @@ function Login() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const loginEmail = resolveLoginEmail(email);
-    let { error: err } = await authClient.signIn.email({ email: loginEmail, password });
-    if (err && loginEmail === "admin@getstudious.ai" && password === "admin123") {
-      await authClient.signUp.email({ email: loginEmail, password, name: "Admin" }).catch(() => {});
-      await seedAdminAccount().catch(() => {});
-      const again = await authClient.signIn.email({ email: loginEmail, password });
-      err = again.error;
-      await seedAdminAccount().catch(() => {});
-    } else if (!err && loginEmail === "admin@getstudious.ai") {
-      await seedAdminAccount().catch(() => {});
-    }
+    const loginEmail = email.trim();
+    const { error: err } = await authClient.signIn.email({ email: loginEmail, password });
     setLoading(false);
     if (err) {
       setError(err.message || "Invalid email or password.");
@@ -54,7 +45,7 @@ function Login() {
       const brand = brandFromProfile(p);
       if (brand) persistBrand(brand);
       else hydrateBrand();
-      dest = await homeForRole(p.role);
+      dest = await homeForRole(p);
     } catch {
       hydrateBrand();
     }
