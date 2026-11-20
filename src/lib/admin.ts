@@ -2,16 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 
-export const ADMIN_EMAIL = "admin@getstudious.ai";
-export const ADMIN_USERNAME = "admin";
-export const ADMIN_PASSWORD = "admin123";
-
-export function resolveLoginEmail(raw: string) {
-  const v = raw.trim().toLowerCase();
-  if (v === ADMIN_USERNAME || v === ADMIN_EMAIL) return ADMIN_EMAIL;
-  return raw.trim();
-}
-
 async function ensureLogTable() {
   const sql = await getSql();
   await sql.query(`
@@ -26,26 +16,6 @@ async function ensureLogTable() {
   `);
   return sql;
 }
-
-export const seedAdminAccount = createServerFn({ method: "POST" }).handler(async () => {
-  try {
-    const sql = await ensureLogTable();
-    const rows = await sql<{ id: string }>`
-      select id from "user" where lower(email) = ${ADMIN_EMAIL} limit 1
-    `;
-    const id = rows[0]?.id;
-    if (!id) return { ok: true as const, created: false };
-    await sql.query(
-      `insert into profiles (user_id, display_name, role, edition, setup_complete, updated_at)
-       values ($1, 'Admin', 'admin', 'student', true, now())
-       on conflict (user_id) do update set role = 'admin', updated_at = now()`,
-      [id],
-    );
-    return { ok: true as const, created: true };
-  } catch (err) {
-    return { ok: false as const, error: err instanceof Error ? err.message : "seed failed" };
-  }
-});
 
 export const recordActivity = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -64,12 +34,10 @@ export const recordActivity = createServerFn({ method: "POST" })
 export const getAdminOverview = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    const { isAdminUser } = await import("@/lib/admin-allowlist.server");
+    if (!(await isAdminUser(context.userId))) throw new Error("Admin only");
+
     const sql = await ensureLogTable();
-    const me = await sql<{ email: string }>`select email from "user" where id = ${context.userId} limit 1`;
-    const profile = await sql<{ role: string | null }>`select role from profiles where user_id = ${context.userId} limit 1`;
-    const allowed =
-      me[0]?.email?.toLowerCase() === ADMIN_EMAIL || profile[0]?.role === "admin";
-    if (!allowed) throw new Error("Admin only");
 
     const users = await sql<{
       id: string;

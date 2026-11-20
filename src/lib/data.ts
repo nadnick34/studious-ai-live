@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { getSql } from "@/lib/db";
 import { parseJson, uid } from "@/lib/utils";
+import { editionForProfileSave, roleForProfileSave } from "@/lib/profile-role";
 import { SAMPLE_PACKAGE } from "@/lib/seed";
 import type {
   AssignmentGuidance,
@@ -195,21 +196,13 @@ export const getProfile = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const sql = await getSql();
-    try {
-      const who = await sql<{ email: string }>`select email from "user" where id = ${context.userId} limit 1`;
-      if (who[0]?.email?.toLowerCase() === "admin@getstudious.ai") {
-        await sql.query(
-          `insert into profiles (user_id, display_name, role, edition, setup_complete, updated_at)
-           values ($1, 'Admin', 'admin', 'student', true, now())
-           on conflict (user_id) do update set role = 'admin', updated_at = now()`,
-          [context.userId],
-        );
-      }
-    } catch {
-      /* ignore */
-    }
     const rows = await sql<ProfileRow>`select * from profiles where user_id = ${context.userId} limit 1`;
-    return mapProfile(rows[0]);
+    const profile = mapProfile(rows[0]);
+    const { isAdminUser } = await import("@/lib/admin-allowlist.server");
+    const isAdmin = await isAdminUser(context.userId);
+    // A stored admin role is not a grant. Only the server allowlist is.
+    const role = profile.role === "admin" && !isAdmin ? "student" : profile.role;
+    return { ...profile, role, isAdmin };
   });
 
 export const saveProfile = createServerFn({ method: "POST" })
@@ -217,12 +210,17 @@ export const saveProfile = createServerFn({ method: "POST" })
   .validator((input: UserProfile) => input)
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    const existing = await sql<{ role: string; edition: string }>`
+      select role, edition from profiles where user_id = ${context.userId} limit 1
+    `;
+    const role = roleForProfileSave(data.role, existing[0]?.role);
+    const edition = editionForProfileSave(role, existing[0]?.edition);
     const childAge = data.childAge == null || data.childAge === ("" as unknown as number) ? null : Number(data.childAge);
     const forChild = Boolean(data.forChild);
     const kidsMode =
       Boolean(data.kidsMode) ||
       forChild ||
-      (data.role === "student" && childAge != null && !Number.isNaN(childAge) && childAge <= 9);
+      (role === "student" && childAge != null && !Number.isNaN(childAge) && childAge <= 9);
     try {
       await sql.query(`alter table profiles add column if not exists education_approach text`);
       await sql.query(`alter table profiles add column if not exists state text`);
@@ -240,8 +238,8 @@ export const saveProfile = createServerFn({ method: "POST" })
       ) values (
         ${context.userId}, ${data.displayName ?? null}, ${data.phone}, ${data.smsAlerts},
         ${data.schoolSelect}, ${data.paletteId ?? null}, ${data.customSchoolName ?? null},
-        ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${data.role},
-        ${data.edition}, ${data.setupComplete},
+        ${data.schoolLogoUrl ?? null}, ${data.avatarDataUrl ?? null}, ${role},
+        ${edition}, ${data.setupComplete},
         ${forChild}, ${childAge}, ${data.childGender ?? null}, ${kidsMode}, ${data.educationApproach ?? null}, ${data.state ?? null}, ${data.educationLevel ?? null}, ${data.collegeClass ?? null}, ${data.studentGrade ?? null}, now()
       )
       on conflict (user_id) do update set

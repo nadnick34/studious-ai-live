@@ -4,39 +4,44 @@ import { signOut } from "@/lib/auth/client";
 import { cn, initialsFromName } from "@/lib/utils";
 import { accountTypeLabel, type UserProfile } from "@/lib/types";
 
-function getNav(role?: string | null) {
+function getNav(role?: string | null, isAdmin?: boolean) {
+  const adminItem = { to: "/admin", label: "Users", icon: Shield, match: (p: string) => p.startsWith("/admin") };
+  let items;
   if (role === "professional") {
-    return [
+    items = [
       { to: "/projects", label: "Projects", icon: FolderKanban, match: (p: string) => p.startsWith("/projects") || p.startsWith("/project") },
       { to: "/meetings", label: "Meetings", icon: Briefcase, match: (p: string) => p.startsWith("/meetings") || p.startsWith("/meeting") },
       { to: "/notes", label: "Notes", icon: NotebookPen, match: (p: string) => p.startsWith("/notes") },
       { to: "/archived", label: "Archived", icon: Archive, match: (p: string) => p.startsWith("/archived") },
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
-  }
-  if (role === "admin") {
-    return [
-      { to: "/admin", label: "Users", icon: Shield, match: (p: string) => p.startsWith("/admin") },
+  } else if (role === "admin") {
+    items = [
+      adminItem,
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
-  }
-  if (role === "teacher") {
-    return [
+  } else if (role === "teacher") {
+    items = [
       { to: "/teacher", label: "Classes", icon: GraduationCap, match: (p: string) => p === "/teacher" || p.startsWith("/teacher/class") },
       { to: "/teacher/analytics", label: "Analytics", icon: LayoutDashboard, match: (p: string) => p.startsWith("/teacher/analytics") },
       { to: "/teacher/scriptorium", label: "Scriptorium", icon: ScrollText, match: (p: string) => p.startsWith("/teacher/scriptorium") },
       { to: "/teacher/test-prep", label: "Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/teacher/test-prep") },
       { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
     ];
+  } else {
+    items = [
+      { to: "/classes", label: "Classes", icon: BookOpen, match: (p: string) => p === "/classes" || p.startsWith("/class/") },
+      { to: "/assistant", label: "Assignment Assistant", shortLabel: "Check", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
+      { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
+      { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
+      { to: "/archived", label: "Archive", shortLabel: "Archive", icon: Archive, match: (p: string) => p.startsWith("/archived") },
+      { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
+    ];
   }
-  return [
-    { to: "/classes", label: "Classes", icon: BookOpen, match: (p: string) => p === "/classes" || p.startsWith("/class/") },
-    { to: "/assistant", label: "Assignment Assistant", shortLabel: "Check", icon: ClipboardCheck, match: (p: string) => p.startsWith("/assistant") || p.includes("/assignments") },
-    { to: "/paper-grade", label: "Paper Grade", shortLabel: "Paper", icon: NotebookPen, match: (p: string) => p.startsWith("/paper-grade") },
-    { to: "/test-prep", label: "Practicum & Prep", shortLabel: "Prep", icon: ClipboardCheck, match: (p: string) => p.startsWith("/test-prep") },
-    { to: "/archived", label: "Archive", shortLabel: "Archive", icon: Archive, match: (p: string) => p.startsWith("/archived") },
-    { to: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") },
-  ];
+  if (isAdmin && !items.some((item) => item.to === "/admin")) {
+    return [adminItem, ...items];
+  }
+  return items;
 }
 
 export function Sidebar({
@@ -68,7 +73,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1 px-2.5">
-        {getNav(profile?.role).map((item) => {
+        {getNav(profile?.role, profile?.isAdmin).map((item) => {
           const Icon = item.icon;
           const active = item.match(pathname);
           return (

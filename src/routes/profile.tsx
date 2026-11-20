@@ -116,7 +116,8 @@ function ProfilePage() {
     document.documentElement.classList.toggle("kids-boy", Boolean(kidsMode && next.childGender === "boy"));
     document.documentElement.classList.toggle("kids-girl", Boolean(kidsMode && next.childGender === "girl"));
     setSaving(false);
-    if (next.edition === "teacher" || next.role === "teacher") await navigate({ to: "/teacher" });
+    if (next.role === "admin") await navigate({ to: "/admin" as "/dashboard" });
+    else if (next.edition === "teacher" || next.role === "teacher") await navigate({ to: "/teacher" });
     else if (next.role === "professional" || next.edition === "professional") await navigate({ to: "/meetings" });
     else await navigate({ to: "/dashboard" });
   }
@@ -207,6 +208,7 @@ function ProfilePage() {
                 }
               }}
             >
+              {role === "admin" && <option value="admin">Admin</option>}
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
               <option value="professional">Professional</option>
